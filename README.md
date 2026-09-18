@@ -24,7 +24,7 @@ Ada should feel like a capable personal companion rather than a developer consol
 
 1. Run the [product discovery interview](docs/prompts/product-discovery-interview-prompt.md).
 2. Define MVP / v1 / later scope.
-3. Evaluate each capability separately using documented decision matrices.
+3. Evaluate required capabilities with documented decision matrices, including cross-capability integration constraints.
 4. Record significant choices as ADRs.
 5. Implement only after the relevant product and architecture decisions are made.
 
