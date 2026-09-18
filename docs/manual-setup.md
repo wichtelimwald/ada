@@ -46,6 +46,6 @@ These settings are not reliably exposed through the connected repository API use
 - [ ] Push protection for secrets.
 - [ ] Dependabot alerts.
 
-GitHub currently places these controls under repository **Settings → Security / Code security and analysis** where available. Availability/wording can vary by account and repository configuration.
+Current GitHub navigation for a public repository: **Settings → Security and quality → Advanced Security**. Private Vulnerability Reporting is configured there. Secret scanning for public repositories runs automatically; additional Secret Protection and Push Protection controls are also exposed there where available.
 
 Do not enable GitHub Actions merely to satisfy a security checkbox; Ada intentionally starts without hosted workflows.
