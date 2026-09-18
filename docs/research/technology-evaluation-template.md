@@ -17,13 +17,23 @@ What should the user be able to accomplish?
 ### Non-goals
 - ...
 
+### Cross-capability integration assumptions
+- Runtime/process topology:
+- IPC/API expectations:
+- Packaging/distribution assumptions:
+- Startup/background-operation assumptions:
+- Shared resource constraints:
+- Other decisions this option constrains:
+
 ## 3. Alternatives
 
-| Option | Version / date checked | License | Maintenance evidence | Notes |
-|---|---|---|---|---|
-| A | | | | |
-| B | | | | |
-| Minimal/custom | | | | |
+| Option | Version / date checked | Code license | Model / asset license | Usage restrictions | Maintenance / security evidence | Notes |
+|---|---|---|---|---|---|---|
+| A | | | | | | |
+| B | | | | | | |
+| Minimal/custom | | | | | | |
+
+Do not infer a model, voice, dataset, or asset license from the surrounding software repository.
 
 ## 4. Decision criteria
 
@@ -33,12 +43,13 @@ Agree weights before scoring.
 |---|---:|---|
 | Privacy / data egress | | |
 | Security / privilege boundary | | |
+| Security history / response process | | |
 | UX / latency | | |
 | Local/offline capability | | |
 | Quality | | |
-| Platform support | | |
+| Target-platform support | | |
 | Maintenance / maturity | | |
-| Integration complexity | | |
+| Integration compatibility / complexity | | |
 | License / distribution | | |
 | Resource use | | |
 | Lock-in / replaceability | | |
@@ -59,8 +70,11 @@ Only prototype uncertainties that could change the decision.
 
 ## 7. Recommendation
 
-Summarize evidence, trade-offs, and remaining uncertainty. Do not hide disadvantages.
+Summarize evidence, trade-offs, integration assumptions, and remaining uncertainty. Do not hide disadvantages.
 
-## 8. Decision
+## 8. Decision and re-evaluation
 
-Link the ADR once the decision is accepted.
+- Accepted option:
+- ADR:
+- Consequences:
+- **Re-open this decision if:** <specific triggers such as license change, discontinued support, unacceptable latency, incompatible packaging, security incident, or changed product requirement>

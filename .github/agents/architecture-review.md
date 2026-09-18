@@ -16,11 +16,13 @@ Review only when a change introduces or modifies a meaningful architectural choi
 - At least two credible alternatives were considered where a real choice exists.
 - Decision criteria and weights are justified rather than reverse-engineered for a preferred option.
 - Evidence is current and comes from primary sources where practical.
-- Privacy, security, usability, maintenance, licensing, platform support, complexity, and lock-in are addressed.
-- Boundaries are explicit and replaceable where replacement has real value.
+- Privacy, security, usability, maintenance, licensing, platform support, complexity, integration, packaging, and lock-in are addressed.
+- Boundaries are explicit without assuming one capability equals one component.
 - No speculative abstraction or framework adoption.
-- Consequences and rejected alternatives are documented.
+- Consequences, rejected alternatives, and re-open triggers are documented.
 
 ## Output
 
-Return: `Approved`, `Changes requested`, or `Blocked`, followed by concise findings and the missing evidence/decision work.
+Return: `Approved`, `Changes requested`, or `Blocked`, followed by concise findings and missing evidence/decision work.
+
+When reviewing an actual pull request and GitHub write access is available, post findings directly to the PR. Do not modify the reviewed change in the same review step.

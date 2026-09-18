@@ -15,7 +15,9 @@ Ada is currently in product discovery and architecture exploration. There is no 
 
 ## Reporting vulnerabilities
 
-Please do not publish exploit details in a public issue. Use GitHub private vulnerability reporting once it is enabled for this repository. Until then, contact the repository owner privately through the contact options on the maintainer's GitHub profile.
+Please do not publish vulnerability or exploit details in a public issue.
+
+GitHub Private Vulnerability Reporting is the intended reporting channel. It must be enabled before Ada has a runnable public release. Until a private channel is available, do not publish sensitive vulnerability details publicly.
 
 ## Scope
 

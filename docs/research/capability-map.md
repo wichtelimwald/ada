@@ -2,18 +2,20 @@
 
 **Status:** Discovery — candidates are illustrative, not selected.
 
+The human metaphors below describe **product capabilities, not required software components**. One technology may implement several capabilities, and one capability may require several components. The map must not bias evaluation against integrated approaches such as speech-to-speech systems.
+
 | Human metaphor | Capability | Status | Example candidates to research later |
 |---|---|---|---|
-| Face | Desktop interaction / visual assistant state | Open | Native UI, Tauri, other lightweight desktop approaches |
-| Ears | Speech-to-text / wake interaction | Open | whisper.cpp and credible alternatives |
-| Voice | Text-to-speech | Open | Kokoro and credible alternatives |
-| Brain | Agent orchestration / reasoning | Open | Letta, minimal custom orchestration, other maintained agent runtimes |
-| Memory | Persistent personal memory | Open | Letta memory, local Markdown/Obsidian vault, dedicated local store, hybrid approaches |
-| Hands | Computer control / actions | Open | Open Interpreter runtime, native OS APIs behind a policy layer, other maintained alternatives |
-| Eyes | Screen/camera understanding | Open | To be researched only if product discovery requires it |
-| Guard | Policy / permission engine | Open | Must be deterministic; framework choice not made |
-| Privacy broker | Optional cloud egress | Open | Architecture to be defined only if cloud use is required |
+| Face | Desktop interaction / visible assistant state | Open | Native UI, Tauri, other lightweight desktop approaches |
+| Ears | Speech input / wake interaction | Open | Local and hybrid speech approaches |
+| Voice | Speech output | Open | Local and hybrid TTS approaches |
+| Brain | Reasoning / orchestration | Open | Stateful agent runtimes, minimal orchestration, integrated models |
+| Memory | Persistent personal context | Open | Human-readable local stores, agent memory, dedicated stores, hybrid approaches |
+| Hands | Computer control / actions | Open | Permissioned agent runtimes, native OS APIs, other maintained alternatives |
+| Eyes | Screen/camera understanding | Open | Research only if product discovery requires it |
+| Guard | Policy / permission enforcement | Open | Must be deterministic; implementation not selected |
+| Privacy broker | Optional remote/cloud data egress | Open | Define only if remote processing is required |
 
 ## Decision order
 
-Do not choose technologies merely to complete the table. Product discovery first defines which capabilities belong in MVP/v1/later. Only then evaluate the relevant rows.
+Do not choose technologies merely to complete the table. Product discovery first defines which capabilities belong in MVP/V1/later. Then evaluate relevant capabilities together with their cross-capability integration constraints.

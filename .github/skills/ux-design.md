@@ -1,7 +1,5 @@
 # Skill: UX design
 
-Informed by Apple's interaction-design principles and accessibility guidance.
-
 ## Principles
 
 - Response should be immediate; show feedback as soon as an interaction starts.

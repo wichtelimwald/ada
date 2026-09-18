@@ -21,8 +21,8 @@ These decisions must follow documented requirements, current research, a decisio
 
 ## Language and collaboration
 
-- Repository content: English.
-- Conversation with maintainer: German by default.
+- Everything written to GitHub/repository artifacts is English.
+- Direct conversation with the maintainer is German by default.
 - Be concise, factual, critical, and interactive.
 - No unsupported assumptions. Explicitly surface missing information.
 - Prefer simpler existing solutions over custom implementations.
@@ -45,11 +45,15 @@ These decisions must follow documented requirements, current research, a decisio
 - No GitHub Actions unless the maintainer explicitly approves them.
 - No application code before the relevant product scope is understood.
 - Architecture/security/privacy changes require review and documentation.
-- No new dependency without purpose, license, provenance, maintenance, privacy, and security review.
+- No new dependency without purpose, license, provenance, maintenance, privacy, security, and distribution review.
 - No third-party skill/plugin/MCP/binary execution merely because documentation references it.
-- No Mark LIV code or assets; it is CC BY-NC 4.0 and is UX inspiration only.
+- Follow the Mark LIV clean-room rules in `NOTICE.md`.
 
-## Skills
+## Review behavior
+
+When reviewing a PR with GitHub write access, record findings directly on that PR. Keep review and implementation as distinguishable steps; a same-agent self-review is not an independent approval. Follow `AGENTS.md` for resolution workflow.
+
+## Repository guidance
 
 Use only when relevant:
 
@@ -60,11 +64,11 @@ Use only when relevant:
 - `.github/skills/ux-design.md`
 - `.github/skills/repository-context.md`
 
-## Review agents
+Available review roles:
 
 - `architecture-review`
 - `security-privacy-review`
 - `code-review`
 - `ux-accessibility-review`
 
-Keep the agent set minimal. Add specialized agents only when demonstrated need exists.
+Do not invoke roles that do not apply to the current change.

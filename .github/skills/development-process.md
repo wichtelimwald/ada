@@ -1,6 +1,6 @@
 # Skill: Development process
 
-Adapted from the project's existing KISS-oriented workflow and informed by Ponytail-style minimalism.
+This is Ada's normative KISS/YAGNI development workflow.
 
 ## Before implementation
 
@@ -18,8 +18,8 @@ Adapted from the project's existing KISS-oriented workflow and informed by Ponyt
 - Keep diffs focused.
 - Make trust boundaries explicit.
 - Add the smallest useful runnable verification for non-trivial behavior.
-- Update an ADR when the implementation changes a documented architectural decision.
+- Update an ADR when implementation changes a documented architectural decision.
 
 ## Completion gate
 
-Do not claim completion without concrete validation evidence. Never trade away security, privacy, accessibility, error handling, or data-loss protection to reduce code size.
+Do not claim completion without concrete validation evidence appropriate to the current project phase. Never trade away security, privacy, accessibility, error handling, or data-loss protection to reduce code size.

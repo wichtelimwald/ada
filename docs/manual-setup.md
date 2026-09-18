@@ -2,43 +2,50 @@
 
 Items that require GitHub UI/admin configuration and are intentionally not performed by coding agents.
 
+**Last verified through the GitHub API:** 2026-09-18.
+
 ## Repository metadata
 
-- [ ] Set description to: `Ada — a local-first, privacy-first personal AI assistant with voice, user-controlled memory, and permissioned computer control.`
-- [ ] Suggested topics: `personal-ai`, `local-first`, `privacy`, `voice-assistant`, `ai-agent`, `open-source`.
+- [x] Repository is public.
+- [x] Description: `Ada — a local-first, privacy-first personal AI assistant with voice, user-controlled memory, and permissioned computer control.`
+- [x] Topics: `personal-ai`, `local-first`, `privacy`, `voice-assistant`, `ai-agent`, `open-source`.
+- [ ] Decide whether the currently enabled GitHub Wiki is wanted; disable it if not.
 
 ## Protect `main`
 
-Create a branch ruleset in **Settings → Rules → Rulesets**.
+Ruleset `protect-main` is active and currently verifies:
 
-Suggested initial configuration for a solo maintainer:
+- [x] Target includes the default branch / `main`.
+- [x] Restrict deletion.
+- [x] Block non-fast-forward updates / force pushes.
+- [x] Require a pull request before merging.
+- [x] Required approvals: 0 for the solo-maintainer phase.
+- [x] Require resolution of pull-request review threads.
+- [x] Code Owner approval is not required while there is only one maintainer.
+- [x] No required status checks are configured.
 
-- [ ] Name: `protect-main`
-- [ ] Enforcement: Active
-- [ ] Target: default branch / `main`
-- [ ] Restrict deletions
-- [ ] Block force pushes
-- [ ] Require a pull request before merging
-- [ ] Required approvals: **0 initially** — this still blocks direct updates while avoiding a self-review deadlock for a solo maintainer
-- [ ] Require resolution of pull-request conversations
-- [ ] Do **not** require status checks while the project intentionally has no hosted CI
-- [ ] Do **not** require Code Owner approval while there is only one maintainer; GitHub does not allow authors to approve their own PRs
+### Bypass review
 
-If another trusted maintainer joins, reconsider requiring one approval and Code Owner review.
+- [ ] Review the ruleset bypass list. The current repository-role entry allows the current maintainer/admin role to bypass the ruleset **always**. Decide whether this emergency escape hatch is intentional or should be removed/restricted.
+
+If another trusted maintainer joins, reconsider one required approval, Code Owner review, stale-review dismissal, and last-push approval.
 
 ## Merge settings
 
-- [ ] Prefer squash merge for focused history.
-- [ ] Consider disabling merge commits if linear history is desired.
-- [ ] Enable automatic deletion of merged head branches if preferred.
+- [x] Squash merge enabled.
+- [x] Merge commits disabled.
+- [x] Automatic deletion of merged head branches enabled.
+- [ ] Rebase merge is currently also enabled; keep or disable according to desired history policy.
 
-## Security settings
+## Security settings — verify manually
 
-Under **Settings → Security** / **Code security and analysis**, review and enable where available:
+These settings are not reliably exposed through the connected repository API used for this setup:
 
-- [ ] Private vulnerability reporting
-- [ ] Secret scanning
-- [ ] Push protection for secrets
-- [ ] Dependabot alerts (runtime update configuration can wait until a package ecosystem exists)
+- [ ] **Private Vulnerability Reporting** — highest priority; `SECURITY.md` assumes this becomes the private reporting channel before a runnable public release.
+- [ ] Secret scanning.
+- [ ] Push protection for secrets.
+- [ ] Dependabot alerts.
 
-Do not enable workflows merely to satisfy a security checkbox; this repository intentionally starts without GitHub Actions.
+GitHub currently places these controls under repository **Settings → Security / Code security and analysis** where available. Availability/wording can vary by account and repository configuration.
+
+Do not enable GitHub Actions merely to satisfy a security checkbox; Ada intentionally starts without hosted workflows.

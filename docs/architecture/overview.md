@@ -1,37 +1,47 @@
 # Architecture overview — pre-decision
 
-**Status:** No implementation architecture selected.
+**Status:** Straw-man for trust-boundary discussion. No implementation architecture or component decomposition is selected.
 
-This document records capability boundaries that should remain distinguishable during research. It does not prescribe frameworks or processes.
+This document records boundaries that must be considered during research. Boxes in the sketch are responsibilities, not necessarily separate processes, libraries, or services.
 
 ```text
 User
   |
 Interaction / UI
   |
-Assistant orchestration
-  |-------------------|
-Memory / private data  Capability tools
-                       |-- speech input/output
-                       |-- computer control
-                       |-- screen/camera (if selected)
-                       |-- integrations
+Assistant reasoning / orchestration
   |
-Policy / permission boundary
-  |
-Local OS and optional external services
+  +---------------- Policy / permission boundary ----------------+
+  |                                                              |
+Persisted memory / private data                         Capability interfaces
+                                                      |-- speech
+                                                      |-- computer actions
+                                                      |-- screen/camera (if selected)
+                                                      |-- integrations
+  |                                                              |
+  +--------------------- local trust boundary --------------------+
+                                  |
+                     Optional privacy / egress boundary
+                                  |
+                         External services (if any)
 ```
+
+The policy boundary must mediate privileged reads/writes and actions. Remote transmission, if introduced, must pass an explicit egress/privacy boundary rather than being an incidental property of a capability.
 
 ## Cross-cutting concerns
 
 - privacy and data classification,
 - deterministic permissions,
-- cloud egress control,
+- cloud-egress control,
 - observability without sensitive logging,
 - user-visible state and approvals,
 - replaceability where it has practical value,
-- recovery/undo for actions where feasible.
+- recovery/undo for actions where feasible,
+- process/runtime topology, IPC, packaging, startup behavior, and update strategy,
+- integration compatibility between separately evaluated capabilities.
 
 ## Architecture decision process
 
-Each major capability is researched independently using `docs/research/technology-evaluation-template.md`. Decisions that materially affect boundaries, dependencies, portability, privacy, or security receive an ADR.
+Product discovery defines required capabilities and constraints first. Capability research then uses `docs/research/technology-evaluation-template.md`.
+
+Before finalizing capability ADRs, check the combined stack for runtime/process, IPC, packaging, resource, security, privacy, and distribution compatibility. Decisions that materially affect boundaries, dependencies, portability, privacy, security, or packaging receive an ADR.

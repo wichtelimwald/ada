@@ -8,6 +8,8 @@ tools:
 
 # Code Review Agent
 
+Use only when implementation code exists.
+
 ## Review dimensions
 
 1. Correctness and failure behavior
@@ -22,4 +24,4 @@ tools:
 
 Do not reward abstraction for its own sake. Prefer a smaller implementation when it preserves correctness, security, privacy, accessibility, and requested behavior.
 
-Return blocking findings first, then non-blocking suggestions. Do not add praise sections that dilute review signal.
+Return blocking findings first, then non-blocking suggestions. When reviewing an actual PR with GitHub write access, post the findings directly to the PR and do not implement them during the review step.
