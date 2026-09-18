@@ -6,7 +6,11 @@ Ada's project-owned source code and project-authored repository guidance are lic
 
 At this stage, no third-party runtime source code, model weights, assets, prompts, or skill text are vendored into this repository.
 
-Content under `.github/` and Ada-specific prompt/agent documentation is original project content. References to external projects describe inspiration, research candidates, or development practices; they do not imply copying, dependency adoption, endorsement, or redistribution.
+Ada-specific repository guidance is project-authored unless explicitly attributed below. References to external projects describe inspiration, research candidates, or development practices; they do not imply dependency adoption, endorsement, or redistribution.
+
+## Guidance provenance
+
+- **UX design guidance** — Ada's concise `.github/skills/ux-design.md` was written for this project after reviewing Emil Kowalski's `apple-design` skill from `emilkowalski/skills` (MIT). Ada does not vendor that skill's text; this attribution is retained to make the design influence and provenance explicit.
 
 ## License evaluation policy
 
