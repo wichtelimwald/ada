@@ -40,9 +40,9 @@ Create separate evidence-based evaluations only for capabilities required by the
 
 ## P3 — Implementation foundation
 
-- [ ] Create implementation scaffold only after the relevant ADRs are accepted.
-- [ ] Add package/dependency management appropriate to the selected stack.
-- [ ] Add local validation commands.
+- [x] Create implementation scaffold only after the relevant ADRs are accepted.
+- [x] Add package/dependency management appropriate to the selected stack.
+- [x] Add local validation commands.
 - [ ] Add Dependabot configuration only after package ecosystems actually exist.
 - [ ] Revisit ProjectAtlas vs Graphify only when repository size/complexity justifies repository indexing.
 
