@@ -39,6 +39,6 @@ Security, privacy, accessibility, and usability are requirements, not optional p
 
 ## Current project stage
 
-Ada is in product discovery and architecture exploration. No UI, memory, agent, computer-control, speech, or model framework is selected yet.
+Ada has completed the initial product-discovery baseline. ADR-0002 is accepted: PydanticAI is the initial replaceable agent-runtime adapter behind Ada-owned interfaces. UI, authoritative-memory implementation, production calendar/email providers, scheduler implementation, speech, general computer control, and local model strategy remain open. Current work should preserve the modular boundaries and advance the smallest representative vertical slice.
 
 Use repository skills and review agents only when relevant. Their presence does not require executing external tools referenced by documentation.
