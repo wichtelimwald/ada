@@ -2,7 +2,7 @@
 
 Ada is a local-first, privacy-first personal AI assistant project named after Ada Lovelace.
 
-> **Status:** Product discovery and architecture exploration. No implementation stack has been selected yet.
+> **Status:** Initial implementation foundation. Product scope is confirmed; ADR-0002 selects PydanticAI as the first replaceable agent-runtime adapter and ADR-0003 selects a Python-first, container-first modular monolith.
 
 ## Vision
 
@@ -22,13 +22,13 @@ Ada should feel like a capable personal companion rather than a developer consol
 
 ## Current phase
 
-1. Run the [product discovery interview](docs/prompts/product-discovery-interview-prompt.md).
-2. Define MVP / v1 / later scope.
-3. Evaluate required capabilities with documented decision matrices, including cross-capability integration constraints.
-4. Record significant choices as ADRs.
-5. Implement only after the relevant product and architecture decisions are made.
+1. Keep Ada-owned domain and security boundaries independent from replaceable frameworks.
+2. Build the smallest representative vertical slice from the confirmed scenarios.
+3. Evaluate missing capabilities independently as **reuse / adapt / build**.
+4. Add stronger process/container isolation only when a capability's risk or lifecycle requires it.
+5. Keep authoritative Memory outside the Ada runtime/container.
 
-See the [capability map](docs/research/capability-map.md) and [backlog](docs/todo.md).
+See the [representative scenarios](docs/product/representative-scenarios.md), [modular core boundaries](docs/architecture/modular-core-boundaries.md), and [backlog](docs/todo.md).
 
 ## Inspiration and upstream candidates
 
@@ -39,6 +39,22 @@ Potential upstream components such as Open Interpreter, Letta, local speech/mode
 ## Development
 
 Repository language is English. Project discussions with the maintainer are normally in German.
+
+The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter. Development can run through the Dev Container or a local Python environment.
+
+Local validation:
+
+```bash
+python -m pip install --editable .
+sh scripts/validate.sh
+```
+
+Runtime container sanity check:
+
+```bash
+docker build --target runtime -t ada:dev .
+docker run --rm --cap-drop=ALL --security-opt=no-new-privileges --read-only ada:dev doctor
+```
 
 - No direct implementation on `main`.
 - No GitHub Actions unless explicitly approved later.
