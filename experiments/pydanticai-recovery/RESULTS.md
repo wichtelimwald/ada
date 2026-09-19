@@ -91,6 +91,36 @@ Current one-shot values are:
 
 The model may have different warm/cold-cache state between runs. Use repeated warm runs before drawing a performance conclusion.
 
+## Repeated local benchmark — first pass
+
+A repeated benchmark with the 4k Qwen3 alias produced:
+
+- warmup: 44.745 s
+- measured runs: 45.003 s, 48.887 s, 56.352 s
+- mean: **50.081 s**
+- median: **48.887 s**
+- all tool calls/results valid: yes
+
+The corresponding OpenJarvis benchmark produced a mean of **8.619 s**.
+
+### Important asymmetry discovered
+
+This first repeated comparison is **not suitable for framework performance ranking**.
+
+Source inspection showed:
+
+- OpenJarvis' native Ollama engine explicitly sends `think=false` for Qwen3 by default.
+- PydanticAI's Ollama provider uses Ollama's OpenAI-compatible API.
+- The PydanticAI run did not disable unified thinking, and PydanticAI's own Ollama tests demonstrate Qwen3 returning a `ThinkingPart` by default.
+
+Therefore the ~5.8x latency gap may largely measure **Qwen3 thinking mode**, not framework overhead.
+
+The benchmark has been corrected to set:
+
+`ModelSettings(thinking=False, temperature=0.0, max_tokens=256)`
+
+Only the corrected rerun should be used for performance comparison.
+
 ## Decision impact
 
 ### Useful MVP reuse
