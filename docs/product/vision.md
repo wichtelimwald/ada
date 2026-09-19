@@ -1,34 +1,60 @@
-# Product vision — draft
+# Product vision
 
-**Status:** Draft; validate through product discovery.
+**Status:** Confirmed discovery baseline for the first MVP iteration.
 
-Ada is a personal AI assistant intended to combine a natural, "Jarvis-like" interaction experience with strong privacy, usability, and user control.
+The authoritative discovery artifact is [`interview-questionnaire.md`](interview-questionnaire.md). This file is only the short product summary.
 
-## Already-established goals
+## Product direction
 
-- Personal assistant named **Ada**, after Ada Lovelace.
-- Public open-source project.
-- Project-owned code under MIT.
-- Local-first/privacy-first direction.
-- High-quality usability is a core requirement.
-- Persistent personalization/memory is desired.
-- Useful computer interaction/automation is desired.
-- Voice and other assistant capabilities should be evaluated deliberately rather than locked to the first available framework.
-- Significant technology choices should be compared with documented decision matrices.
+Ada is a public, MIT-licensed, local-first and privacy-first personal AI assistant intended to feel like a capable household companion rather than a developer console.
 
-## Not decided yet
+The first real-world setting is a family. Adults and children should be able to contribute information and receive appropriate assistance while private context, audience, and authority remain distinct. Other households should be able to adopt the project, although developer-oriented setup is acceptable initially.
 
-- MVP feature set,
-- platform sequence,
-- UI framework,
-- memory architecture,
-- agent/orchestration framework,
-- computer-control implementation,
-- STT/TTS implementation,
-- model/runtime strategy,
-- optional cloud providers,
-- screen/camera capabilities,
-- proactive/background behavior,
-- remote/mobile companion capabilities.
+## Confirmed MVP
 
-The product discovery interview must define functional scope before these architecture decisions are made.
+The first coherent MVP includes:
+
+- local text chat,
+- email intake and replies, including forwarded source material,
+- calendar maintenance within explicit permission grants,
+- scheduling-conflict detection including approximate travel time,
+- personal and family briefings on request,
+- persistent memory that is external to Ada, human-readable, directly editable, and correctable,
+- deterministic permission enforcement independent of model decisions,
+- private/shared scopes, action logging, correction, recovery, pause, and resume.
+
+The MVP does **not** include speech, direct school-system integrations, autonomous conflict resolution, autonomous third-party coordination, broad computer control, project telemetry, or hidden persistent agent memory.
+
+## Initial operating constraints
+
+- First platform: macOS.
+- First hardware: MacBook Air with Apple M1 and 16 GB RAM.
+- Continuous availability is not required.
+- Local chat and local-memory use should work offline.
+- Local processing is preferred; remote processing requires appropriately scoped authorization and data minimization.
+- Developer knowledge may be assumed for initial installation.
+- Development and maintenance capacity is approximately one to two evenings per week.
+
+## Development direction
+
+Proceed through narrow end-to-end slices rather than selecting a comprehensive stack up front.
+
+1. Preserve the confirmed discovery baseline.
+2. Create representative family scenarios and expected outcomes.
+3. Evaluate the smallest useful local path on the actual target hardware.
+4. Make only architecture decisions required by the next working slice, using evidence, decision matrices, and ADRs.
+5. Build and validate one complete journey before expanding scope.
+
+## Still deliberately open
+
+- programming language and execution architecture,
+- local interaction/UI implementation,
+- model/runtime and optional remote assistance,
+- memory representation and retrieval implementation,
+- email/calendar integration mechanism,
+- permission/policy implementation and action records,
+- remote-data boundary implementation,
+- orchestration approach,
+- packaging/update strategy,
+- speech/perception architecture,
+- detailed personal-context selection, calendar ownership, cancellation scopes, forgetting semantics, and offline integration behavior.
