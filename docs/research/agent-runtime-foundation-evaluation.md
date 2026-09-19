@@ -1,6 +1,6 @@
 # Technology evaluation — Agent runtime / foundation
 
-**Status:** Research — provisional weighted evaluation before targeted prototypes  
+**Status:** Research complete — weighted evaluation updated with targeted prototype evidence  
 **Evidence:** [Agent Runtime / Foundation Deep Research](agent-runtime-foundation-deep-research.md)
 
 ## 1. Decision
@@ -58,7 +58,7 @@ Multi-agent features, general browser/computer control, and raw plugin counts re
 - **2 — Weak:** significant mismatch, maintenance burden, or unused surface.
 - **1 — Poor:** little useful reuse for this criterion.
 
-Scores below are intentionally provisional. Only evidence-backed uncertainties that could change the ranking should be prototyped.
+Scores below are the final research scores used to support ADR-0002. Prototype evidence changed OpenJarvis' security-boundary score from 3 to 4; the later local-performance tests did not justify further score changes.
 
 ## 5. Weighted matrix
 
@@ -74,7 +74,7 @@ Scores below are intentionally provisional. Only evidence-backed uncertainties t
 | Complexity tax / unnecessary surface | 5% | 2 | 4 | 2 | 4 | **5** |
 | **Weighted total / 100** | **100%** | **73** | **83** | **75** | **72** | **62** |
 
-### Provisional order
+### Final research order
 
 1. **PydanticAI — 83**
 2. **Microsoft Agent Framework — 75**
@@ -82,11 +82,11 @@ Scores below are intentionally provisional. Only evidence-backed uncertainties t
 4. **LangGraph — 72**
 5. **Minimal Ada runtime — 62**
 
-This is **not** the ADR decision.
+The architectural selection is recorded separately in ADR-0002.
 
 ## 6. Score rationale
 
-### OpenJarvis — 69
+### OpenJarvis — 73
 
 **Why reuse = 5:** only candidate already close to a local personal-assistant platform, with local engines, MCP, server, scheduler/event infrastructure and broader assistant plumbing.
 
@@ -104,7 +104,7 @@ This is **not** the ADR decision.
 
 **Why reuse = 3:** strong runtime glue, model providers, MCP and persistence primitives, but little ready-made personal-assistant platform.
 
-**Why maintenance = 4:** active project with quick security response, but rapid release cadence requires strict pinning and upgrade tests.
+**Why maintenance = 4:** active project with quick security response, but rapid release cadence requires strict pinning and upgrade tests. The local Qwen3 probe also showed that generic `thinking=False` did not disable reasoning for the tested Ollama profile; Ada must pin and regression-test provider-specific model settings such as `openai_reasoning_effort="none"`.
 
 ### Microsoft Agent Framework — 75
 
@@ -134,84 +134,185 @@ This is **not** the ADR decision.
 
 The control confirms that using a framework is justified if it removes enough of this lifecycle work.
 
-## 7. Sensitivity / uncertainty
+## 7. Prototype evidence
 
-The matrix has one clear provisional leader, but two uncertainties could materially change the decision:
+The targeted prototypes resolved the decision-critical uncertainties.
 
-### PydanticAI uncertainty
+### PydanticAI recovery / side-effect safety
 
-If `StepPersistence` plus a thin Ada action layer handles crash/restart/idempotency well in practice, its reuse/durability value is stronger than the current conservative score.
+Prototype:
 
-If not, Ada must build more lifecycle infrastructure and its lead narrows.
+`local model → typed action proposal → Ada Guard → Ada action ledger → fake calendar provider → crash → recovery`
 
-### OpenJarvis uncertainty
+Results on the target Mac:
 
-OpenJarvis' targeted Guard-boundary prototype passed across the tested direct, MCP, agent, scheduler, and server/direct-helper paths without a fork. This raises Security-boundary fit from 3/5 to 4/5 and the provisional total from 69 to 73.
+- exception after provider commit: safe recovery, exactly one provider side effect;
+- hard `os._exit()` after provider commit: exactly one provider side effect;
+- StepPersistence retained useful run/effect metadata, including the stable Ada operation id;
+- a hard process death did not leave a continuable snapshot;
+- safe recovery therefore came from Ada-owned operation identity, action ledger and provider reconciliation;
+- no framework-internal patch or approval mechanism was used as the authority boundary.
 
-The remaining OpenJarvis uncertainty is no longer whether Ada Guard can be inserted at all. It is whether enough scheduler, server/local-chat, model-runtime, and connector functionality can be reused **without** inheriting unwanted memory, analytics, broad tool exposure, or misleading action-success semantics.
+Conclusion:
 
-### MAF / LangGraph uncertainty
+> PydanticAI provides useful runtime persistence and orchestration support, but Ada must own idempotency and consequential-action truth.
 
-Both remain credible fallbacks. Their current research evidence is sufficient to defer hands-on work until the higher-value uncertainties above are resolved.
+This supports durability = 4 rather than 5.
 
-## 8. Prototype decision
+### OpenJarvis Guard boundary
 
-To minimize experimental work, prototype **two architectural extremes first**:
+One Ada-owned privileged fake calendar tool was exercised through:
 
-1. **PydanticAI** — provisional matrix leader and cleanest Ada-owned architecture.
-2. **OpenJarvis** — highest reuse upside; Guard-boundary uncertainty resolved positively, but reuse-vs-complexity remains open.
+- direct ToolExecutor,
+- MCP `tools/call`,
+- a real tool-using agent,
+- scheduler execution,
+- the canonical server/direct-operation helper.
 
-This is not selecting OpenJarvis over the higher-scoring MAF or LangGraph. It is testing the uncertainty most likely to change the decision.
+Results:
 
-### Prototype A — PydanticAI recovery slice
+- every tested path reached Ada Guard exactly once;
+- denied actions produced zero provider writes;
+- explicit MCP construction exposed only the supplied Ada tool;
+- no OpenJarvis fork or source patch was required.
 
-Build only:
+This raised Security-boundary fit from 3 to 4.
 
-`local model → typed action proposal → Ada Guard → fake calendar side effect → effect record → crash → resume`
+Important residual finding:
 
-Acceptance questions:
+- agent/scheduler completion can still appear successful while an underlying privileged tool was denied.
 
-- Does the runtime preserve enough stable state to resume safely?
-- Can Ada guarantee no duplicate side effect after a crash between provider commit and tool-result return?
-- Can authoritative Ada Memory remain completely outside runtime persistence?
-- Is remote observability fully absent in the local profile?
+Ada must therefore own explicit action state such as:
 
-### Prototype B — OpenJarvis Guard-boundary slice
+`proposed → denied | failed | committed`
 
-Register one Ada-owned privileged fake calendar adapter and exercise it through:
+and must never treat agent/scheduler completion as proof of a successful side effect.
 
-- normal agent execution,
-- scheduler/background execution,
-- MCP entry,
-- server/API entry.
+### Local Ollama / Qwen3 performance
 
-Acceptance questions:
+Target:
 
-- Can every actual side effect be forced through the same Ada Guard?
-- Is there any supported path that bypasses the Ada adapter?
-- Can built-in fact memory and external analytics be disabled cleanly?
-- How much of OpenJarvis' scheduler/server/local-engine infrastructure remains useful once Ada Guard and Ada Memory replace the critical boundaries?
-- Is a fork required?
+- MacBook Air M1 / 16 GB
+- Ollama 0.33.2
+- base model `qwen3:8b`
+- 4k context alias
+- one deterministic calendar-conflict tool
+- temperature 0
+- max 256 output tokens
 
-## 9. Decision rule after prototypes
+Correctly configured results:
 
-- **If PydanticAI validates:** it remains the default candidate unless OpenJarvis demonstrates a clearly lower lifetime implementation/maintenance burden without weakening the Guard boundary.
-- **OpenJarvis Guard-boundary result:** passed on the tested paths without a fork; keep it in the serious shortlist.
-- **If PydanticAI recovery proves insufficient:** prototype MAF next.
-- **Use LangGraph next only if explicit durable workflow control becomes more valuable than the extra application infrastructure Ada must build.**
-- **Minimal custom wins only if framework lifecycle/audit burden approaches the cost of maintaining the missing runtime functionality ourselves.**
+| Path | Mean | Median | Valid |
+| --- | ---: | ---: | --- |
+| PydanticAI | **7.720 s** | **7.720 s** | yes |
+| OpenJarvis | **8.619 s** | **8.651 s** | yes |
+| Direct Ollama native `/api/chat` | 10.717 s | 10.673 s | yes |
+| Direct Ollama OpenAI-compatible `/v1/chat/completions` | 10.859 s | 10.938 s | yes |
 
-## 10. ADR gate
+The small timing differences are **not a framework-ranking criterion**. The conclusion is that both PydanticAI and OpenJarvis can provide acceptable local tool-calling performance on the target hardware when configured correctly.
 
-Do **not** create the final ADR until the two targeted prototypes are evaluated.
+A useful integration caveat was discovered:
 
-The ADR must contain:
+- OpenJarvis' native Ollama engine disables Qwen3 thinking by default;
+- PydanticAI 2.46.0 required the explicit provider-specific setting `openai_reasoning_effort="none"` in this test;
+- generic `thinking=False` did not produce equivalent behavior for the tested local Qwen3 profile.
 
-- hard-gate outcome,
-- agreed weighted matrix,
-- prototype evidence,
-- selected option,
-- rejected alternatives and why,
-- consequences,
-- version/pinning/privacy requirements,
-- explicit re-open triggers.
+Ada must therefore pin and regression-test local model/provider settings.
+
+### Ollama API-path isolation
+
+A framework-free comparison showed:
+
+- native `/api/chat`: 10.717 s mean;
+- OpenAI-compatible `/v1/chat/completions`: 10.859 s mean.
+
+The API-path difference was only about 1.3%, so it did not explain the earlier slow PydanticAI runs.
+
+## 8. Residual risks
+
+### PydanticAI
+
+- StepPersistence / Harness is still a young surface and must be isolated behind an Ada adapter.
+- Hard process death still requires Ada-owned reconciliation semantics.
+- Provider/model profiles can have behavior gaps; local model settings require explicit regression tests.
+- PydanticAI does not supply Ada's scheduler, mail/calendar integration, local UI, identity/audience model or permission system.
+
+### OpenJarvis
+
+- external analytics are enabled by default in the tested configuration and must be disabled and egress-tested;
+- broad dependency and feature surface increases audit and upgrade cost;
+- automatic tool discovery is inappropriate for Ada's privileged runtime profile; explicit allowlists are required;
+- framework-level completion is not authoritative action status;
+- large amounts of platform capability are outside Ada's MVP and remain maintenance surface even if unused.
+
+### Microsoft Agent Framework and LangGraph
+
+Both remain credible alternatives but no unresolved evidence currently justifies displacing the higher-scoring PydanticAI option.
+
+## 9. Research conclusion
+
+The weighted matrix and prototype evidence support **PydanticAI as Ada's initial agent runtime foundation**.
+
+The reason is not that it has the most features. It provides the best current balance of:
+
+- clean Ada-owned security boundary,
+- external authoritative memory,
+- typed tools and MCP,
+- local model support,
+- useful persistence/runtime primitives,
+- low enough framework surface to audit and maintain.
+
+OpenJarvis remains the most important alternative because it offers substantially more ready-made personal-assistant infrastructure. The Guard prototype showed that Ada could retain its own authority boundary without forking it. Its lower score is driven primarily by lifecycle/audit/privacy/complexity cost rather than inability to satisfy Ada's architecture.
+
+The minimal custom runtime remains a control/fallback rather than the preferred path.
+
+## 10. Decision constraints carried into ADR-0002
+
+Selecting PydanticAI does **not** delegate the following to PydanticAI:
+
+- authorization or permission decisions;
+- long-term authoritative Ada Memory;
+- identity, audience or guardian semantics;
+- side-effect truth / exactly-once guarantees;
+- mail/calendar/travel provider semantics;
+- secrets management.
+
+Required boundary:
+
+`model → typed proposal → Ada Guard → Ada action ledger → Ada provider adapter`
+
+Required implementation rules:
+
+- pin tested PydanticAI / Harness versions;
+- isolate Harness/StepPersistence behind an Ada-owned adapter;
+- use explicit local model/provider settings and regression tests;
+- keep observability/telemetry off by default in the local profile;
+- keep authoritative user memory outside the runtime;
+- give every consequential action a stable Ada operation id;
+- reconcile ambiguous provider outcomes before retrying.
+
+## 11. Re-open triggers
+
+Re-open the runtime decision if any of the following becomes true:
+
+- PydanticAI can no longer support the Ada Guard boundary without framework patches;
+- local/self-hosted operation materially regresses;
+- Harness/persistence churn creates sustained upgrade burden;
+- Ada's workflows require durable graph semantics that the current approach cannot provide cleanly;
+- OpenJarvis demonstrates materially lower lifetime implementation and maintenance burden after unwanted memory, analytics and broad authority surfaces are removed;
+- MAF or LangGraph gains a clearly superior fit for newly confirmed MVP requirements;
+- a minimal Ada runtime becomes simpler to maintain than the selected framework integration.
+
+## 12. ADR gate
+
+The research gate is satisfied:
+
+- hard gates evaluated;
+- weights agreed before scoring;
+- weighted matrix completed;
+- PydanticAI recovery prototype completed;
+- OpenJarvis Guard-boundary prototype completed;
+- local model behavior validated on the target M1/16 GB system;
+- provider/API performance anomaly isolated.
+
+ADR-0002 may now record the runtime selection.
