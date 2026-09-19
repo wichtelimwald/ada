@@ -17,5 +17,5 @@
     "--security-opt=no-new-privileges",
     "--pids-limit=256"
   ],
-  "postCreateCommand": "python -m pip install --editable . && ./scripts/validate.sh"
+  "postCreateCommand": "python -m pip install --editable . && sh ./scripts/validate.sh"
 }
