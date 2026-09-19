@@ -121,6 +121,48 @@ The benchmark has been corrected to set:
 
 Only the corrected rerun should be used for performance comparison.
 
+## Repeated local benchmark — thinking disabled
+
+Corrected rerun with:
+
+- base model: `qwen3:8b`
+- model alias: `ada-qwen3-8b-4k`
+- context: 4096
+- `thinking=false`
+- temperature: 0
+- max output tokens: 256
+- 1 warm-up + 3 measured runs
+
+Results:
+
+- warmup: **44.241 s**
+- run 1: **45.490 s**
+- run 2: **55.423 s**
+- run 3: **106.598 s**
+- mean: **69.170 s**
+- median: **55.423 s**
+- tool calls valid: yes, exactly one each
+- final answers correct: yes
+- system stable: yes
+
+### Interpretation
+
+Disabling PydanticAI's unified thinking did **not** remove the large latency gap to OpenJarvis.
+
+The current measurements are therefore:
+
+- OpenJarvis native Ollama path: mean **8.619 s**, median **8.651 s**
+- PydanticAI Ollama/OpenAI-compatible path: mean **69.170 s**, median **55.423 s**
+
+This is a real target-machine observation, but it is **not yet evidence that PydanticAI itself adds ~47 seconds of framework overhead**.
+
+The candidates use different Ollama protocol paths:
+
+- OpenJarvis: native Ollama `/api/chat`
+- PydanticAI: Ollama OpenAI-compatible `/v1/chat/completions`
+
+Before attributing the difference to a framework, isolate the provider/API-path cost with one direct Ollama A/B probe.
+
 ## Decision impact
 
 ### Useful MVP reuse
