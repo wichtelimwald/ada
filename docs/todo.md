@@ -18,7 +18,7 @@ Representative scenarios: [`docs/product/representative-scenarios.md`](product/r
 
 Before final capability ADRs, document integration constraints that could make individually attractive choices incompatible. The accepted modular direction is captured in [`docs/architecture/modular-core-boundaries.md`](architecture/modular-core-boundaries.md); the items below remain open until their concrete constraints are settled:
 
-- [ ] Runtime/process topology and IPC expectations.
+- [x] Runtime/process topology and IPC expectations ([ADR-0003](decisions/ADR-0003-execution-topology-containerization.md)).
 - [ ] Packaging, installation, startup/background-operation, and update constraints.
 - [ ] Shared resource budgets and model/artifact distribution constraints.
 - [ ] Security/privacy boundaries that every capability must respect.
