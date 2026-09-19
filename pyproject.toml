@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=80,<81"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ada-assistant"
+version = "0.0.1"
+description = "Local-first, privacy-first personal AI assistant"
+requires-python = ">=3.14,<3.15"
+license = "MIT"
+dependencies = [
+    "pydantic-ai-slim[openai]==2.46.0",
+]
+
+[project.scripts]
+ada = "ada.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
