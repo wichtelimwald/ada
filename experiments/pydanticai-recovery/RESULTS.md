@@ -163,6 +163,56 @@ The candidates use different Ollama protocol paths:
 
 Before attributing the difference to a framework, isolate the provider/API-path cost with one direct Ollama A/B probe.
 
+## Final local benchmark — explicit Ollama reasoning disabled
+
+Final rerun with the provider-specific setting:
+
+`openai_reasoning_effort="none"`
+
+and otherwise the same controlled profile:
+
+- model: `ada-qwen3-8b-4k`
+- context: 4096
+- temperature: 0
+- max output tokens: 256
+- one warm-up + three measured runs
+
+Results:
+
+- warmup: **8.722 s**
+- run 1: **7.711 s**
+- run 2: **7.729 s**
+- run 3: **7.720 s**
+- mean: **7.720 s**
+- median: **7.720 s**
+- all tool calls valid: yes
+- final answers correct: yes
+- system stable: yes
+
+### Root cause of the earlier slow runs
+
+The earlier 45–106 s PydanticAI measurements were not caused by:
+
+- PydanticAI framework overhead in general, or
+- Ollama's OpenAI-compatible API path.
+
+The framework-free API-path experiment measured native Ollama at 10.717 s mean and the OpenAI-compatible endpoint at 10.859 s mean.
+
+The material difference was Qwen3 reasoning configuration. In PydanticAI 2.46.0, unified `thinking=False` did not disable reasoning for this local Qwen3/Ollama profile, while explicit `openai_reasoning_effort="none"` did.
+
+This is a **provider-profile integration caveat**, not a structural local-performance disadvantage.
+
+### Comparative local result
+
+Under equivalent non-reasoning settings on the same target Mac:
+
+- PydanticAI: **7.720 s mean / median**
+- OpenJarvis: **8.619 s mean / 8.651 s median**
+- direct Ollama native: **10.717 s mean**
+- direct Ollama OpenAI-compatible: **10.859 s mean**
+
+These tiny benchmark differences should not be used as a framework ranking criterion. The relevant conclusion is that both framework candidates provide acceptable local tool-calling performance on the M1/16 GB target when configured correctly.
+
 ## Decision impact
 
 ### Useful MVP reuse
