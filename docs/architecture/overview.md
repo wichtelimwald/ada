@@ -1,15 +1,17 @@
-# Architecture overview — pre-decision
+# Architecture overview
 
-**Status:** Straw-man for trust-boundary discussion. No implementation architecture or component decomposition is selected.
+**Status:** Product scope is confirmed and ADR-0002 is accepted. Ada uses a modular core with replaceable infrastructure adapters; several capability and deployment decisions remain open.
 
-This document records boundaries that must be considered during research. Boxes in the sketch are responsibilities, not necessarily separate processes, libraries, or services.
+This document records the high-level trust boundaries. Boxes in the sketch are responsibilities, not necessarily separate processes, libraries, or services. The current modular implementation boundary is defined in [`modular-core-boundaries.md`](modular-core-boundaries.md).
 
 ```text
 User
   |
 Interaction / UI
   |
-Assistant reasoning / orchestration
+Assistant application / orchestration
+  |
+Replaceable agent-runtime adapter
   |
   +---------------- Policy / permission boundary ----------------+
   |                                                              |
@@ -42,6 +44,6 @@ The policy boundary must mediate privileged reads/writes and actions. Remote tra
 
 ## Architecture decision process
 
-Product discovery defines required capabilities and constraints first. Capability research then uses `docs/research/technology-evaluation-template.md`.
+Product discovery defines required capabilities and constraints first. Capability research then uses `docs/research/technology-evaluation-template.md`. ADR-0002 selected PydanticAI as the initial replaceable agent-runtime adapter, not as Ada's application architecture.
 
 Before finalizing capability ADRs, check the combined stack for runtime/process, IPC, packaging, resource, security, privacy, and distribution compatibility. Decisions that materially affect boundaries, dependencies, portability, privacy, security, or packaging receive an ADR.
