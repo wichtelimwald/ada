@@ -63,24 +63,33 @@ StepPersistence adds useful evidence and workflow context, but **Ada remains res
 
 ## Local Ollama smoke test
 
-Pending.
+Executed on the target M1 / 16 GB Mac with a 4k-context alias of the same local Qwen3 model used for the OpenJarvis comparison.
 
-Run:
+- base model: `qwen3:8b`
+- test alias: `ada-qwen3-8b-4k`
+- context: 4096
+- framework: PydanticAI 2.46.0
+- Python: 3.14.6
+- observability: off
+- tool selected correctly: yes
+- arguments valid: yes
+- final answer correct: yes
+- end-to-end latency: **45.140 s**
+- system stability: stable
+- output: correctly identified the 15:00 / 15:15 conflict and 25-minute travel-time issue
 
-```bash
-export ADA_OLLAMA_MODEL='<installed tool-capable Ollama model>'
-uv run python ollama_smoke.py
-```
+The run ended with a probe-only reporting error after successful model/tool execution because the script called `result.usage()` although this version exposes `result.usage` as an object. The probe code has been corrected. This does not invalidate the tool-call or latency result.
 
-Record:
+### Performance caution
 
-- Model:
-- Ollama version:
-- Tool selected correctly:
-- Arguments valid:
-- End-to-end latency:
-- Peak memory / observed pressure:
-- Notes:
+Do not rank frameworks from this single measurement.
+
+Current one-shot values are:
+
+- OpenJarvis: 34.612 s
+- PydanticAI: 45.140 s
+
+The model may have different warm/cold-cache state between runs. Use repeated warm runs before drawing a performance conclusion.
 
 ## Decision impact
 
