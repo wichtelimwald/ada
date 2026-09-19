@@ -5,7 +5,8 @@ import os
 import statistics
 import time
 
-from pydantic_ai import Agent, ModelSettings
+from pydantic_ai import Agent
+from pydantic_ai.models.openai import OpenAIChatModelSettings
 from pydantic_ai.models.ollama import OllamaModel
 from pydantic_ai.providers.ollama import OllamaProvider
 
@@ -21,10 +22,10 @@ model = OllamaModel(
 )
 agent = Agent(
     model,
-    model_settings=ModelSettings(
+    model_settings=OpenAIChatModelSettings(
         temperature=0.0,
         max_tokens=256,
-        thinking=False,
+        openai_reasoning_effort="none",
     ),
 )
 
@@ -73,7 +74,7 @@ summary = {
     "model": MODEL,
     "temperature": 0.0,
     "max_tokens": 256,
-    "thinking": False,
+    "openai_reasoning_effort": "none",
     "warmup": warmup,
     "runs": runs,
     "mean_seconds": round(statistics.mean(timings), 3),
