@@ -1,6 +1,6 @@
 # Technology evaluation — Execution topology and container boundary
 
-**Status:** Research — decision framing complete; weights not yet agreed, so no numeric scoring yet  
+**Status:** Research complete — decision evidence supports ADR-0003  
 **Date checked:** 2026-09-19  
 **Depends on:** ADR-0002 and `docs/architecture/modular-core-boundaries.md`
 
@@ -423,18 +423,73 @@ Scale:
 
 The score does **not** imply that option B's single process is less modular than C or D. Replaceability comes from Ada-owned ports and dependency direction, not process count.
 
-## 11. Prototype questions
+## 11. Target-Mac prototype evidence
 
-Only two uncertainties could plausibly change the B-vs-A decision:
+The remaining B-vs-A uncertainties were tested on the target MacBook Air M1 / 16 GB using the same local PydanticAI/Qwen3 tool-call path used in ADR-0002 research.
 
-1. **M1 resource impact:** measure idle and simple-request CPU/RAM overhead of the containerized first vertical slice versus native Python.
-2. **Host Ollama connectivity:** verify the container can execute the already-tested Qwen3 tool-call path through the configurable host endpoint without material latency or reliability regression.
+### Container profile
 
-Do **not** prototype split-process IPC unless option C becomes competitive after scoring.
+The probe successfully ran with:
 
-## 12. Recommendation before target-Mac prototype
+- non-root application user;
+- `--cap-drop=ALL`;
+- `no-new-privileges`;
+- read-only root filesystem;
+- tmpfs-only writable temporary space;
+- no host filesystem mounts;
+- no Docker socket;
+- PID, memory and CPU limits;
+- host Ollama reached through a configurable endpoint.
 
-The agreed weighting favors:
+### Latency
+
+Native PydanticAI baseline:
+
+- mean: **7.720 s**
+- median: **7.720 s**
+
+Containerized PydanticAI:
+
+- warm-up: **13.756 s**
+- measured: **7.808 / 7.794 / 7.790 s**
+- mean: **7.797 s**
+- median: **7.794 s**
+- all tool calls/results valid: yes
+
+Measured median difference: **+0.074 s (~+0.96%)**.
+
+This is not a material runtime regression for the tested path.
+
+### Container-process memory
+
+One initialized idle-probe container reported:
+
+- memory: **66.68 MiB / 1 GiB**
+- PIDs: **1**
+
+This is modest relative to the 16 GB target.
+
+A one-shot CPU sample showed 71.35%, but it was captured around startup/import activity and is **not treated as steady-state idle CPU evidence**. Real idle/background CPU should be measured later against the actual long-running Ada runtime.
+
+The resource score therefore remains 3 rather than being raised: the Ada process itself is small, but Docker Desktop / the Linux VM has its own host-level baseline overhead that this probe did not attempt to eliminate.
+
+### Prototype conclusion
+
+Option B passes the target-machine gate:
+
+- host Ollama connectivity works;
+- intended hardening flags work;
+- request latency is effectively equivalent to native execution;
+- Ada/PydanticAI process memory is modest;
+- no authoritative Memory mount is required.
+
+No evidence from the prototype justifies preferring native execution over container-first for the initial topology.
+
+Split-process IPC was not prototyped because option C did not become the preferred score and no current MVP capability requires that added complexity.
+
+## 12. Final recommendation
+
+The agreed weighting plus target-Mac evidence supports:
 
 > **Python-first modular monolith, container-first runtime, Dev Container for development, host Ollama initially, external authoritative Memory outside the container.**
 
@@ -451,7 +506,27 @@ Use one process until a capability introduces a real reason to isolate it, such 
 
 At that point, move the capability behind an existing Ada-owned port into a separate sandbox/process rather than redesigning the whole system.
 
-## 13. Re-open triggers
+## 13. Decision handoff
+
+Record the following in ADR-0003:
+
+> **Ada starts as a Python-first, container-first modular monolith.**
+
+Meaning:
+
+- one initial Ada application process/deployable unit;
+- strict Ada-owned ports and dependency direction;
+- PydanticAI as the replaceable runtime adapter;
+- a Dev Container for development and a separate hardened runtime image/profile;
+- host Ollama initially on macOS;
+- authoritative Memory outside the container;
+- no broad host mounts;
+- no privileged mode or Docker socket;
+- risk-driven capability isolation later behind existing Ada-owned ports.
+
+The container is defense in depth, not the permission model.
+
+## 14. Re-open triggers
 
 Re-open the topology/container decision if:
 
