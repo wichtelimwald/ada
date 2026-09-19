@@ -1,0 +1,12 @@
+[project]
+name = "ada-pydanticai-recovery-probe"
+version = "0.0.0"
+description = "Disposable Ada architecture experiment for PydanticAI recovery and side-effect safety"
+requires-python = ">=3.11"
+dependencies = [
+  "pydantic-ai-slim[openai]==2.46.0",
+  "pydantic-ai-harness==0.31.0",
+]
+
+[tool.uv]
+package = false
