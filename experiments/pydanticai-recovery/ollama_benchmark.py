@@ -24,6 +24,7 @@ agent = Agent(
     model_settings=ModelSettings(
         temperature=0.0,
         max_tokens=256,
+        thinking=False,
     ),
 )
 
@@ -72,6 +73,7 @@ summary = {
     "model": MODEL,
     "temperature": 0.0,
     "max_tokens": 256,
+    "thinking": False,
     "warmup": warmup,
     "runs": runs,
     "mean_seconds": round(statistics.mean(timings), 3),
