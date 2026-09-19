@@ -1,6 +1,6 @@
-# ADR-0002: Use PydanticAI as the initial agent runtime foundation
+# ADR-0002: Use PydanticAI behind a modular Ada runtime boundary
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-19
 
 ## Context
@@ -85,13 +85,19 @@ For the tested PydanticAI/Ollama/Qwen3 combination, explicit
 
 ## Decision
 
-Use **PydanticAI as Ada's initial agent runtime foundation**.
+Use **PydanticAI as Ada's initial agent-runtime implementation behind Ada-owned interfaces**.
 
-PydanticAI is selected as runtime/orchestration infrastructure only. It does not become Ada's authority, memory owner, identity model or side-effect ledger.
+The architectural decision is deliberately broader than "build Ada on PydanticAI":
+
+> **Ada is the stable system; PydanticAI is the first replaceable runtime adapter.**
+
+PydanticAI is selected as runtime/orchestration infrastructure only. It does not become Ada's authority, memory owner, identity model, side-effect ledger, application shell, or permanent architectural center.
 
 The privileged action path must remain:
 
 `model → typed proposal → Ada Guard → Ada action ledger → Ada provider adapter`
+
+The Ada core must not require callers or domain code to depend directly on PydanticAI-specific types where an Ada-owned contract can express the requirement.
 
 ### Ada-owned responsibilities
 
@@ -118,21 +124,84 @@ PydanticAI may provide:
 - conversation/runtime glue;
 - optional persistence/runtime evidence through StepPersistence/Harness.
 
+### Modularity strategy
+
+Ada should be designed as a small, stable core with explicit ports/interfaces around replaceable infrastructure.
+
+Conceptually:
+
+```text
+Ada Core
+├── Identity / Family / Audience
+├── Permissions / Ada Guard
+├── Action Ledger
+├── Memory boundary
+├── Scheduler port
+├── Connector ports
+├── Event / audit port
+└── Agent-runtime port
+       └── PydanticAI adapter (initial implementation)
+```
+
+The same principle applies outside the agent runtime:
+
+- scheduler implementations must be replaceable behind an Ada-owned scheduler contract;
+- mail, calendar, travel-time, and other integrations must sit behind narrow Ada-owned provider contracts;
+- authoritative memory must remain behind an Ada-owned boundary and independent of runtime persistence;
+- event/audit infrastructure must expose Ada semantics rather than third-party framework semantics;
+- UI/server layers must communicate with Ada-owned application APIs rather than directly with PydanticAI.
+
+This allows Ada to combine mature components without adopting another framework's complete architecture.
+
+### Reuse and third-party components
+
+Ada may reuse or adapt mature functionality from OpenJarvis or other projects when it reduces implementation and maintenance work.
+
+Reuse should follow this preference order:
+
+1. **Use a well-bounded dependency behind an Ada-owned interface** when a suitable component already exists.
+2. **Adapt or wrap an isolated component** when direct use would leak third-party concepts into Ada core.
+3. **Use an implementation as architectural inspiration** when its code or lifecycle model is not a good dependency fit.
+4. **Implement Ada-specific functionality directly** when trust boundaries or semantics are unique to Ada.
+
+OpenJarvis is therefore both:
+
+- an important reference implementation for assistant plumbing such as scheduler, channels, connectors, server/UI, events, and proactive workflows; and
+- a possible source of selectively reusable components where the dependency and license boundary remains clear.
+
+The default is **not** to depend on OpenJarvis as Ada's global runtime.
+
+### Licensing strategy
+
+Ada-owned core code remains intended to use **MIT**.
+
+When selecting reusable components:
+
+- prefer MIT-compatible dependencies where functionality and quality are comparable;
+- keep third-party code/dependencies isolated behind explicit interfaces where practical;
+- do not relabel third-party code as MIT;
+- preserve all applicable copyright, license, attribution, and NOTICE obligations;
+- direct reuse of Apache-2.0 OpenJarvis code remains Apache-2.0-governed for that reused material even when used inside an MIT project;
+- prefer a dependency/adapter boundary over copying substantial third-party implementation into the Ada core when that keeps licensing and upgrades cleaner.
+
+The modularity goal is not "MIT at any cost"; it is to keep **Ada-owned architecture and code permissive, understandable, replaceable, and minimally coupled**.
+
 ## Implementation constraints
 
-1. Pin tested PydanticAI and Harness versions rather than tracking floating latest releases.
-2. The prototype baseline is:
+1. Depend on PydanticAI through an Ada-owned runtime adapter; domain/application code should not depend on PydanticAI-specific APIs unless unavoidable.
+2. Pin tested PydanticAI and Harness versions rather than tracking floating latest releases.
+3. The prototype baseline is:
    - `pydantic-ai 2.46.0`
    - `pydantic-ai-harness 0.31.0`
-3. Isolate Harness / StepPersistence behind an Ada-owned adapter because that surface is young and may change.
-4. Keep observability and external telemetry disabled by default for the local profile.
-5. Do not use framework approval/HITL as Ada's authorization boundary.
-6. Do not use framework persistence as long-term authoritative user memory.
-7. Give every consequential action a stable Ada operation ID before provider execution.
-8. Treat provider commit with missing tool result as ambiguous until reconciled.
-9. Explicitly configure and regression-test local model/provider behavior; do not assume unified model settings map correctly for every provider/model combination.
-10. Do not add broad shell/browser/filesystem tools merely because the framework supports tools.
-11. Multi-agent architecture is not required for the MVP; introduce additional agents only when a confirmed capability benefits from separation.
+4. Isolate Harness / StepPersistence behind an Ada-owned adapter because that surface is young and may change.
+5. Keep observability and external telemetry disabled by default for the local profile.
+6. Do not use framework approval/HITL as Ada's authorization boundary.
+7. Do not use framework persistence as long-term authoritative user memory.
+8. Give every consequential action a stable Ada operation ID before provider execution.
+9. Treat provider commit with missing tool result as ambiguous until reconciled.
+10. Explicitly configure and regression-test local model/provider behavior; do not assume unified model settings map correctly for every provider/model combination.
+11. Do not add broad shell/browser/filesystem tools merely because the framework supports tools.
+12. Multi-agent architecture is not required for the MVP; introduce additional agents only when a confirmed capability benefits from separation.
 
 ## Consequences
 
@@ -147,7 +216,7 @@ PydanticAI may provide:
 
 ### Negative
 
-- Ada must still build its own scheduler/background policy, mail/calendar/travel adapters, permission model, local UI and action ledger.
+- Ada still owns the contracts and Ada-specific semantics for scheduler/background policy, mail/calendar/travel, permissions, UI/application APIs and the action ledger; some implementations may be reused from third-party components rather than built from scratch.
 - Safe hard-crash recovery still requires Ada-owned reconciliation logic.
 - Provider/model profile behavior can require explicit configuration and regression tests.
 - Rapid upstream releases require disciplined version pinning and upgrade validation.
@@ -159,11 +228,13 @@ PydanticAI may provide:
 
 Not selected as the initial foundation.
 
-OpenJarvis demonstrated substantial reusable assistant infrastructure and passed the tested Ada Guard boundary without a fork. It remains the most important alternative.
+OpenJarvis demonstrated substantial reusable assistant infrastructure and passed the tested Ada Guard boundary without a fork. It remains the most important alternative and an important source of implementation ideas and potentially reusable isolated components.
 
-It was not selected because Ada would inherit a larger dependency/audit surface, default external analytics that require hardening, broader capability surface than the MVP needs, and framework-level completion semantics that cannot be treated as authoritative action state.
+It was not selected as the global runtime because Ada would inherit a larger dependency/audit surface, default external analytics that require hardening, broader capability surface than the MVP needs, and framework-level completion semantics that cannot be treated as authoritative action state.
 
-Reconsider OpenJarvis if later evidence shows that its scheduler/server/local-assistant infrastructure materially lowers Ada's lifetime implementation and maintenance cost after unwanted memory, analytics and authority surfaces are constrained.
+This decision does **not** reject selective OpenJarvis reuse. Scheduler, connector, channel, server/UI, event, or proactive-workflow implementations may be evaluated independently and adopted behind Ada-owned interfaces when their reuse value exceeds their coupling, audit, upgrade, and licensing cost.
+
+Reconsider OpenJarvis as the global runtime if later evidence shows that its integrated infrastructure materially lowers Ada's lifetime implementation and maintenance cost after unwanted memory, analytics and authority surfaces are constrained.
 
 ### Microsoft Agent Framework
 
@@ -199,16 +270,24 @@ Re-open this ADR if:
 - Ada requires durable workflow semantics that are awkward or unsafe to implement around PydanticAI;
 - OpenJarvis demonstrates materially lower lifetime cost after Ada-incompatible defaults/surfaces are removed;
 - another candidate becomes materially better aligned with newly confirmed requirements;
-- maintaining the PydanticAI integration becomes comparable to maintaining a minimal Ada runtime.
+- maintaining the PydanticAI integration becomes comparable to maintaining a minimal Ada runtime;
+- Ada-owned interfaces fail to keep runtime/framework replacement reasonably bounded, indicating that the modularity strategy is not working in practice.
 
 ## Follow-up
 
-The next architecture work should define Ada-owned interfaces around the selected runtime rather than immediately building product features:
+The next architecture work should define the Ada-owned modular boundaries before substantial product implementation:
 
 - `AdaGuard`
 - `ActionLedger`
 - privileged provider adapter contract
 - runtime persistence adapter
 - external authoritative memory boundary
+- agent-runtime port with a PydanticAI adapter
+- scheduler port
+- connector/provider ports
+- event/audit port
+- Ada-owned application API for UI/server clients
 
 The implementation should begin with the smallest vertical slice that preserves these boundaries.
+
+For each missing MVP capability, evaluate **reuse / adapt / build** independently. OpenJarvis and other frameworks may supply implementations, but no individual component should become an implicit architectural owner merely because it was convenient to reuse.
