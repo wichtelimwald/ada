@@ -123,6 +123,25 @@ The smoke probe has been changed to:
 
 Do not use the failed first attempt for scoring until the capped-context rerun is available.
 
+## Local Ollama smoke test — capped context
+
+Rerun after correcting the first probe to `JARVIS_NUM_CTX=4096`:
+
+- model: `qwen3:8b`
+- context: 4096
+- output tokens cap: 256
+- result: **success**
+- tool selected: `calendar_conflicts`
+- tool result: correct
+- turns: **2**
+- end-to-end latency: **34.612 s**
+- final answer: correctly identified the 15:00 / 15:15 conflict and 25-minute travel-time issue
+- system stability: stable
+
+This confirms OpenJarvis can run the Ada-style local tool-calling slice on the target M1/16 GB system when the context is constrained appropriately.
+
+The earlier 16k-context crash remains recorded as a test-design/configuration issue rather than a framework failure.
+
 ## Decision impact
 
 ### Security-boundary fit / Ada Guard
