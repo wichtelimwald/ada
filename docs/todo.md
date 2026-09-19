@@ -2,13 +2,15 @@
 
 ## P0 — Product discovery
 
-- [ ] Run the Ada product discovery interview.
-- [ ] Save the resulting questionnaire under `docs/product/`.
-- [ ] Derive a feature inventory and classify MVP / V1 / later / nice-to-have / out-of-scope.
-- [ ] Confirm target user, primary end-to-end MVP journey, and desired "Jarvis-like" interaction qualities.
-- [ ] Confirm privacy/cloud stance at product level, including bystander capture and non-obvious egress.
-- [ ] Confirm initial platform and real hardware constraints without selecting a UI framework.
-- [ ] Confirm distribution ambition and realistic maintainer/time budget.
+- [x] Run the Ada product discovery interview.
+- [x] Save the resulting questionnaire under `docs/product/`.
+- [x] Derive a feature inventory and classify MVP / V1 / later / nice-to-have / out-of-scope.
+- [x] Confirm target user, primary end-to-end MVP journey, and desired "Jarvis-like" interaction qualities.
+- [x] Confirm privacy/cloud stance at product level, including bystander capture and non-obvious egress.
+- [x] Confirm initial platform and real hardware constraints without selecting a UI framework.
+- [x] Confirm distribution ambition and realistic maintainer/time budget.
+
+Product discovery baseline: [`docs/product/interview-questionnaire.md`](product/interview-questionnaire.md).
 
 ## P1 — Cross-cutting constraints
 
