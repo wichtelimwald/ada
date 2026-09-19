@@ -1,0 +1,21 @@
+{
+  "name": "Ada",
+  "build": {
+    "dockerfile": "../Dockerfile",
+    "context": "..",
+    "target": "development"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "ada",
+  "containerEnv": {
+    "PYDANTIC_AI_NO_BANNER": "1",
+    "OLLAMA_BASE_URL": "http://host.docker.internal:11434/v1"
+  },
+  "runArgs": [
+    "--cap-drop=ALL",
+    "--security-opt=no-new-privileges",
+    "--pids-limit=256"
+  ],
+  "postCreateCommand": "python -m pip install --editable . && ./scripts/validate.sh"
+}
