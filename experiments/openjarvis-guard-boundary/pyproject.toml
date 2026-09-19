@@ -1,0 +1,11 @@
+[project]
+name = "ada-openjarvis-guard-probe"
+version = "0.0.0"
+description = "Disposable Ada architecture experiment for OpenJarvis guard-boundary behavior"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "OpenJarvis @ git+https://github.com/open-jarvis/OpenJarvis.git@b03203fb91e3c9a2a23815eb50d5e93b4c0ba4cc",
+]
+
+[tool.uv]
+package = false
