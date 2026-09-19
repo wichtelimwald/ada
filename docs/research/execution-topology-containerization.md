@@ -294,24 +294,87 @@ Docker Desktop is one macOS option, but Ada should not make Docker Desktop itsel
 
 A future friendly install may wrap these prerequisites, but that is outside the current MVP.
 
-## 9. Proposed decision criteria — not yet agreed
+## 9. Agreed decision criteria
 
-Per Ada's evaluation process, **do not score until weights are agreed with the maintainer**.
+Weights were agreed with the maintainer before scoring.
 
-Suggested criteria for this decision:
-
-| Criterion | Proposed weight | Why it matters |
+| Criterion | Weight | Why it matters |
 | --- | ---: | --- |
-| Maintainer simplicity / lifetime operational burden | 20% | One to two evenings per week strongly penalizes IPC and multi-service overhead. |
+| Maintainer simplicity / lifetime operational burden | 15% | One to two evenings per week penalizes unnecessary IPC and multi-service overhead. |
 | Security / host privilege boundary | 20% | Ada processes untrusted content and will eventually hold consequential credentials. |
-| Reproducible installation / deployment | 20% | A public project needs a tractable setup beyond one developer machine. |
+| Reproducible installation / deployment | 15% | A public project needs a tractable setup beyond one developer machine. |
 | Portability / future Linux-server path | 15% | Avoid a permanent macOS-only architecture without a concrete benefit. |
-| Resource overhead on M1 / 16 GB | 10% | Ada shares the family laptop and must yield resources. |
-| Native host integration | 10% | Containers can make macOS-native APIs and files less convenient. |
-| Lock-in / replaceability | 5% | Runtime tooling must not become Ada's domain architecture. |
+| Resource overhead on M1 / 16 GB | 15% | Ada shares the family laptop and must yield resources. |
+| Native host integration | 5% | Containers can make macOS-native APIs and files less convenient. |
+| Lock-in / replaceability | 15% | Ada must be able to replace channels, providers, runtimes, and implementation frameworks without redesigning the core. |
 | **Total** | **100%** | |
 
-These weights are a proposal only.
+## 9a. "Modular monolith" means deployment topology, not architecture coupling
+
+In this evaluation, **monolith** means one initial Ada application process / deployable unit.
+
+It does **not** mean:
+
+- one giant module;
+- shared global state across capabilities;
+- direct dependencies between every feature;
+- a single framework owning all integrations;
+- inability to replace components.
+
+The intended structure is:
+
+```text
+Ada process
+├── stable Ada core/domain
+├── application/use-case layer
+├── ports
+│   ├── AgentRuntimePort
+│   ├── MessageChannelPort        (when first channel is implemented)
+│   ├── CalendarPort
+│   ├── TravelTimePort
+│   ├── SchedulerPort             (when required)
+│   └── MemoryPort                (after Memory ADR)
+└── adapters
+    ├── PydanticAI runtime
+    ├── Email channel
+    ├── future WhatsApp channel
+    ├── calendar provider
+    └── other selected components
+```
+
+Replacing one adapter must not require changes to unrelated domain logic.
+
+Examples:
+
+- email → WhatsApp changes a channel adapter, not the authority model;
+- PydanticAI → another runtime changes the AgentRuntimePort implementation, not Ada Guard or Action Ledger;
+- one calendar provider → another changes CalendarPort implementation, not conflict-domain logic.
+
+### Capability growth model
+
+Ada is expected to gain capabilities over time.
+
+For low-risk, trusted capabilities, an adapter may run in-process for simplicity.
+
+A future third-party plugin mechanism must **not** mean arbitrary downloaded Python code automatically executes inside Ada's trusted process. Higher-risk or less-trusted extensions may require an out-of-process/container sandbox behind the same Ada-owned port.
+
+Therefore topology can evolve per capability:
+
+```text
+today:
+Ada process -> in-process trusted adapter
+
+later, if risk requires:
+Ada process -> same port -> isolated capability process/container
+```
+
+This is the key reason to keep topology and modularity separate decisions.
+
+### Discovery / registration rule
+
+Adapter availability may be discovered for usability, but **privileged capability activation is explicit**.
+
+A newly installed channel, tool, MCP server, or plugin must not gain consequential authority through automatic discovery. It must receive explicit configuration and the applicable Ada grants.
 
 ## 10. Evidence summary before scoring
 
@@ -327,6 +390,39 @@ These weights are a proposal only.
 | Requires IPC now | no | no | yes | yes |
 | Matches maintainer capacity | strong | strong | weak | poor |
 
+## 10a. Evidence-based scoring
+
+Scale:
+
+- **5 — Excellent:** strongly satisfies the criterion with little compensation.
+- **4 — Good:** solid fit with bounded trade-offs.
+- **3 — Adequate:** workable but meaningful cost/compensation remains.
+- **2 — Weak:** significant mismatch or ongoing burden.
+- **1 — Poor:** fundamentally unattractive for this criterion.
+
+| Criterion | Weight | A Native Python | B Container-first modular monolith | C Split core/runtime | D Polyglot services |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Maintainer simplicity | 15% | **4** | **4** | 2 | 1 |
+| Security / host boundary | 20% | 2 | **4** | **5** | 4 |
+| Reproducible install/deploy | 15% | 3 | **5** | 4 | 3 |
+| Portability / Linux server | 15% | 4 | **5** | **5** | 4 |
+| M1 / 16 GB resource use | 15% | **5** | 3 | 3 | 2 |
+| Native host integration | 5% | **5** | 3 | 3 | 4 |
+| Lock-in / replaceability | 15% | **5** | **5** | 4 | 3 |
+| **Weighted total / 100** | **100%** | **76** | **85** | **77** | **59** |
+
+### Score rationale
+
+**A — Native Python (76):** simplest and cheapest at runtime, excellent native integration, and still highly modular if Ada ports are respected. It loses mainly on host isolation and reproducible deployment.
+
+**B — Container-first modular monolith (85):** preserves the same in-code modularity while adding a reproducible Linux runtime and useful host defense in depth. Its main cost is Docker/VM resource overhead and weaker direct macOS integration.
+
+**C — Split core/runtime (77):** strongest security boundary, but the immediate IPC/lifecycle burden is not justified by the current MVP. It remains an important escalation path for riskier capabilities.
+
+**D — Polyglot services (59):** flexible in theory but creates too much packaging, IPC, dependency, and maintenance overhead before Ada has evidence that separate languages/services are needed.
+
+The score does **not** imply that option B's single process is less modular than C or D. Replaceability comes from Ada-owned ports and dependency direction, not process count.
+
 ## 11. Prototype questions
 
 Only two uncertainties could plausibly change the B-vs-A decision:
@@ -336,13 +432,13 @@ Only two uncertainties could plausibly change the B-vs-A decision:
 
 Do **not** prototype split-process IPC unless option C becomes competitive after scoring.
 
-## 12. Preliminary recommendation
+## 12. Recommendation before target-Mac prototype
 
-Subject to agreed weights, use:
+The agreed weighting favors:
 
 > **Python-first modular monolith, container-first runtime, Dev Container for development, host Ollama initially, external authoritative Memory outside the container.**
 
-This is intentionally a **modular monolith**, not a microservice architecture.
+This is intentionally a **modular monolith**, not a microservice architecture. The single-process topology is a KISS starting point; capability replaceability is enforced through Ada-owned ports.
 
 Use one process until a capability introduces a real reason to isolate it, such as:
 
