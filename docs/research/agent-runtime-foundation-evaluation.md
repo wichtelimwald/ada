@@ -65,21 +65,21 @@ Scores below are intentionally provisional. Only evidence-backed uncertainties t
 | Criterion | Weight | OpenJarvis | PydanticAI | Microsoft Agent Framework | LangGraph | Minimal Ada |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Useful MVP reuse | 25% | **5** | 3 | 4 | 2 | 1 |
-| Security-boundary fit / Ada Guard | 20% | 3 | **5** | 4 | 4 | **5** |
+| Security-boundary fit / Ada Guard | 20% | **4** | **5** | 4 | 4 | **5** |
 | Maintainability & stability | 15% | 2 | **4** | 3 | **4** | 2 |
 | Durability / recovery / side-effect safety | 15% | 3 | 4 | **4** | **4** | 2 |
 | Local-first / privacy operating fit | 10% | 4 | **5** | 4 | **5** | **5** |
 | Memory / data-model fit | 5% | 4 | **5** | 4 | 4 | **5** |
 | Integration clarity | 5% | 3 | **5** | 4 | 4 | **5** |
 | Complexity tax / unnecessary surface | 5% | 2 | 4 | 2 | 4 | **5** |
-| **Weighted total / 100** | **100%** | **69** | **83** | **75** | **72** | **62** |
+| **Weighted total / 100** | **100%** | **73** | **83** | **75** | **72** | **62** |
 
 ### Provisional order
 
 1. **PydanticAI — 83**
 2. **Microsoft Agent Framework — 75**
-3. **LangGraph — 72**
-4. **OpenJarvis — 69**
+3. **OpenJarvis — 73**
+4. **LangGraph — 72**
 5. **Minimal Ada runtime — 62**
 
 This is **not** the ADR decision.
@@ -90,7 +90,7 @@ This is **not** the ADR decision.
 
 **Why reuse = 5:** only candidate already close to a local personal-assistant platform, with local engines, MCP, server, scheduler/event infrastructure and broader assistant plumbing.
 
-**Why security = 3:** the #836 capability-gate failure was serious and affected multiple execution paths. The broad fix keeps OpenJarvis viable, but Ada must maintain an independent side-effect boundary.
+**Why security = 4:** the #836 capability-gate failure was serious, but the targeted Ada prototype verified that an Ada-owned privileged tool remained the effective side-effect boundary across direct ToolExecutor, MCP, a tool-using agent, scheduler execution, and the canonical server/direct helper. Denied actions produced zero provider writes without a fork. It is not 5/5 because framework-level run success can still diverge from action success, auto-discovery must be constrained, and the historical enforcement defects justify continued defense in depth.
 
 **Why maintenance = 2 / complexity = 2:** broad, young, fast-moving platform with the largest dependency/audit surface and substantial functionality Ada does not need in the MVP.
 
@@ -146,13 +146,9 @@ If not, Ada must build more lifecycle infrastructure and its lead narrows.
 
 ### OpenJarvis uncertainty
 
-OpenJarvis scores poorly because its large reuse upside is offset by security, maintenance and complexity risk.
+OpenJarvis' targeted Guard-boundary prototype passed across the tested direct, MCP, agent, scheduler, and server/direct-helper paths without a fork. This raises Security-boundary fit from 3/5 to 4/5 and the provisional total from 69 to 73.
 
-A small prototype can determine whether an Ada-owned Guard can remain a single non-bypassable boundary across the relevant OpenJarvis execution paths without forking the framework.
-
-If this fails, OpenJarvis should be dropped despite its feature breadth.
-
-If it succeeds cleanly, its security/durability scores may improve enough to justify further consideration.
+The remaining OpenJarvis uncertainty is no longer whether Ada Guard can be inserted at all. It is whether enough scheduler, server/local-chat, model-runtime, and connector functionality can be reused **without** inheriting unwanted memory, analytics, broad tool exposure, or misleading action-success semantics.
 
 ### MAF / LangGraph uncertainty
 
@@ -163,7 +159,7 @@ Both remain credible fallbacks. Their current research evidence is sufficient to
 To minimize experimental work, prototype **two architectural extremes first**:
 
 1. **PydanticAI** — provisional matrix leader and cleanest Ada-owned architecture.
-2. **OpenJarvis** — highest reuse upside and highest material uncertainty.
+2. **OpenJarvis** — highest reuse upside; Guard-boundary uncertainty resolved positively, but reuse-vs-complexity remains open.
 
 This is not selecting OpenJarvis over the higher-scoring MAF or LangGraph. It is testing the uncertainty most likely to change the decision.
 
@@ -200,7 +196,7 @@ Acceptance questions:
 ## 9. Decision rule after prototypes
 
 - **If PydanticAI validates:** it remains the default candidate unless OpenJarvis demonstrates a clearly lower lifetime implementation/maintenance burden without weakening the Guard boundary.
-- **If OpenJarvis fails the Guard-boundary test or requires a substantial fork:** remove it from the shortlist.
+- **OpenJarvis Guard-boundary result:** passed on the tested paths without a fork; keep it in the serious shortlist.
 - **If PydanticAI recovery proves insufficient:** prototype MAF next.
 - **Use LangGraph next only if explicit durable workflow control becomes more valuable than the extra application infrastructure Ada must build.**
 - **Minimal custom wins only if framework lifecycle/audit burden approaches the cost of maintaining the missing runtime functionality ourselves.**
