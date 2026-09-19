@@ -107,6 +107,22 @@ The experiment used public OpenJarvis extension points:
 
 Ada-specific authorization remained entirely inside Ada-owned code.
 
+## First local Ollama smoke attempt
+
+The first `qwen3:8b` smoke attempt destabilized the target Mac before producing a result.
+
+Post-analysis found that OpenJarvis' Ollama engine defaults to `num_ctx=16384` when `JARVIS_NUM_CTX` is unset. That made the initial comparison unnecessarily aggressive on the M1/16 GB target and asymmetric with the PydanticAI probe.
+
+This incident is therefore recorded as a **test-design issue, not yet an OpenJarvis framework failure**.
+
+The smoke probe has been changed to:
+
+- `JARVIS_NUM_CTX=4096`
+- `max_tokens=256`
+- `max_turns=3`
+
+Do not use the failed first attempt for scoring until the capped-context rerun is available.
+
 ## Decision impact
 
 ### Security-boundary fit / Ada Guard
