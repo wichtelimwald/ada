@@ -9,12 +9,14 @@
 - [x] Confirm privacy/cloud stance at product level, including bystander capture and non-obvious egress.
 - [x] Confirm initial platform and real hardware constraints without selecting a UI framework.
 - [x] Confirm distribution ambition and realistic maintainer/time budget.
+- [x] Create a synthetic representative MVP scenario set for architecture and acceptance testing.
 
-Product discovery baseline: [`docs/product/interview-questionnaire.md`](product/interview-questionnaire.md).
+Product discovery baseline: [`docs/product/interview-questionnaire.md`](product/interview-questionnaire.md).  
+Representative scenarios: [`docs/product/representative-scenarios.md`](product/representative-scenarios.md).
 
 ## P1 — Cross-cutting constraints
 
-Before final capability ADRs, document integration constraints that could make individually attractive choices incompatible:
+Before final capability ADRs, document integration constraints that could make individually attractive choices incompatible. The accepted modular direction is captured in [`docs/architecture/modular-core-boundaries.md`](architecture/modular-core-boundaries.md); the items below remain open until their concrete constraints are settled:
 
 - [ ] Runtime/process topology and IPC expectations.
 - [ ] Packaging, installation, startup/background-operation, and update constraints.
@@ -28,7 +30,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [ ] Face — UI / interaction approach.
 - [ ] Ears — wake word / speech input.
 - [ ] Voice — speech output.
-- [ ] Brain — reasoning / orchestration.
+- [x] Brain — initial agent-runtime/orchestration foundation ([ADR-0002](decisions/ADR-0002-agent-runtime-foundation.md)).
 - [ ] Memory — human-readable stores, agent memory, dedicated local stores, and credible hybrid alternatives.
 - [ ] Hands — computer control / action runtime.
 - [ ] Guard — permission/policy architecture.
