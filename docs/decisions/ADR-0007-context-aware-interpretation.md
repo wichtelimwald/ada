@@ -118,7 +118,7 @@ References:
 
 ### quickadd / ctparse lineage
 
-Acreom's quickadd is an actively maintained fork of the archived Comtravo ctparse project.
+Acreom's quickadd is a fork of the archived Comtravo ctparse project. Its recent substantive maintenance activity is limited, which remains a maintenance concern for Ada.
 
 Relevant properties:
 
@@ -319,7 +319,7 @@ Unknowns remain TBD until characterized; TBD is not a pass.
 | Candidate | License | Local/offline | Privacy/security | Deployment path | Reproducible source | Gate result |
 | --- | --- | --- | --- | --- | --- | --- |
 | dateparser 1.4.3 | PASS — BSD-3-Clause | PASS | PASS | PASS — Python 3.14 target Mac | **CONDITIONAL** — top-level release pinned, transitive graph not yet locked | **CONDITIONAL** |
-| Quickadd 0.6.5 + safe JSON scorer | PASS — MIT | PASS | **CONDITIONAL PASS** — no runtime pickle; production artifact path still to formalize | PASS — Python 3.14 target Mac; Linux validation remains | **CONDITIONAL** — source commit pinned, transitive graph + JSON artifact provenance not yet fully locked | **CONDITIONAL** |
+| Quickadd 0.6.5 + safe JSON scorer | **CONDITIONAL** — code repository is MIT, but scorer-model provenance/redistribution terms have not yet been recorded separately | PASS | **CONDITIONAL PASS** — no runtime pickle; production artifact path still to formalize | PASS — Python 3.14 target Mac; Linux validation remains | **CONDITIONAL** — source commit pinned, transitive graph + JSON artifact provenance not yet fully locked | **CONDITIONAL** |
 | Duckling 59a13ff8 | PASS — BSD-3-Clause | PASS | PASS in reviewed design | **NOT DEMONSTRATED for Ada container path** — pinned upstream Dockerfile fails without modernization; native Haskell path exists upstream | PASS — pinned commit | **DEFERRED / NOT SELECTED** |
 | Microsoft Recognizers-Text | PASS — MIT | PASS | PASS in reviewed design | TBD — stale Python distribution path | TBD | **DEFERRED** |
 | HeidelTime | **FAIL for Ada's MIT distribution strategy** — GPL-3.0 | PASS | PASS in reviewed design | Java/UIMA burden | PASS | **EXCLUDED before scoring** |
@@ -452,7 +452,7 @@ Across all 15 cases, semantic comparison produced:
 
 - 10 agreements;
 - 3 interpretation conflicts;
-- 2 degraded-single-resolver cases;
+- 2 single_resolver_result cases;
 - 0 cases unresolved by both.
 
 Material conflicts:
@@ -471,7 +471,7 @@ Run 1 also confirmed that quickadd installs and executes on Ada's target Python 
 
 | Gate | dateparser | quickadd |
 | --- | --- | --- |
-| License compatibility | PASS — BSD-3-Clause | PASS — MIT |
+| License compatibility | PASS — BSD-3-Clause | **CONDITIONAL** — repository code is MIT; bundled scorer-model provenance/redistribution terms still require separate review |
 | Local/offline operation | PASS | PASS |
 | Privacy/security fit | PASS in current review | **CONDITIONAL PASS** — Run 3 proves a no-pickle JSON scorer path with identical characterized semantics; production integration strategy still required |
 | Supported target deployment | PASS — documented Python 3.14 | PASS on target Mac by characterization; Linux still to retain as supported path |
@@ -650,7 +650,6 @@ ResolverEvidence
   semantic_kind / granularity
   normalized_value
   source_span
-  parser_metadata
 ~~~
 
 Parser-native types never cross the Ada port boundary.
@@ -1013,7 +1012,7 @@ The proposed resolver strategy can move from Proposed to Accepted only when:
 2. no Ada-owned natural-language dictionary is required for ordinary temporal interpretation;
 3. ambiguous, invalid, or conflicting values fail safely without forcing verbose input for obvious context;
 4. the selected primary and shadow adapters map into Ada-owned evidence/derivation types without leaking framework-specific types into core;
-5. license and NOTICE obligations are compatible with Ada's project/distribution strategy;
+5. code, scorer-model/artifact provenance, redistribution terms, and NOTICE obligations are compatible with Ada's project/distribution strategy;
 6. the complete production dependency graph is pinned/auditable rather than only top-level packages;
 7. the Quickadd primary path has a reproducible, versioned, integrity-checked JSON scorer artifact and does not deserialize pickle in Ada's normal build/runtime path;
 8. the selected production adapters are validated in Ada's supported Python/container deployment path, including the future Linux path before that path is claimed supported;
@@ -1040,7 +1039,7 @@ The comparison records `agreement`, `interpretation_conflict`, `single_resolver_
 
 ## Remaining follow-ups before acceptance
 
-1. define the production-safe Quickadd JSON artifact generation/provenance/integrity process;
+1. define the production-safe Quickadd JSON artifact generation/provenance/integrity process, including separate scorer-model licensing/redistribution evidence;
 2. capture a fully resolved production dependency lock rather than relying on top-level pins;
 3. characterize the selected adapters in the intended Ada container/runtime profile and retain Linux validation as a prerequisite before claiming Linux support;
 4. convert the proposed conceptual types/port into an implementation plan without changing the existing Draft -> Proposal -> AdaGuard authority boundary;
