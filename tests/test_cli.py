@@ -73,7 +73,8 @@ class CliTests(unittest.TestCase):
         joined = "\n".join(output)
         self.assertIn("noch nichts in den Kalender eingetragen", joined)
         self.assertIn("Endzeit oder Dauer", joined)
-        self.assertNotIn("eingetragen.", joined.splitlines()[-1] if joined else "")
+        self.assertNotIn("Termin wurde eingetragen", joined)
+        self.assertNotIn("appointment was created", joined)
 
     def test_chat_recovers_from_runtime_error_without_action_claim(self) -> None:
         inputs = iter(("calendar request", "/quit"))
