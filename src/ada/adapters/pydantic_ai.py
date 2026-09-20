@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Protocol, Sequence
 
-from ada.core.actions import CreateCalendarEventProposal
+from ada.core.actions import (
+    CreateCalendarEventDraft,
+    CreateCalendarEventProposal,
+)
 from ada.ports.agent_runtime import AgentRequest, AgentResponse, AgentRuntimePort
 
 
@@ -54,6 +57,8 @@ class PydanticAIRuntime(AgentRuntimePort):
                 self._message_history = tuple(all_messages())
 
         output = result.output
+        if isinstance(output, CreateCalendarEventDraft):
+            return AgentResponse(text="", drafts=(output,))
         if isinstance(output, CreateCalendarEventProposal):
             return AgentResponse(text="", proposals=(output,))
 
