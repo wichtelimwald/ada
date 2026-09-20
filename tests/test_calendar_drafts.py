@@ -177,9 +177,24 @@ class CalendarDraftTests(unittest.TestCase):
 
         self.assertEqual(assessment.missing, ("calendar",))
 
-    def test_unknown_calendar_id_is_not_accepted_even_if_nonempty(self) -> None:
+    def test_explicit_calendar_target_can_be_corroborated(self) -> None:
         draft = _draft(
             calendar_id="work",
+        )
+
+        assessment = assess_calendar_create_draft(
+            draft,
+            source_text=(
+                "Please add the dentist appointment on 2026-09-21 "
+                "from 16:00 to 16:30 to the work calendar."
+            ),
+        )
+
+        self.assertEqual(assessment.missing, ())
+
+    def test_mismatched_calendar_target_is_not_accepted(self) -> None:
+        draft = _draft(
+            calendar_id="family",
         )
 
         assessment = assess_calendar_create_draft(
