@@ -63,3 +63,27 @@ If the community binding is not sufficiently maintainable or compatible, compare
 1. local Cedar sidecar around the official Rust engine;
 2. tiny Ada-owned PyO3 bridge to the official engine;
 3. small Ada evaluator as fallback/control.
+
+
+## Target-Mac run 2
+
+Cedar authorization itself behaved correctly in all ten tests.
+
+Result:
+
+- **7 tests passed**
+- **3 tests failed only on expected rule-label assertions**
+- all three failures returned the correct authorization decision and the correct determining Cedar policy, but `diagnostics.reasons` exposed parser-generated ids (`policy0`, `policy1`, `policy2`) rather than the human `@id(...)` annotations expected by the experiment.
+
+This matches cedarpy 4.12.0's documented contract:
+
+- `diagnostics.reasons` contains Cedar/parser policy IDs;
+- `diagnostics.id_annotations_by_reason` maps those IDs to optional human-readable `@id` annotations.
+
+The adapter now maps each determining Cedar policy ID through `id_annotations_by_reason`, falling back to the Cedar ID when no annotation exists.
+
+This is diagnostics translation only; authorization semantics were already correct in run 2.
+
+### Production implication
+
+Ada-generated grants/policies should assign unique, stable `@id` values derived from Ada's own grant/rule identifiers. Cedar's internal policy IDs remain engine-local details.
