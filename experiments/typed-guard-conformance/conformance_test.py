@@ -63,6 +63,7 @@ class GuardConformanceTests(unittest.TestCase):
         self.assertEqual(decision.effect, Effect.ALLOW)
         self.assertEqual(decision.reason_code, "matching_grant")
         self.assertEqual(decision.matched_rule_ids, ("grant-school-calendar",))
+        self.assertEqual(decision.policy_version, "prototype-v1")
 
     def test_02_same_create_without_grant_is_default_denied(self) -> None:
         decision = evaluate(request(), [])
