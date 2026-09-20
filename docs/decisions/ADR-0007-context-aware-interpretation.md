@@ -559,6 +559,8 @@ Source inspection shows that Quickadd's trained scorer state consists only of pr
 
 These values are directly representable in a transparent JSON schema. The model does **not** require an inherently pickle-specific runtime representation.
 
+License/provenance remains a separate hard gate. At the pinned Quickadd revision, `ctparse/models/model.pbz` is bundled as package data in a repository whose top-level code license is MIT. The reviewed packaging/source does not separately document the scorer model's origin, training-data provenance, or redistribution terms. Under Ada's NOTICE policy, the repository code license is therefore insufficient evidence to mark the transformed JSON scorer artifact as license-cleared. Ada must not vendor or redistribute that artifact until those terms are explicitly recorded.
+
 This creates a plausible hardening path: convert the trusted pinned upstream model once in a controlled research/build step, then load only primitive JSON at runtime. A new `quickadd-json` characterization backend has been added to test whether this preserves exact semantics without runtime `pickle.load()`.
 
 At Run 2 the no-pickle equivalence was still unproven. Run 3 later demonstrated equivalent behavior with a JSON-backed scorer; this Run 2 statement is retained only as historical research context.
