@@ -43,6 +43,10 @@ For Ada development:
 - **cedarpy 4.12.0** — Apache License 2.0. Community-maintained Python/PyO3 binding used only behind AdaGuard.
 - **Cedar Policy engine 4.12.0** — Apache License 2.0. Embedded by cedarpy as the authorization engine selected by ADR-0004.
 
+## Accepted dependency pending implementation
+
+- **DBOS 3.0.0** — MIT License. Accepted by ADR-0005 as Ada's initial durable-execution substrate behind Ada-owned action/outcome semantics. It is not yet a runtime dependency in the production scaffold.
+
 Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; third-party code is not relicensed as Ada MIT code. Required license and NOTICE material must be preserved when distribution obligations apply.
 
 When a third-party component is adopted or upgraded, add or update the required attribution/notices and exact reviewed version here before merge.
