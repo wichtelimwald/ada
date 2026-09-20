@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from ada.core.actions import ActionProposal
+from ada.core.actions import ActionDraft, ActionProposal
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +18,7 @@ class AgentResponse:
     """Framework-neutral result returned by an agent runtime adapter."""
 
     text: str
+    drafts: tuple[ActionDraft, ...] = ()
     proposals: tuple[ActionProposal, ...] = ()
 
 
