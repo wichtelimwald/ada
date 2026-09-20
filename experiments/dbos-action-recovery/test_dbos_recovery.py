@@ -71,7 +71,12 @@ class DBOSActionRecoveryTests(unittest.TestCase):
 
         recovered = self.run_worker("recover", operation_id)
         self.assertEqual(recovered.returncode, 0, recovered.stderr)
-        payload = json.loads(recovered.stdout.strip().splitlines()[-1])
+        json_lines = [
+            line for line in recovered.stdout.splitlines()
+            if line.strip().startswith("{")
+        ]
+        self.assertTrue(json_lines, recovered.stdout)
+        payload = json.loads(json_lines[-1])
 
         self.assertEqual(payload["workflow_id"], operation_id)
         self.assertEqual(payload["result"], f"evt-{operation_id}")
