@@ -13,12 +13,15 @@ _CALENDAR_CONTEXT_RE = re.compile(
 
 _CALENDAR_ACTION_RE = re.compile(
     r"(?:"
-    r"\beintragen\b|\beingetragen\b|\bhinzufügen\b|\bhinzugefügt\b|"
+    r"\beintragen\b|\beingetragen\b|"
+    r"\btrag(?:e|st|t)?\b[^.!?\n]{0,120}\bein\b|"
+    r"\bhinzufügen\b|\bhinzugefügt\b|"
+    r"\bfüg(?:e|st|t)?\b[^.!?\n]{0,120}\bhinzu\b|"
     r"\berstellen\b|\berstellt\b|\banlegen\b|\bangelegt\b|"
     r"\bspeichern\b|\bgespeichert\b|\bbuchen\b|\bgebucht\b|"
     r"\bändern\b|\bgeändert\b|\blöschen\b|\bgelöscht\b|"
     r"\bverschieben\b|\bverschoben\b|\bplanen\b|\bgeplant\b|"
-    r"\badd\b|\badded\b|\bcreate\b|\bcreated\b|"
+    r"\badd\b|\badded\b|\bput\b|\bcreate\b|\bcreated\b|"
     r"\bschedule\b|\bscheduled\b|\bsave\b|\bsaved\b|"
     r"\bbook\b|\bbooked\b|\bchange\b|\bchanged\b|"
     r"\bdelete\b|\bdeleted\b|\bremove\b|\bremoved\b|"
