@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from urllib.parse import urlparse
+import json
+from urllib.error import URLError
+from urllib.parse import urlparse, urlunparse
+from urllib.request import urlopen
 
 from pydantic_ai import Agent
 from pydantic_ai.models.ollama import OllamaModel
@@ -18,6 +21,10 @@ DEFAULT_OLLAMA_MODEL = "qwen3:8b"
 
 class LocalModelConfigurationError(ValueError):
     """The local model profile violates Ada's local-only assumptions."""
+
+
+class LocalModelUnavailableError(RuntimeError):
+    """The configured loopback Ollama service/model is not ready."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +50,45 @@ def validate_local_ollama_base_url(base_url: str) -> None:
     if parsed.path.rstrip("/") != "/v1":
         raise LocalModelConfigurationError(
             "Ollama URL must point to the OpenAI-compatible /v1 endpoint"
+        )
+
+
+
+def check_local_ollama_ready(
+    config: LocalOllamaConfig,
+    *,
+    timeout_seconds: float = 2.0,
+) -> None:
+    """Fail early with a concise error when the local service/model is unavailable."""
+
+    validate_local_ollama_base_url(config.base_url)
+    parsed = urlparse(config.base_url)
+    tags_url = urlunparse(
+        parsed._replace(
+            path="/api/tags",
+            params="",
+            query="",
+            fragment="",
+        )
+    )
+
+    try:
+        with urlopen(tags_url, timeout=timeout_seconds) as response:
+            payload = json.load(response)
+    except (OSError, URLError, ValueError) as exc:
+        raise LocalModelUnavailableError(
+            f"cannot reach local Ollama at {parsed.scheme}://{parsed.netloc}"
+        ) from exc
+
+    installed = {
+        str(model.get("name") or model.get("model"))
+        for model in payload.get("models", ())
+        if isinstance(model, dict) and (model.get("name") or model.get("model"))
+    }
+    if config.model not in installed:
+        raise LocalModelUnavailableError(
+            f"local Ollama model {config.model!r} is not installed; "
+            f"run: ollama pull {config.model}"
         )
 
 
