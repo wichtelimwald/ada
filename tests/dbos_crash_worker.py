@@ -108,7 +108,7 @@ class PersistentCrashCalendarAdapter:
             calendar_id=proposal.calendar_id,
             location=proposal.location,
         )
-        with _connect(self._provider_db) as con:
+        with closing(_connect(self._provider_db)) as con:
             con.execute("INSERT INTO calls(kind) VALUES ('create')")
             con.execute(
                 """
