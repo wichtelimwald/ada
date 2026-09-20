@@ -18,7 +18,7 @@ from ada.ports.agent_runtime import AgentRequest
 
 
 class FakeRunResult:
-    def __init__(self, output: str, messages: Sequence[Any]) -> None:
+    def __init__(self, output: Any, messages: Sequence[Any]) -> None:
         self.output = output
         self._messages = tuple(messages)
 
@@ -65,6 +65,34 @@ class LocalChatRuntimeTests(unittest.TestCase):
         runtime.reset_session()
         runtime.run(AgentRequest(text="after reset"))
         self.assertIsNone(agent.calls[2][1])
+
+    def test_pydantic_runtime_keeps_calendar_draft_out_of_proposals(self) -> None:
+        draft = CreateCalendarEventDraft(
+            title="Zahnarzt",
+            date="21.09.",
+            start_time="16:00",
+            calendar_id="family",
+            language="de",
+            unresolved=("year", "end_time"),
+        )
+
+        class DraftAgent:
+            def run_sync(
+                self,
+                prompt: str,
+                *,
+                message_history: Sequence[Any] | None = None,
+            ) -> FakeRunResult:
+                del prompt, message_history
+                return FakeRunResult(draft, ())
+
+        response = PydanticAIRuntime(DraftAgent()).run(
+            AgentRequest(text="calendar request")
+        )
+
+        self.assertEqual(response.drafts, (draft,))
+        self.assertEqual(response.proposals, ())
+        self.assertEqual(response.text, "")
 
     def test_local_runtime_configures_non_executable_calendar_draft_output(self) -> None:
         captured: dict[str, Any] = {}
