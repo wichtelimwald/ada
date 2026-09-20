@@ -6,6 +6,7 @@ import sys
 import unittest
 
 from ada.cli import _chat_loop
+from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest, AgentResponse
 
 
@@ -22,6 +23,30 @@ class FakeChatRuntime:
         self.reset_count += 1
 
 
+class DraftRuntime:
+    def run(self, request: AgentRequest) -> AgentResponse:
+        del request
+        return AgentResponse(
+            text="",
+            drafts=(
+                CreateCalendarEventDraft(
+                    title="Zahnarzt",
+                    date="21.09.",
+                    start_time="16:00",
+                    calendar_id="family",
+                    language="de",
+                    unresolved=("year", "end_time"),
+                ),
+            ),
+        )
+
+
+class FailingRuntime:
+    def run(self, request: AgentRequest) -> AgentResponse:
+        del request
+        raise RuntimeError("synthetic model parse failure")
+
+
 class CliTests(unittest.TestCase):
     def test_doctor(self) -> None:
         result = subprocess.run(
@@ -33,6 +58,38 @@ class CliTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["status"], "ok")
         self.assertIn("python", payload)
+
+    def test_chat_renders_calendar_draft_without_execution_claim(self) -> None:
+        inputs = iter(("add dentist appointment", "/quit"))
+        output: list[str] = []
+
+        result = _chat_loop(
+            DraftRuntime(),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertIn("noch nichts in den Kalender eingetragen", joined)
+        self.assertIn("Endzeit oder Dauer", joined)
+        self.assertNotIn("eingetragen.", joined.splitlines()[-1] if joined else "")
+
+    def test_chat_recovers_from_runtime_error_without_action_claim(self) -> None:
+        inputs = iter(("calendar request", "/quit"))
+        output: list[str] = []
+
+        result = _chat_loop(
+            FailingRuntime(),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        self.assertIn(
+            "Ada: I could not reliably process that request. No action was executed.",
+            output,
+        )
 
     def test_chat_loop_keeps_running_and_can_reset_session(self) -> None:
         runtime = FakeChatRuntime()
