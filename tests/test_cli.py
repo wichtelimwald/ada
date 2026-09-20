@@ -4,6 +4,7 @@ import json
 import subprocess
 import sys
 import unittest
+from unittest.mock import patch
 
 from ada.cli import _chat_loop, build_parser
 from ada.core.actions import CreateCalendarEventDraft
@@ -51,7 +52,8 @@ class FailingRuntime:
 
 class CliTests(unittest.TestCase):
     def test_chat_defaults_to_qwen35_9b(self) -> None:
-        args = build_parser().parse_args(["chat"])
+        with patch("ada.cli.os.getenv", side_effect=lambda key, default=None: default):
+            args = build_parser().parse_args(["chat"])
 
         self.assertEqual(args.model, "qwen3.5:9b")
 
