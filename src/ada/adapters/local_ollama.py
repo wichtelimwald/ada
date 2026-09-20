@@ -23,7 +23,7 @@ from ada.core.personality import (
 
 
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434/v1"
-DEFAULT_OLLAMA_MODEL = "qwen3:8b"
+DEFAULT_OLLAMA_MODEL = "qwen3.5:9b"
 
 
 class LocalModelConfigurationError(ValueError):
@@ -138,7 +138,9 @@ Do not invent material details. In particular:
 - do not invent a year when the user gives only a day/month;
 - do not invent an end time or duration;
 - do not invent a location;
-- set missing fields to null and list unresolved material details in "unresolved";
+- set missing fields to null;
+- in "unresolved", use only these canonical values when applicable:
+  "title", "year", "date", "start_time", "end_time", "calendar";
 - use language="de" for German requests and language="en" for English requests;
 - use calendar_id="family" only when the user explicitly refers to the family
   calendar / Familienkalender.
