@@ -6,7 +6,7 @@ from ada.ports.agent_runtime import AgentResponse
 
 
 _CALENDAR_CONTEXT_RE = re.compile(
-    r"\b(?:kalender|calendar|termin|appointment|event|ereignis)\b",
+    r"(?:\bkalender\b|\bcalendar\b|\b\w*termin\b|\bappointment\b|\bevent\b|\bereignis\b)",
     re.IGNORECASE,
 )
 
