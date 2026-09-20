@@ -46,14 +46,12 @@ def _source_explicitly_supports_date(
     """
 
     year = str(value.year)
-    short_year = year[-2:]
     month = str(value.month)
     day = str(value.day)
 
     patterns = (
         rf"(?<!\d){year}\s*[-/.]\s*0?{month}\s*[-/.]\s*0?{day}(?!\d)",
         rf"(?<!\d)0?{day}\s*[-/.]\s*0?{month}\s*[-/.]\s*{year}(?!\d)",
-        rf"(?<!\d)0?{day}\s*[-/.]\s*0?{month}\s*[-/.]\s*{short_year}(?!\d)",
     )
     return any(re.search(pattern, source_text) for pattern in patterns)
 
