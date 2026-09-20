@@ -35,13 +35,14 @@ The script currently:
 
 1. creates isolated environments for dateparser, normal Quickadd, and Quickadd with the scorer disabled;
 2. installs the top-level research candidates independently;
-3. runs the shared characterization corpus;
-4. exports the pinned Quickadd scorer to primitive JSON when the normal Quickadd run succeeds;
-5. creates a fourth isolated Quickadd environment that loads that JSON scorer without runtime pickle deserialization;
-6. prints a compact human-readable summary by default;
-7. writes full raw JSON and comparison payloads in the temporary run directory for the duration of the run;
-8. prints pairwise semantic comparison counts for dateparser vs Quickadd, Quickadd vs DummyScorer, and Quickadd vs JSON-backed scorer when the relevant runs succeed;
-9. treats Quickadd availability/expected behavior and Quickadd-vs-JSON safe-path availability/semantic equivalence as regression gates; dateparser and DummyScorer remain diagnostic evidence.
+3. instruments the pinned Quickadd research environments so upstream `CTParseTimeoutError` is surfaced instead of being collapsed into an ordinary non-match;
+4. runs the shared characterization corpus;
+5. exports the pinned Quickadd scorer to primitive JSON when the normal Quickadd run succeeds;
+6. creates a fourth isolated Quickadd environment that loads that JSON scorer without runtime pickle deserialization;
+7. prints a compact human-readable summary by default;
+8. writes full raw JSON and comparison payloads in the temporary run directory for the duration of the run;
+9. prints pairwise semantic comparison counts for dateparser vs Quickadd, Quickadd vs DummyScorer, and Quickadd vs JSON-backed scorer when the relevant runs succeed;
+10. treats Quickadd availability/expected behavior and Quickadd-vs-JSON safe-path availability/semantic equivalence as regression gates; dateparser and DummyScorer remain diagnostic evidence.
 
 Use `VERBOSE=1` to print the full raw JSON, comparison payloads, preparation details, and captured warnings:
 
@@ -65,7 +66,7 @@ For each case, the comparison reports one of:
 - input_error — at least one resolver raised an input-specific error while processing the expression;
 - unresolved — neither produced a result and neither reported an input error.
 
-These comparison states do not represent operational health. In particular, `single_resolver_result` must not be interpreted as degraded availability.
+These comparison states do not represent operational health. In particular, `single_resolver_result` must not be interpreted as degraded availability. Backend import/setup failures terminate that backend run instead of being repeated as per-input errors; the research-only Quickadd instrumentation preserves parser timeouts as input-specific failures.
 
 These states are evidence, not final Ada execution policy.
 
