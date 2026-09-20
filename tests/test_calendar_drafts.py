@@ -63,6 +63,12 @@ class CalendarDraftTests(unittest.TestCase):
         self.assertIn("Datum mit Jahr", response)
         self.assertIn("Endzeit oder Dauer", response)
 
+    def test_source_text_is_required_for_draft_assessment(self) -> None:
+        draft = _draft()
+
+        with self.assertRaises(TypeError):
+            assess_calendar_create_draft(draft)  # type: ignore[call-arg]
+
     def test_model_cannot_invent_missing_year_from_partial_source(self) -> None:
         draft = _draft(
             title="Zahnarzt",
