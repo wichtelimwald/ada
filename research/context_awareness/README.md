@@ -100,3 +100,28 @@ Re-run the same command:
 ~~~sh
 sh research/context_awareness/run.sh
 ~~~
+
+
+## Optional Duckling benchmark
+
+After Run 3 demonstrated a safe JSON-backed Quickadd path, the remaining major trade-off is maintenance burden versus adopting a heavier independently maintained specialist.
+
+An optional Duckling benchmark is therefore provided:
+
+~~~sh
+sh research/context_awareness/run_duckling.sh
+~~~
+
+The script:
+
+1. requires a locally available Docker daemon;
+2. clones the upstream Facebook Duckling repository;
+3. checks out pinned commit `59a13ff87b1aa8be6b93d387244f8636b26185c5`;
+4. builds the **upstream Dockerfile locally** instead of trusting a third-party image;
+5. binds the service only to `127.0.0.1:18000`;
+6. runs the same characterization corpus with explicit reference time, `de_DE`, and `Europe/Berlin`;
+7. removes the container and temporary source checkout afterward.
+
+A build failure is itself useful operational evidence. The current upstream Dockerfile still uses a Haskell 8 / Debian Buster build/runtime base, which may impose significant maintenance cost even if Duckling's temporal semantics are strong.
+
+This benchmark remains research-only and does not add Duckling to Ada's runtime dependencies.
