@@ -44,6 +44,12 @@ class DraftRuntime:
         )
 
 
+class FalseCompletionRuntime:
+    def run(self, request: AgentRequest) -> AgentResponse:
+        del request
+        return AgentResponse(text="Ich habe den Termin eingetragen.")
+
+
 class FailingRuntime:
     def run(self, request: AgentRequest) -> AgentResponse:
         del request
@@ -84,6 +90,24 @@ class CliTests(unittest.TestCase):
         self.assertIn("Endzeit oder Dauer", joined)
         self.assertNotIn("Termin wurde eingetragen", joined)
         self.assertNotIn("appointment was created", joined)
+
+    def test_chat_blocks_unverified_calendar_completion_claim(self) -> None:
+        inputs = iter((
+            "Kannst du den Termin in den Kalender eintragen?",
+            "/quit",
+        ))
+        output: list[str] = []
+
+        result = _chat_loop(
+            FalseCompletionRuntime(),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertNotIn("Ich habe den Termin eingetragen.", joined)
+        self.assertIn("No calendar action was executed.", joined)
 
     def test_chat_recovers_from_runtime_error_without_action_claim(self) -> None:
         inputs = iter(("calendar request", "/quit"))
