@@ -41,7 +41,7 @@ The script currently:
 6. prints a compact human-readable summary by default;
 7. writes full raw JSON and comparison payloads in the temporary run directory for the duration of the run;
 8. prints pairwise semantic comparison counts for dateparser vs Quickadd, Quickadd vs DummyScorer, and Quickadd vs JSON-backed scorer when the relevant runs succeed;
-9. treats Quickadd's explicitly expected corpus and Quickadd-vs-JSON semantic equivalence as regression gates.
+9. treats Quickadd availability/expected behavior and Quickadd-vs-JSON safe-path availability/semantic equivalence as regression gates; dateparser and DummyScorer remain diagnostic evidence.
 
 Use `VERBOSE=1` to print the full raw JSON, comparison payloads, preparation details, and captured warnings:
 
