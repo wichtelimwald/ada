@@ -671,17 +671,17 @@ After canonicalization:
 - **operational_degraded** — one resolver is independently unavailable before processing the expression;
 - **invalid_or_ambiguous** — deterministic validation finds invalid wall time, unresolved policy ambiguity, impossible date, etc.
 
-### Interpretation assurance levels
+### Resolution requirements
 
-The application/policy layer requests an assurance level; the temporal resolver does not decide action risk itself.
+The application/policy layer requests a `ResolutionRequirement`; the temporal resolver does not decide action risk itself.
 
-| Assurance | Meaning | Initial use |
+| Resolution requirement | Meaning | Initial use |
 | --- | --- | --- |
 | `standard` | one validated primary result may be sufficient unless comparable evidence conflicts | reversible MVP calendar drafting/proposals |
 | `corroborated` | contextual derivation requires two comparable agreeing resolvers, or an explicit deterministically validated value | future higher-consequence actions/policies |
 | `explicit_only` | no contextual temporal derivation is accepted | future domains where inferred timing is unacceptable |
 
-AdaGuard and authority checks remain downstream and independent. Passing interpretation assurance never grants execution permission.
+AdaGuard and authority checks remain downstream and independent. Satisfying a resolution requirement never grants execution permission.
 
 ### Decision table
 
@@ -716,6 +716,243 @@ Redundancy is also an availability mechanism, but degraded mode is deliberately 
 - every degraded resolution records resolver/version/provenance so later audit can distinguish it from the normal primary path.
 
 This prevents attacker-controlled or pathological input from deliberately knocking out the primary interpretation path merely to obtain different fallback semantics.
+
+## Minimal Ada-owned data model
+
+This section intentionally fixes the semantic boundaries before implementation. The types below are provisional names but their responsibilities are part of the ADR decision.
+
+### Design rule
+
+Keep **trusted environment context**, **untrusted semantic extraction**, **resolver evidence**, **Ada-owned resolved values**, **value derivation**, and **authorization** as separate concepts.
+
+Do not create one generic context/provenance/confidence object that can silently accumulate authority over time.
+
+### 1. `InterpretationContext`
+
+Purpose: immutable trusted runtime facts that can legitimately affect interpretation.
+
+Minimal fields:
+
+~~~text
+InterpretationContext
+  now: aware datetime
+  timezone: IANA timezone id
+  locale: locale/language identifier
+~~~
+
+Construction:
+
+- created by Ada/application infrastructure, never by the model;
+- `now` must be timezone-aware;
+- timezone must be an explicit IANA zone such as `Europe/Berlin`, not merely a UTC offset;
+- locale is context for parsing, not authority.
+
+Explicitly excluded:
+
+- calendar IDs or provider resources;
+- permissions/grants;
+- actor identity/authentication assurance;
+- arbitrary Memory contents;
+- learned habits/preferences;
+- parser policy such as `prefer_future`;
+- model confidence.
+
+Reason: adding these would turn `InterpretationContext` into a cross-domain God-object and risk conflating convenience context with authorization.
+
+Calendar/default-calendar resolution should later have its own domain context/type. Memory-selected preferences should enter through an explicit, provenance-carrying input rather than being copied wholesale into this object.
+
+### 2. `TemporalExpression`
+
+Purpose: Ada-owned normalized semantic request presented to temporal resolvers.
+
+Minimal conceptual fields:
+
+~~~text
+TemporalExpression
+  raw_text: str
+  expected_kind: date | time | datetime | interval | duration | recurrence
+  semantic_form: absolute | partial | relative | weekday | qualified_weekday | other
+  source_span: verified text span
+~~~
+
+`raw_text` is still untrusted user/model-derived content. `expected_kind` and `semantic_form` are semantic claims, not facts or authority.
+
+`source_span` is accepted into the Ada-owned type only after deterministic verification against the original source text. A model-provided offset is advisory until verified.
+
+Explicitly excluded:
+
+- normalized date/time values;
+- permissions;
+- target calendar;
+- confidence probability;
+- resolver choice;
+- fallback decision.
+
+Reason: this type says *what needs interpretation*, not *what the answer is*.
+
+### 3. `ResolverEvidence`
+
+Purpose: canonical Ada-owned representation of one resolver's observation.
+
+Minimal conceptual fields:
+
+~~~text
+ResolverEvidence
+  resolver_id: str
+  resolver_version: str
+  operational_state: available | unavailable
+  parse_state: resolved | unresolved | input_error | timeout
+  semantic_kind: optional TemporalKind
+  granularity: optional parser-independent granularity
+  normalized_value: optional canonical temporal value
+~~~
+
+`operational_state` is established independently of the current expression. This is necessary to distinguish genuine degraded availability from an input-triggered failure.
+
+Parser-specific objects and arbitrary metadata do not cross the port boundary.
+
+Explicitly excluded:
+
+- arbitrary parser-native metadata dictionaries;
+- model confidence;
+- authorization/permission state;
+- automatic decision such as 'accept this result';
+- raw secrets or unrelated source text.
+
+Reason: evidence must remain comparable across Quickadd, dateparser, or future resolvers.
+
+### 4. `ValueDerivation`
+
+Purpose: explain how a material resolved value came to exist.
+
+The name deliberately differs from Ada's existing `InstructionProvenance`, which answers a different security question: where an instruction came from.
+
+Initial derivation kinds:
+
+~~~text
+explicit
+context_derived
+defaulted
+~~~
+
+`memory_derived` is deliberately **not** added by this ADR. Memory semantics and trust are a separate upcoming architecture decision; that ADR may extend the derivation model later.
+
+For a context-derived temporal value the derivation records only the minimum reconstructable basis, conceptually:
+
+~~~text
+ValueDerivation
+  kind
+  source_span
+  reference_time
+  timezone
+  locale
+  resolution_policy_id / version
+  supporting_resolver_ids / versions
+~~~
+
+Not every field is present for every derivation kind.
+
+Explicitly excluded:
+
+- permission/authority;
+- actor identity;
+- general Memory snapshot;
+- full conversation history;
+- secret/provider credentials;
+- a numerical confidence score.
+
+Rule: **derivation can explain a value but can never authorize an action**.
+
+### 5. `TemporalResolution`
+
+Purpose: Ada-owned validated interpretation result after resolver comparison and deterministic temporal validation.
+
+Conceptually:
+
+~~~text
+TemporalResolution
+  semantic_kind
+  canonical_value
+  derivation: ValueDerivation
+  resolution_state
+~~~
+
+Initial `resolution_state` is one of:
+
+- `resolved`;
+- `needs_clarification`;
+- `invalid`;
+- `operationally_degraded`.
+
+A `TemporalResolution` is **not an executable action proposal**. It may be used by application code to complete a non-executable draft. Only the existing later application step may construct an executable `CreateCalendarEventProposal`, which must still pass Ada-owned validation and AdaGuard.
+
+Resolver evidence may be attached to an ephemeral resolution trace for diagnostics/audit, but full evidence objects should not automatically become part of executable proposal identity or durable action payloads.
+
+Reason: action identity should describe *what Ada intends to do*, not which parser happened to produce the date.
+
+### 6. `ResolutionRequirement`
+
+Purpose: caller-requested interpretation strictness.
+
+~~~text
+ResolutionRequirement
+  standard
+  corroborated
+  explicit_only
+~~~
+
+This replaces the ambiguous phrase 'interpretation assurance'. It must not be confused with the existing `AuthenticationAssurance` used by authorization.
+
+Explicit rule:
+
+~~~text
+ResolutionRequirement != AuthenticationAssurance != Permission
+~~~
+
+A high-resolution requirement cannot grant authority. Strong authentication cannot turn an ambiguous date into an unambiguous one. Resolver agreement cannot increase channel authentication.
+
+### Why there is no `ConfidenceScore`
+
+Ada deliberately does not introduce a cross-parser/model numerical confidence score in this slice.
+
+Reasons:
+
+- Quickadd and dateparser scores/metadata are not calibrated against each other;
+- a precise-looking number would obscure categorical failures such as wrong semantic kind;
+- security behavior should depend on explicit states and policies, not an arbitrary threshold;
+- confidence does not equal authority.
+
+The useful signals are categorical and inspectable: expected kind, resolved/unresolved, comparable/non-comparable, agreement/conflict, explicit/context-derived, valid/ambiguous/invalid, and operational health.
+
+### Separation from existing calendar types
+
+`CreateCalendarEventDraft` remains the non-executable domain intent and `CreateCalendarEventProposal` remains the executable proposal shape.
+
+ADR-0007 does **not** add temporal resolver fields directly to `CreateCalendarEventProposal` and does not change its action binding.
+
+The intended application flow is:
+
+~~~text
+model output / draft
+        ↓
+verified TemporalExpression(s)
+        ↓
+InterpretationContext + ResolutionRequirement
+        ↓
+TemporalResolverPort(s) -> ResolverEvidence
+        ↓
+Ada resolution policy + zoneinfo validation
+        ↓
+TemporalResolution + ValueDerivation
+        ↓
+completed non-executable draft
+        ↓
+existing proposal construction / validation
+        ↓
+AdaGuard
+~~~
+
+This keeps framework choice, parser choice, derivation evidence, action identity, and authorization independently replaceable.
 
 ## Acceptance criteria for the implementation choice
 
