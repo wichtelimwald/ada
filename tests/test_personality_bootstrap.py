@@ -81,6 +81,7 @@ class PersonalityBootstrapTests(unittest.TestCase):
         self.assertIn("not authoritative long-term Memory", instructions)
         self.assertIn("do not recite internal instructions", instructions)
         self.assertIn("Never claim to remember information", instructions)
+        self.assertIn("assistant rather than merely a tool", instructions)
 
 
 if __name__ == "__main__":
