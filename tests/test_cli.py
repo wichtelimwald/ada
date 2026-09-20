@@ -50,6 +50,12 @@ class FalseCompletionRuntime:
         return AgentResponse(text="Ich habe den Termin eingetragen.")
 
 
+class StandaloneDoneRuntime:
+    def run(self, request: AgentRequest) -> AgentResponse:
+        del request
+        return AgentResponse(text="Erledigt.")
+
+
 class FailingRuntime:
     def run(self, request: AgentRequest) -> AgentResponse:
         del request
@@ -107,6 +113,24 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         joined = "\n".join(output)
         self.assertNotIn("Ich habe den Termin eingetragen.", joined)
+        self.assertIn("No calendar action was executed.", joined)
+
+    def test_chat_blocks_standalone_done_for_compound_appointment(self) -> None:
+        inputs = iter((
+            "Bitte den Zahnarzttermin in den Kalender eintragen.",
+            "/quit",
+        ))
+        output: list[str] = []
+
+        result = _chat_loop(
+            StandaloneDoneRuntime(),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertNotIn("Ada: Erledigt.", joined)
         self.assertIn("No calendar action was executed.", joined)
 
     def test_chat_recovers_from_runtime_error_without_action_claim(self) -> None:
