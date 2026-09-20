@@ -190,3 +190,10 @@ A second target-hardware run confirmed 41/41 automated tests and clean banner-fr
 The branch now strengthens the standing personality instruction against invented session recall and separates `CreateCalendarEventDraft` from executable proposals. The draft schema permits missing fields, while Ada-owned deterministic code identifies required clarifications such as missing year or end time/duration.
 
 ADR-0006 remains Proposed pending one more real-model re-test of those two corrected behaviors.
+
+
+### Structured local-chat response transport
+
+PydanticAI 2.46.0 documents that self-hosted Ollama v0.5.0+ enforces JSON Schema through its grammar-constrained decoder when `NativeOutput` is used. After target-hardware testing exposed retry failures on the default tool-output path, PR #22 switched the local chat response envelope to `NativeOutput([AgentTextReply, CreateCalendarEventDraft])`.
+
+This keeps ordinary replies and calendar drafts type-safe without relying on output-tool calling. Calendar draft fields are all schema-required but nullable where information may legitimately be missing; the model must therefore explicitly represent missing information rather than omitting arbitrary fields.
