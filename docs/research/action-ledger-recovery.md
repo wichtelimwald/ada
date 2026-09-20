@@ -8,7 +8,9 @@
 
 Ada needs a durable record of consequential operations so that a crash, timeout, provider ambiguity, or model/runtime retry does not silently produce duplicate real-world effects.
 
-The Action Ledger is the source of truth for Ada's own operation state. It is not:
+The “Action Ledger” is the logical source of truth for Ada's operation/outcome semantics. It does **not** imply that Ada must own a separate persistence engine or duplicate DBOS workflow state.
+
+It is not:
 
 - model memory;
 - agent-runtime persistence;
@@ -135,7 +137,7 @@ The ledger may need a minimal structured action envelope for deterministic recov
 - forwarded emails/documents;
 - authoritative long-term Memory.
 
-A separate append-only transition table may record state changes and timestamps without full private content.
+A separate append-only transition table may record state changes and timestamps without full private content **if later needed**, but is not a default requirement. Reuse DBOS durable state plus provider evidence first.
 
 ## 6. Provider contract
 
@@ -149,7 +151,27 @@ For the current CalendarPort this means:
 
 The provider adapter must not report `committed` merely because the API call returned without a local exception.
 
-## 7. Candidate architecture approaches
+## 7. Provider capability scan — reuse before custom recovery
+
+The provider scan materially reduces how much custom “ledger” machinery Ada needs.
+
+| Provider / standard | Native duplicate-safety mechanism | Ada implication |
+| --- | --- | --- |
+| Google Calendar | Client-specified event ID; Google explicitly documents duplicate prevention when the backend succeeded but the client did not receive the response | Map stable Ada operation identity to a valid event ID and safely reconcile/retry |
+| Microsoft Graph Calendar | `transactionId` supplied by the client to avoid redundant create-event POSTs after timeouts/retries | Map Ada operation identity to `transactionId` |
+| CalDAV / iCalendar | Persistent globally unique `UID`; CalDAV requires UID uniqueness, defines `no-uid-conflict`, and recommends conditional create with `If-None-Match: *` | Use standard UID/resource semantics rather than inventing Ada-specific duplicate control |
+| Gmail send | No equivalent documented send idempotency key found; sent drafts are replaced by a new SENT message | Use stable RFC822 `Message-ID` for reconciliation; a found sent message is positive evidence, while no immediate match can remain ambiguous |
+
+This confirms that “external exactly-once” is usually solved through a combination of durable workflow execution and provider/standard idempotency primitives rather than by a universal local ledger.
+
+For Ada, the default order is therefore:
+
+1. use provider-native idempotency / stable resource identity;
+2. otherwise reconcile using stable Ada/provider metadata;
+3. only if neither is reliable, stop at `ambiguous` / explicit handling;
+4. do not add a custom durable state subsystem merely to duplicate DBOS.
+
+## 8. Candidate architecture approaches
 
 The initial research framed this too narrowly as a database choice. The custom SQLite prototype and maintainer review showed that the broader problem belongs to the **durable execution / workflow recovery / idempotency** domain.
 
@@ -277,7 +299,7 @@ SQLAlchemy+SQLite, event-sourcing libraries, and PydanticAI/Harness persistence 
 - event sourcing gives history but does not by itself solve external side-effect recovery;
 - PydanticAI persistence already failed as a standalone source of external side-effect truth in the hard-crash experiment.
 
-## 8. Reference-system evidence
+## 9. Reference-system evidence
 
 ### OpenJarvis
 
@@ -299,7 +321,7 @@ Its public README documents an Undo stack for local reversible actions and says 
 
 No public evidence used here shows a crash-durable external-provider transaction/reconciliation system. This is an undo/reversibility mechanism, not evidence of exactly-once external action recovery.
 
-## 9. License / distribution hard gate
+## 10. License / distribution hard gate
 
 License and distribution fit is evaluated before scoring.
 
@@ -317,7 +339,7 @@ Restate is not automatically excluded: its current BSL additional-use grant perm
 
 Any future candidate must pass the same license/distribution gate before final scoring.
 
-## 10. Agreed decision criteria
+## 11. Agreed decision criteria
 
 | Criterion | Weight | Why it matters |
 | --- | ---: | --- |
@@ -329,7 +351,7 @@ Any future candidate must pass the same license/distribution gate before final s
 | Replaceability / integration clarity | **10%** | Durable infrastructure must not become Ada's domain semantics. |
 | **Total** | **100%** | |
 
-## 11. Final scoring
+## 12. Final scoring
 
 The DBOS target-Mac hard-crash prototype is complete, so the reopened comparison can now be scored.
 
@@ -367,7 +389,7 @@ All four approaches still require provider-specific idempotency/reconciliation f
 
 The score therefore does **not** reward claims of generic "exactly once" for arbitrary external APIs. The DBOS negative test explicitly demonstrated the boundary: an uncheckpointed unreconcilable provider step executes again after recovery and can duplicate the effect.
 
-## 12. Custom SQLite control prototype
+## 13. Custom SQLite control prototype
 
 A standard-library-only prototype exercised the critical crash window:
 
@@ -393,7 +415,7 @@ Validated:
 
 The fake provider deliberately supports stable operation identity/reconciliation. This experiment does not claim SQLite can create exactly-once semantics for an arbitrary external provider.
 
-## 13. DBOS target-Mac prototype
+## 14. DBOS target-Mac prototype
 
 DBOS 3.0.0 was executed on the target Mac / Python 3.14.6.
 
@@ -440,21 +462,21 @@ external system
 
 For providers without safe idempotency/reconciliation, the Ada adapter must not expose DBOS' raw at-least-once retry behavior as a safe consequential action. Recovery must resolve to `ambiguous` / explicit handling instead of blindly repeating the external effect.
 
-## 14. Research conclusion
+## 15. Research conclusion
 
 The evidence supports:
 
-> **Ada keeps an Ada-owned Action Ledger semantic boundary and uses DBOS as the initial durable-execution substrate behind it.**
+> **Ada keeps Ada-owned action/outcome semantics and uses DBOS as the initial durable-execution substrate behind them.**
 
-This is deliberately different from "DBOS is the ledger."
+This is deliberately different from both “DBOS is the complete business truth” and “Ada must build a second workflow database.”
 
-Ada owns the meaning of operations and outcomes. DBOS owns workflow checkpointing/recovery mechanics.
+Ada owns the meaning of operations and outcomes. DBOS owns workflow checkpointing/recovery mechanics. Provider-native idempotency/reconciliation is the first choice for external duplicate safety.
 
 The custom SQLite implementation remains the control/fallback if DBOS later becomes unsuitable.
 
-A separate Ada operation/audit view may be needed even with DBOS, but it should contain only Ada-specific semantics and minimal privacy-safe references rather than duplicate the full DBOS workflow journal.
+A separate Ada operation/audit view may be needed even with DBOS, but it should be added only for concrete audit/query/privacy needs and should not duplicate the full DBOS workflow journal.
 
-## 15. Architectural invariant independent of implementation
+## 16. Architectural invariant independent of implementation
 
 Whichever implementation wins:
 
@@ -466,7 +488,7 @@ Whichever implementation wins:
 - authoritative user Memory remains separate from workflow/ledger state;
 - only minimal data required for recovery/audit should be persisted.
 
-## 16. Primary references
+## 17. Primary references
 
 - Python 3.14 sqlite3 documentation: https://docs.python.org/3.14/library/sqlite3.html
 - SQLite atomic commit: https://www.sqlite.org/atomiccommit.html
@@ -482,3 +504,9 @@ Whichever implementation wins:
 - Temporal open-source project: https://temporal.io/
 - OpenJarvis: https://github.com/open-jarvis/OpenJarvis
 - Mark LIV public README: https://github.com/FatihMakes/Mark-LIV/blob/main/readme.md
+- Google Calendar event creation / client-set event ID: https://developers.google.com/workspace/calendar/api/guides/create-events
+- Microsoft Graph event `transactionId`: https://learn.microsoft.com/graph/api/resources/event
+- RFC 5545 iCalendar UID: https://www.rfc-editor.org/rfc/rfc5545
+- RFC 4791 CalDAV: https://www.rfc-editor.org/rfc/rfc4791
+- Gmail drafts/send behavior: https://developers.google.com/workspace/gmail/api/guides/drafts
+- Gmail RFC822 Message-ID search: https://developers.google.com/workspace/gmail/api/reference/rest/v1/users.messages/list
