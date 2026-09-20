@@ -64,7 +64,9 @@
 - provider ambiguity being misreported as success,
 - accidental configuration of the "local" model profile to send prompts/history to a non-loopback endpoint,
 - a compromised or malicious local model artifact producing manipulative or privilege-seeking output,
-- ephemeral conversation context being mistaken for authoritative long-term Memory.
+- ephemeral conversation context being mistaken for authoritative long-term Memory,
+- untrusted content or model output silently rewriting the persistent personality,
+- personality drift being used to smuggle new authority, disclosure rules, or false action claims into model behavior.
 
 ## Initial design targets
 
@@ -92,6 +94,9 @@
 - first local-model profile restricted in code to loopback HTTP(S) endpoints,
 - local model output remains proposal/data and never becomes authorization,
 - local-chat history remains process-local runtime context until the authoritative Memory design is accepted,
-- model/runtime artifact provenance and pinning reviewed before Ada distributes or auto-provisions model artifacts.
+- model/runtime artifact provenance and pinning reviewed before Ada distributes or auto-provisions model artifacts,
+- personality bootstrap seed copied only into empty authoritative Memory; existing Memory wins,
+- persistent personality changes must be inspectable, reversible, attributable, and isolated from permissions/privacy/action-truth rules,
+- untrusted content/model output cannot directly persist personality changes.
 
 Update this document whenever a new trust boundary, threat actor, data flow, or privileged capability is introduced.
