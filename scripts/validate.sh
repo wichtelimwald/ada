@@ -11,5 +11,11 @@ else
 fi
 
 "$PYTHON" -m compileall -q src tests
-"$PYTHON" -m unittest discover -s tests -v
+
+if [ "${ADA_TEST_VERBOSE:-0}" = "1" ]; then
+  "$PYTHON" -m unittest discover -s tests -v
+else
+  "$PYTHON" -m unittest discover -s tests
+fi
+
 "$PYTHON" -m ada doctor

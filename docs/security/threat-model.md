@@ -11,7 +11,8 @@
 - microphone/camera/screen data,
 - browser/session data,
 - operating-system integrity,
-- user intent and control.
+- user intent and control,
+- durable action/workflow state and provider outcome evidence.
 
 ## Initial threat actors
 
@@ -31,7 +32,9 @@
 - local components ↔ explicit remote-egress boundary,
 - trusted project code ↔ third-party dependencies/plugins/models,
 - AdaGuard ↔ pinned `cedarpy` / embedded Cedar native policy engine,
-- external content ↔ model context.
+- external content ↔ model context,
+- Ada durable-action semantics ↔ DBOS system database / recovery engine,
+- DBOS workflow steps ↔ external providers with their own idempotency/reconciliation semantics.
 
 ## Threats to evaluate
 
@@ -52,7 +55,11 @@
 - bystander capture without appropriate product controls,
 - insecure remote/mobile control if introduced,
 - denial of service / runaway automation,
-- misleading or unusable approval prompts.
+- misleading or unusable approval prompts,
+- duplicate external side effects after crash/recovery,
+- durable workflow payloads retaining more personal data than recovery requires,
+- workflow-ID collision or replay causing the wrong operation result to be reused,
+- provider ambiguity being misreported as success.
 
 ## Initial design targets
 
@@ -69,6 +76,13 @@
 - pinned Cedar binding/engine plus permanent conformance tests on upgrades,
 - policy/schema validation before activation,
 - trusted Guard-owned clock for expiry evaluation rather than caller/model-provided time,
-- privileged grant/policy mutation separate from policy evaluation.
+- privileged grant/policy mutation separate from policy evaluation,
+- stable Ada operation IDs reused as durable workflow identities,
+- each operation ID bound to canonical immutable action metadata and mismatched replays rejected before returning a durable result,
+- provider-native idempotency/reconciliation preferred before retrying consequential writes,
+- unreconcilable external outcomes fail to explicit `ambiguous` rather than blind retry,
+- DBOS isolated behind an Ada-owned durable-action port,
+- minimal durable workflow payloads with no raw prompts/messages/secrets merely for convenience,
+- production-provider review of sensitive action-payload storage before real personal data is connected.
 
 Update this document whenever a new trust boundary, threat actor, data flow, or privileged capability is introduced.

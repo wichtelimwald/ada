@@ -47,9 +47,11 @@ Current examples:
 | Agent runtime | PydanticAI behind an Ada-owned replaceable adapter | MIT; accepted |
 | Permissions / authorization | Cedar behind AdaGuard | Apache-2.0; accepted |
 | Python Cedar integration | `cedarpy` around the Cedar Rust engine | Apache-2.0; implemented behind AdaGuard |
-| Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, implementation pending |
+| Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, synthetic calendar slice implemented |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
+
+The current DBOS-backed calendar path is **synthetic/test-only**. No real calendar account or personal event data is connected yet. Before a production provider is added, Ada must review how sensitive event payloads are stored in durable workflow state and minimize or reference them appropriately.
 
 ## Current phase
 
@@ -71,14 +73,25 @@ Potential upstream components such as Open Interpreter, Letta, local speech/mode
 
 Repository language is English. Project discussions with the maintainer are normally in German.
 
-The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter and Cedar/cedarpy pinned behind AdaGuard. Development can run through the Dev Container or a local Python environment.
+The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter, Cedar/cedarpy pinned behind AdaGuard, and DBOS pinned behind Ada's durable-action port. Development can run through the Dev Container or a local Python environment.
 
-Local validation:
+Local validation from the repository root:
 
 ```bash
-python3 -m pip install --editable .
+cd "$(git rev-parse --show-toplevel)"
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --editable .
 sh scripts/validate.sh
 ```
+
+The default validation output is intentionally concise. For per-test output, run:
+
+```bash
+ADA_TEST_VERBOSE=1 sh scripts/validate.sh
+```
+
+A project-local virtual environment is intentional. Do not bypass a Homebrew/PEP 668 externally-managed Python with `--break-system-packages`.
 
 Runtime container sanity check:
 
