@@ -52,6 +52,14 @@ run_backend() {
     return 1
   fi
 
+  if [ "$backend" != "dateparser" ]; then
+    detail "==> $backend: surface parser timeouts for research"
+    if ! run_quiet "$backend-timeout" "$venv/bin/python" "$HERE/prepare_quickadd_timeout.py"; then
+      echo "WARN: $backend timeout instrumentation failed." >&2
+      return 1
+    fi
+  fi
+
   if [ "$mode" = "quickadd-safe" ]; then
     detail "==> $backend: disable import-time pickle scorer for research"
     if ! run_quiet "$backend-prepare" "$venv/bin/python" "$HERE/prepare_quickadd_safe.py"; then
@@ -179,9 +187,15 @@ if [ -f "$QUICKADD_MODEL_JSON" ]; then
   else
     detail "==> quickadd-json: install research dependency"
     if "$TMP/quickadd-json-venv/bin/python" -m pip install --disable-pip-version-check -q -r "$HERE/requirements-quickadd.txt"; then
-      detail "==> quickadd-json: install safe JSON scorer model"
-      if run_quiet quickadd-json-prepare "$TMP/quickadd-json-venv/bin/python" \
-        "$HERE/prepare_quickadd_json.py" --model-json "$QUICKADD_MODEL_JSON"; then
+      detail "==> quickadd-json: surface parser timeouts for research"
+      if ! run_quiet quickadd-json-timeout "$TMP/quickadd-json-venv/bin/python" \
+        "$HERE/prepare_quickadd_timeout.py"; then
+        echo "WARN: quickadd-json timeout instrumentation failed." >&2
+        INVARIANT_OK=0
+      else
+        detail "==> quickadd-json: install safe JSON scorer model"
+        if run_quiet quickadd-json-prepare "$TMP/quickadd-json-venv/bin/python" \
+          "$HERE/prepare_quickadd_json.py" --model-json "$QUICKADD_MODEL_JSON"; then
         detail "==> quickadd-json: characterize"
         "$TMP/quickadd-json-venv/bin/python" "$HERE/run_characterization.py" \
           --backend quickadd-json --output "$QUICKADD_JSON_RESULT" \
@@ -194,9 +208,10 @@ if [ -f "$QUICKADD_MODEL_JSON" ]; then
           cat "$TMP/quickadd-json-warnings.log" >&2
           INVARIANT_OK=0
         fi
-      else
-        echo "WARN: quickadd-json safe preparation failed." >&2
-        INVARIANT_OK=0
+        else
+          echo "WARN: quickadd-json safe preparation failed." >&2
+          INVARIANT_OK=0
+        fi
       fi
     else
       echo "WARN: quickadd-json installation failed." >&2
