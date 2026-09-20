@@ -91,3 +91,8 @@ Before accepting ADR-0007:
 2. if not practical, benchmark Duckling as the next independent specialist candidate;
 3. keep dateparser as a likely lightweight shadow/fallback candidate rather than the primary appointment parser;
 4. only then finalize the hard-gate and weighted decision matrix.
+
+
+## Terminology note
+
+This file preserves the output/terminology of the harness version used for this historical run. The later ADR and harness distinguish a healthy parser returning no result from true operational unavailability. New comparisons use `single_resolver_result` for the former and preserve input-specific failures as `input_error`; neither should be interpreted as automatic degraded-mode authorization.
