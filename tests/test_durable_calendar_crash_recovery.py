@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 import sqlite3
 import subprocess
 import sys
@@ -13,7 +14,7 @@ WORKER = Path(__file__).with_name("dbos_crash_worker.py")
 
 
 def provider_counts(provider_db: Path) -> tuple[int, int, int]:
-    with sqlite3.connect(provider_db) as con:
+    with closing(sqlite3.connect(provider_db)) as con:
         effects = int(con.execute("SELECT COUNT(*) FROM effects").fetchone()[0])
         creates = int(
             con.execute(
