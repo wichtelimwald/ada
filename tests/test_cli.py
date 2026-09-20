@@ -106,7 +106,7 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("Termin wurde eingetragen", joined)
         self.assertNotIn("appointment was created", joined)
 
-    def test_chat_blocks_unverified_calendar_completion_claim(self) -> None:
+    def test_chat_marks_false_completion_as_conversation_only(self) -> None:
         inputs = iter((
             "Kannst du den Termin in den Kalender eintragen?",
             "/quit",
@@ -121,39 +121,24 @@ class CliTests(unittest.TestCase):
 
         self.assertEqual(result, 0)
         joined = "\n".join(output)
-        self.assertNotIn("Ich habe den Termin eingetragen.", joined)
-        self.assertIn("No calendar action was executed.", joined)
-
-    def test_chat_blocks_standalone_done_for_compound_appointment(self) -> None:
-        inputs = iter((
-            "Trag den Zahnarzttermin ein.",
-            "/quit",
-        ))
-        output: list[str] = []
-
-        result = _chat_loop(
-            StandaloneDoneRuntime(),
-            read=lambda prompt: next(inputs),
-            write=output.append,
+        self.assertIn("Ich habe den Termin eingetragen.", joined)
+        self.assertIn(
+            "Conversation only: no external action was executed in this turn.",
+            joined,
         )
 
-        self.assertEqual(result, 0)
-        joined = "\n".join(output)
-        self.assertNotIn("Ada: Erledigt.", joined)
-        self.assertIn("No calendar action was executed.", joined)
-
-    def test_chat_blocks_free_text_for_calendar_action_requests(self) -> None:
+    def test_chat_marks_all_free_text_as_non_authoritative(self) -> None:
         replies = (
             "I added the appointment.",
             "Added to your calendar.",
             "Your calendar has been updated.",
             "Which calendar should I use?",
+            "A calendar is a way to organize dates and events.",
         )
-        request = "Please add the appointment to my calendar."
 
         for reply in replies:
             with self.subTest(reply=reply):
-                inputs = iter((request, "/quit"))
+                inputs = iter(("ordinary free text turn", "/quit"))
                 output: list[str] = []
 
                 result = _chat_loop(
@@ -164,22 +149,11 @@ class CliTests(unittest.TestCase):
 
                 self.assertEqual(result, 0)
                 joined = "\n".join(output)
-                self.assertNotIn(reply, joined)
-                self.assertIn("No calendar action was executed.", joined)
-
-    def test_chat_keeps_free_text_for_non_action_calendar_discussion(self) -> None:
-        reply = "A calendar is a way to organize dates and events."
-        inputs = iter(("What is a calendar?", "/quit"))
-        output: list[str] = []
-
-        result = _chat_loop(
-            TextRuntime(reply),
-            read=lambda prompt: next(inputs),
-            write=output.append,
-        )
-
-        self.assertEqual(result, 0)
-        self.assertIn(f"Ada: {reply}", output)
+                self.assertIn(reply, joined)
+                self.assertIn(
+                    "Conversation only: no external action was executed in this turn.",
+                    joined,
+                )
 
     def test_chat_recovers_from_runtime_error_without_action_claim(self) -> None:
         inputs = iter(("calendar request", "/quit"))
