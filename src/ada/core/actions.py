@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, Protocol, runtime_checkable
+from typing import Literal, Protocol
 
 
-@runtime_checkable
 class ActionProposal(Protocol):
     """Marker contract for typed proposals returned by an agent runtime."""
 
