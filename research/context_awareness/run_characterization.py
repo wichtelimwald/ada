@@ -6,7 +6,7 @@ from importlib import metadata
 import json
 from pathlib import Path
 import sys
-from typing import Any
+from typing import Any, Callable
 from zoneinfo import ZoneInfo
 
 
@@ -42,13 +42,15 @@ def _normalize_point(value: datetime, zone_name: str) -> dict[str, Any]:
     }
 
 
-def _run_dateparser(expression: str, context: dict[str, Any]) -> dict[str, Any] | None:
-    from dateparser.date import DateDataParser
-
+def _run_dateparser(
+    expression: str,
+    context: dict[str, Any],
+    date_data_parser: Any,
+) -> dict[str, Any] | None:
     reference = datetime.fromisoformat(context["reference"]).replace(tzinfo=None)
     locale = context["locale"]
     languages = [locale.split("-")[0], "en"]
-    parser = DateDataParser(
+    parser = date_data_parser(
         languages=languages,
         use_given_order=True,
         settings={
@@ -84,11 +86,13 @@ def _time_to_local(value: Any) -> str | None:
     ).isoformat(timespec="minutes")
 
 
-def _run_quickadd(expression: str, context: dict[str, Any]) -> dict[str, Any] | None:
-    from ctparse import ctparse
-
+def _run_quickadd(
+    expression: str,
+    context: dict[str, Any],
+    ctparse_func: Callable[..., Any],
+) -> dict[str, Any] | None:
     reference = datetime.fromisoformat(context["reference"]).replace(tzinfo=None)
-    parsed = ctparse(
+    parsed = ctparse_func(
         expression,
         ts=reference,
         date_format="EU",
@@ -206,16 +210,38 @@ def main() -> int:
     args = parser.parse_args()
 
     context = json.loads(args.cases.read_text(encoding="utf-8"))
-    run_backend = _run_dateparser if args.backend == "dateparser" else _run_quickadd
+
+    timeout_error_type: type[Exception] | None = None
+    if args.backend == "dateparser":
+        from dateparser.date import DateDataParser
+
+        run_backend = lambda expression, ctx: _run_dateparser(
+            expression,
+            ctx,
+            DateDataParser,
+        )
+    else:
+        from ctparse import ctparse
+        from ctparse.timers import CTParseTimeoutError
+
+        timeout_error_type = CTParseTimeoutError
+        run_backend = lambda expression, ctx: _run_quickadd(
+            expression,
+            ctx,
+            ctparse,
+        )
 
     results = []
     for case in context["cases"]:
         try:
             actual = run_backend(case["expression"], context)
             error = None
-        except Exception as exc:  # Research harness: preserve parser failure as evidence.
-            actual = None
-            error = f"{type(exc).__name__}: {exc}"
+        except Exception as exc:
+            if timeout_error_type is not None and isinstance(exc, timeout_error_type):
+                actual = None
+                error = f"timeout: {type(exc).__name__}: {exc}"
+            else:
+                raise
         results.append(
             {
                 "id": case["id"],
@@ -257,7 +283,10 @@ def main() -> int:
         if failed:
             print("  mismatches: " + ", ".join(item["id"] for item in failed))
         if errors:
-            print("  input errors: " + ", ".join(item["id"] for item in errors))
+            print(
+                "  input errors/timeouts: "
+                + ", ".join(item["id"] for item in errors)
+            )
 
     if args.require_all_expected and failed:
         print(
