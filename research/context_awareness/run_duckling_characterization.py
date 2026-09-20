@@ -130,15 +130,9 @@ def main() -> int:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             method="POST",
         )
-        try:
-            with urlopen(request, timeout=10) as response:
-                raw = json.loads(response.read().decode("utf-8"))
-            actual = _normalize_duckling(raw, context["timezone"])
-            error = None
-        except Exception as exc:
-            raw = None
-            actual = None
-            error = f"{type(exc).__name__}: {exc}"
+        with urlopen(request, timeout=10) as response:
+            raw = json.loads(response.read().decode("utf-8"))
+        actual = _normalize_duckling(raw, context["timezone"])
 
         rows.append(
             {
@@ -151,7 +145,7 @@ def main() -> int:
                     actual,
                     case.get("expected"),
                 ),
-                "error": error,
+                "error": None,
                 "raw": raw,
             }
         )
