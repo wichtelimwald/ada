@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import tempfile
+import threading
 import unittest
+from concurrent.futures import ThreadPoolExecutor
+from unittest.mock import patch
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -18,13 +21,17 @@ from ada.application.calendar_actions import (
     render_calendar_action_response,
 )
 from ada.core.action_outcomes import (
+    AuthorizationEvidence,
     BusinessOutcomeStatus,
     OperationId,
     OperationIdentityConflictError,
     ProviderCapability,
     ProviderOutcomeStatus,
 )
-from ada.core.actions import CreateCalendarEventProposal
+from ada.core.actions import (
+    CalendarProposalValidationError,
+    CreateCalendarEventProposal,
+)
 from ada.core.authorization import (
     AuthenticationAssurance,
     AuthorizationRequest,
@@ -32,6 +39,7 @@ from ada.core.authorization import (
 )
 from ada.ports.agent_runtime import AgentRequest
 from ada.ports.calendar import CalendarEvent
+from ada.ports.durable_action import DurableCalendarCreate
 from ada.ports.travel_time import TravelEstimate
 
 
@@ -67,13 +75,14 @@ def proposal(
     title: str = "Parent-teacher meeting",
     start: datetime | None = None,
     end: datetime | None = None,
-    location: str = "School North",
+    calendar_id: str = "family",
+    location: str | None = "School North",
 ) -> CreateCalendarEventProposal:
     return CreateCalendarEventProposal(
         title=title,
         start=start or datetime(2026, 10, 12, 16, 0, tzinfo=timezone.utc),
         end=end or datetime(2026, 10, 12, 16, 30, tzinfo=timezone.utc),
-        calendar_id="family",
+        calendar_id=calendar_id,
         location=location,
     )
 
@@ -207,6 +216,120 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
 
         self.assertEqual(first.execution, second.execution)
         self.assertEqual(calendar.create_attempts, 1)
+
+    def test_invalid_calendar_proposals_stop_before_provider_execution(self) -> None:
+        calendar = InMemoryCalendarAdapter()
+        durable = self.launch_adapter(calendar)
+        service = CalendarActionService(
+            guard=self.guard(),
+            durable_actions=durable,
+        )
+        start = datetime(2026, 10, 12, 16, 0, tzinfo=timezone.utc)
+
+        invalid_proposals = (
+            proposal(title="   "),
+            proposal(calendar_id="   "),
+            proposal(start=start, end=start),
+            proposal(
+                start=datetime(2026, 10, 12, 16, 0),
+                end=datetime(2026, 10, 12, 16, 30),
+            ),
+        )
+
+        for index, invalid in enumerate(invalid_proposals):
+            with self.subTest(index=index):
+                with self.assertRaises(CalendarProposalValidationError):
+                    service.create_event(
+                        invalid,
+                        operation_id=OperationId(f"op-invalid-{index}"),
+                        authorization=authorization(),
+                    )
+
+        self.assertEqual(calendar.create_attempts, 0)
+        self.assertEqual(calendar.effect_count, 0)
+
+    def test_concurrent_first_writer_rejects_mismatched_loser(self) -> None:
+        calendar = InMemoryCalendarAdapter()
+        durable = self.launch_adapter(calendar)
+        operation_id = OperationId("op-concurrent-binding")
+        evidence = AuthorizationEvidence(
+            policy_version="test-policy-v1",
+            matched_rule_ids=("grant-family-calendar",),
+        )
+        requests = (
+            DurableCalendarCreate(
+                operation_id=operation_id,
+                proposal=proposal(title="Concurrent appointment A"),
+                authorization=evidence,
+            ),
+            DurableCalendarCreate(
+                operation_id=operation_id,
+                proposal=proposal(title="Concurrent appointment B"),
+                authorization=evidence,
+            ),
+        )
+
+        # Force both callers to complete the initial binding lookup before
+        # either can proceed to DBOS workflow creation. This deterministically
+        # exercises the post-check rather than merely the normal pre-check.
+        entered = threading.Barrier(2)
+        checked = threading.Barrier(2)
+        seen_threads: set[int] = set()
+        seen_lock = threading.Lock()
+        original_assert = DBOSDurableCalendarActions._assert_workflow_binding
+
+        def coordinated_assert(
+            instance: DBOSDurableCalendarActions,
+            candidate_operation_id: str,
+            expected_binding: str,
+        ) -> None:
+            thread_id = threading.get_ident()
+            with seen_lock:
+                first_check = thread_id not in seen_threads
+                if first_check:
+                    seen_threads.add(thread_id)
+
+            if first_check:
+                entered.wait(timeout=5)
+                original_assert(
+                    instance,
+                    candidate_operation_id,
+                    expected_binding,
+                )
+                checked.wait(timeout=5)
+                return
+
+            original_assert(
+                instance,
+                candidate_operation_id,
+                expected_binding,
+            )
+
+        results = []
+        conflicts = []
+        with patch.object(
+            DBOSDurableCalendarActions,
+            "_assert_workflow_binding",
+            new=coordinated_assert,
+        ):
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [
+                    pool.submit(durable.create_calendar_event, request)
+                    for request in requests
+                ]
+                for future in futures:
+                    try:
+                        results.append(future.result(timeout=15))
+                    except OperationIdentityConflictError as exc:
+                        conflicts.append(exc)
+
+        self.assertEqual(len(results), 1)
+        self.assertEqual(len(conflicts), 1)
+        self.assertEqual(
+            results[0].provider.status,
+            ProviderOutcomeStatus.COMMITTED,
+        )
+        self.assertEqual(calendar.effect_count, 1)
 
     def test_same_operation_id_rejects_different_action_payload(self) -> None:
         calendar = InMemoryCalendarAdapter()
@@ -419,6 +542,33 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         self.assertEqual(
             conflicts[0].travel_source,
             "synthetic:Location A->Location B",
+        )
+
+    def test_conflict_checker_detects_reverse_direction_travel_gap(self) -> None:
+        checker = CalendarConflictChecker(FixedTravelTime(minutes=25))
+        candidate = proposal(
+            start=datetime(2026, 10, 12, 15, 0, tzinfo=timezone.utc),
+            end=datetime(2026, 10, 12, 15, 30, tzinfo=timezone.utc),
+            location="Location B",
+        )
+        existing = CalendarEvent(
+            event_id="existing-after",
+            title="Later appointment",
+            start=datetime(2026, 10, 12, 15, 40, tzinfo=timezone.utc),
+            end=datetime(2026, 10, 12, 16, 10, tzinfo=timezone.utc),
+            calendar_id="family",
+            location="Location A",
+        )
+
+        conflicts = checker.check(candidate, existing_events=(existing,))
+
+        self.assertEqual(len(conflicts), 1)
+        self.assertEqual(conflicts[0].kind, ConflictKind.TRAVEL_TIME)
+        self.assertEqual(conflicts[0].available_gap, timedelta(minutes=10))
+        self.assertEqual(conflicts[0].required_travel, timedelta(minutes=25))
+        self.assertEqual(
+            conflicts[0].travel_source,
+            "synthetic:Location B->Location A",
         )
 
     def test_conflict_checker_detects_direct_overlap_without_location_data(self) -> None:
