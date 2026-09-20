@@ -1,0 +1,274 @@
+# ADR-0005: Use DBOS behind Ada's Action Ledger semantics
+
+- **Status:** Proposed
+- **Date:** 2026-09-20
+
+## Context
+
+Ada needs durable recovery for consequential external actions such as calendar writes, sending messages, future computer control, and other real-world side effects.
+
+A durable workflow engine can recover execution after crashes, but it cannot by itself establish the truth of an external provider outcome.
+
+The critical crash window is:
+
+```text
+provider commits external effect
+        |
+process crashes before local durable checkpoint
+        |
+recovery re-enters unfinished work
+```
+
+If the provider offers neither idempotency nor reconciliation, replaying the external call can duplicate the real-world effect.
+
+Therefore Ada distinguishes:
+
+- execution durability;
+- provider outcome truth;
+- business outcome truth.
+
+The evaluated primary approaches were:
+
+1. Ada-owned durable state machine + stdlib SQLite;
+2. DBOS 3.0.0;
+3. Restate;
+4. Temporal.
+
+Agreed weights:
+
+| Criterion | Weight |
+| --- | ---: |
+| Recovery / duplicate-side-effect safety | 30% |
+| Crash durability / atomic transition clarity | 20% |
+| Maintainer simplicity / lifetime reviewability | 20% |
+| Privacy / data minimization | 10% |
+| Local resource / portability fit | 10% |
+| Replaceability / integration clarity | 10% |
+
+Final scores after targeted prototypes:
+
+| Candidate | Score |
+| --- | ---: |
+| **DBOS 3.0.0** | **92** |
+| Ada-owned SQLite control | 90 |
+| Restate | 80 |
+| Temporal | 74 |
+
+## Evidence
+
+### Custom SQLite control
+
+A standard-library-only control implementation passed the critical hard-crash case:
+
+- operation durably moved to executing;
+- provider committed;
+- process died via `os._exit()`;
+- restart reconciled the provider;
+- operation became committed;
+- provider effect count remained exactly one.
+
+It also proved:
+
+- denied actions create zero provider effects;
+- illegal transitions are rejected;
+- stale double claims are rejected;
+- unreconcilable outcomes remain ambiguous rather than being blindly retried.
+
+This proves the Ada-owned design is technically viable.
+
+### DBOS target-Mac probe
+
+DBOS 3.0.0 was tested on the target Apple Silicon Mac with Python 3.14.6.
+
+```text
+Ran 3 tests in 21.110s
+
+OK
+```
+
+The probe showed:
+
+1. **Reconcilable provider:** the uncheckpointed DBOS step ran again after recovery, but provider reconciliation by Ada operation ID kept the real effect count at exactly one.
+2. **Unreconcilable provider:** the step ran again and produced a second real effect, proving that DBOS does not create exactly-once semantics for arbitrary external providers.
+3. **Stable workflow identity:** using the Ada operation ID as the DBOS workflow ID caused a completed invocation to replay its durable result without another provider attempt.
+
+## Decision
+
+Use **DBOS as Ada's initial durable-execution substrate behind an Ada-owned Action Ledger semantic boundary**.
+
+This is not:
+
+> DBOS is Ada's Action Ledger.
+
+It is:
+
+> Ada owns operation/outcome semantics; DBOS initially owns durable execution/checkpoint/recovery plumbing.
+
+The boundary is:
+
+```text
+Ada action proposal
+        |
+AdaGuard
+        |
+Ada Action Ledger semantics
+        |
+Ada DurableActionPort
+        |
+DBOS adapter
+        |
+provider adapter
+        |
+external system
+```
+
+## Ada-owned semantics
+
+Ada owns at least:
+
+- stable `operation_id`;
+- action kind;
+- Guard decision linkage;
+- provider capability classification;
+- provider reference;
+- provider outcome;
+- business outcome;
+- `ambiguous` semantics;
+- reconcile-before-retry rules;
+- privacy-safe audit representation.
+
+DBOS workflow status is execution evidence, not automatically provider/business truth.
+
+## Provider capability model
+
+Before allowing automatic durable retry of a consequential external action, the provider integration must declare whether it supports:
+
+1. a true idempotency key;
+2. reliable reconciliation/search by Ada operation ID or durable provider reference;
+3. neither.
+
+### Idempotent/reconcilable providers
+
+DBOS durable steps may be retried, provided the provider adapter uses the stable Ada operation ID and reconciliation/idempotency correctly.
+
+### Providers with neither capability
+
+Ada must not expose the raw DBOS at-least-once retry behavior as safe.
+
+The Ada durable-action adapter must ensure recovery resolves to an explicit `ambiguous` state / manual handling rather than blindly repeating an uncertain external effect.
+
+## Privacy
+
+DBOS persists durable workflow state, including workflow inputs/outputs and step outputs.
+
+Therefore DBOS state is privacy-sensitive operational state, not Ada Memory.
+
+Do not pass raw:
+
+- complete messages/emails;
+- prompts/transcripts;
+- private documents;
+- secrets/tokens;
+- authoritative long-term Memory
+
+through DBOS simply for convenience.
+
+Prefer minimal typed envelopes and stable references:
+
+```text
+operation_id
+action_kind
+provider_kind
+provider_reference?
+opaque content/store reference?
+minimal typed outcome
+```
+
+If recovery requires sensitive content, keep the content in an appropriate Ada-owned private store and pass a stable reference where practical.
+
+## Persistence
+
+DBOS may use SQLite for Ada's initial local/single-host profile.
+
+SQLite is an implementation choice inside the DBOS adapter, not the Ada domain boundary.
+
+If later deployment requirements make another DBOS-supported system database preferable, the Ada Action Ledger semantics must remain unchanged.
+
+## Licensing
+
+- DBOS Python: MIT — compatible with Ada's current MIT-owned project code.
+- Temporal: MIT — license gate passes, but operational complexity is higher.
+- Restate Python SDK: MIT.
+- Restate runtime/server: BSL 1.1 with an additional production-use grant and future Apache-2.0 change license; treated as a conditional fit rather than an automatic rejection.
+
+License fit remains a mandatory gate for future durable-execution candidates.
+
+## Consequences
+
+### Positive
+
+- reuses a mature durable-execution system instead of growing Ada-specific workflow infrastructure;
+- in-process Python fit;
+- Python 3.14 support;
+- SQLite-capable local profile;
+- stable workflow IDs map naturally to Ada operation IDs;
+- durable restart/recovery, waiting, signals, queues and scheduling primitives become available;
+- current PydanticAI integration may reduce duplicate durability glue later;
+- custom SQLite control remains available as a fallback concept.
+
+### Negative
+
+- DBOS adds a non-trivial dependency set;
+- durable workflow state must be treated as privacy-sensitive;
+- DBOS semantics/decorators must be isolated behind Ada-owned interfaces;
+- external provider safety still requires Ada-specific idempotency/reconciliation rules;
+- providers without safe reconciliation need explicit ambiguous/manual recovery handling;
+- upgrades require crash/recovery regression testing.
+
+## Alternatives considered
+
+### Ada-owned SQLite state machine
+
+Technically viable and only narrowly behind DBOS.
+
+Not selected initially because Ada would own growing durable-execution mechanics such as recovery orchestration, durable waiting, signals, retries, workflow lifecycle and related migrations over the project lifetime.
+
+Remains the fallback/control.
+
+### Restate
+
+Strong durable-execution primitives and good AI integration story.
+
+Not selected initially because the separate runtime process increases local operational complexity and the current server license is BSL 1.1 rather than an OSI-open-source license.
+
+### Temporal
+
+Highly mature and MIT licensed.
+
+Not selected because its service/worker architecture is substantially heavier than Ada's current single-host personal-assistant MVP.
+
+## Re-open triggers
+
+Re-open this ADR if:
+
+- DBOS cannot implement Ada's unreconcilable-provider `ambiguous` rule without substantial custom state machinery;
+- DBOS durable-state privacy cannot be constrained to acceptable minimal data;
+- DBOS SQLite support proves unreliable for Ada's local profile;
+- dependency/resource overhead becomes material on the target Mac;
+- DBOS integration leaks widely into Ada domain/application code;
+- upgrades repeatedly break durable behavior;
+- Restate/Temporal or another system materially improves license/operational fit;
+- Ada moves to a deployment topology where another durable-execution engine clearly fits better.
+
+## Follow-up
+
+If accepted:
+
+1. define Ada-owned `OperationId`, provider capability and outcome types;
+2. define `DurableActionPort` independent of DBOS;
+3. integrate DBOS 3.0.0 only behind its adapter;
+4. promote hard-crash cases into permanent regression tests;
+5. implement explicit unreconcilable-provider recovery to `ambiguous`;
+6. keep DBOS payloads minimal/privacy-safe;
+7. expose a minimal user/audit operation view without copying full workflow journals;
+8. update README with the plain-language user guarantee: Ada recovers actions after crashes but never claims or retries uncertain real-world outcomes blindly.
