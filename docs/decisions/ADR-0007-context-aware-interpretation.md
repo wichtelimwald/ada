@@ -350,7 +350,7 @@ Interpretation:
 
 ### Weighted decision matrix
 
-Only candidates that pass all hard gates are scored.
+Only candidates that pass all hard gates are eligible for a **final selection score**. Conditional candidates may carry clearly labeled provisional research scores so the trade-off remains visible while their gates are being closed.
 
 | Criterion | Weight |
 | --- | ---: |
