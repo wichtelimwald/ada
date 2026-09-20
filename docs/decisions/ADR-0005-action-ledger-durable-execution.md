@@ -1,6 +1,6 @@
 # ADR-0005: Use DBOS behind Ada action/outcome semantics
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-20
 
 ## Context
@@ -271,9 +271,7 @@ Re-open this ADR if:
 - Restate/Temporal or another system materially improves license/operational fit;
 - Ada moves to a deployment topology where another durable-execution engine clearly fits better.
 
-## Follow-up
-
-If accepted:
+## Implementation follow-up
 
 1. define Ada-owned `OperationId`, provider capability and outcome types;
 2. define `DurableActionPort` independent of DBOS;
