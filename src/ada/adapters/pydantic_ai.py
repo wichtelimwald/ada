@@ -6,7 +6,12 @@ from ada.core.actions import (
     CreateCalendarEventDraft,
     CreateCalendarEventProposal,
 )
-from ada.ports.agent_runtime import AgentRequest, AgentResponse, AgentRuntimePort
+from ada.ports.agent_runtime import (
+    AgentRequest,
+    AgentResponse,
+    AgentRuntimePort,
+    AgentTextReply,
+)
 
 
 class _PydanticAgentLike(Protocol):
@@ -57,6 +62,8 @@ class PydanticAIRuntime(AgentRuntimePort):
                 self._message_history = tuple(all_messages())
 
         output = result.output
+        if isinstance(output, AgentTextReply):
+            return AgentResponse(text=output.text)
         if isinstance(output, CreateCalendarEventDraft):
             return AgentResponse(text="", drafts=(output,))
         if isinstance(output, CreateCalendarEventProposal):
