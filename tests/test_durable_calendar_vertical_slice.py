@@ -103,6 +103,8 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
             "name": f"ada-test-{self._counter}",
             "application_version": "test",
             "run_admin_server": False,
+            "log_level": "WARNING",
+            "console_log_level": "WARNING",
             "system_database_url": (
                 f"sqlite:///{Path(self.tmp.name) / 'dbos.sqlite'}"
             ),
