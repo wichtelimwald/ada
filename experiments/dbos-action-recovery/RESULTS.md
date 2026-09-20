@@ -1,10 +1,10 @@
 # Results — DBOS Action Recovery Probe
 
-**Status:** Prepared; target execution pending.
+**Status:** Prepared against current stable DBOS 3.0.0; target execution pending.
 
 ## Dependency
 
-- DBOS: 2.31.1 stable
+- DBOS: 3.0.0 stable
 - license: MIT
 - Python: >=3.10, Python 3.14 supported
 - local system database: SQLite
