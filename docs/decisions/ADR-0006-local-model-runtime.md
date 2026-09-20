@@ -142,3 +142,12 @@ Before changing this ADR from Proposed to Accepted:
 2. The session must make no non-loopback model request.
 3. The personality baseline must be observable without historical impersonation.
 4. Existing local validation must remain green.
+
+
+## Evidence references
+
+- PydanticAI Ollama integration: https://ai.pydantic.dev/models/ollama/
+- Ollama model metadata for qwen3:8b: https://ollama.com/library/qwen3:8b
+- Ollama runtime: https://github.com/ollama/ollama
+- llama.cpp: https://github.com/ggml-org/llama.cpp
+- MLX-LM: https://github.com/ml-explore/mlx-lm
