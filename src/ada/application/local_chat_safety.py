@@ -6,28 +6,33 @@ from ada.ports.agent_runtime import AgentResponse
 
 
 _CALENDAR_CONTEXT_RE = re.compile(
-    r"(?:\bkalender\b|\bcalendar\b|\b\w*termin\b|\bappointment\b|\bevent\b|\bereignis\b)",
+    r"(?:\bkalender\b|\bcalendar\b|\b\w*termin\b|\bappointment\b|"
+    r"\bevent\b|\bereignis\b)",
     re.IGNORECASE,
 )
 
-_COMPLETION_CLAIM_RE = re.compile(
+_CALENDAR_ACTION_RE = re.compile(
     r"(?:"
-    r"\b(?:ich\s+habe|ich\s+hab|i\s+have|i've)\b"
-    r"[^.!?\n]{0,120}"
-    r"\b(?:eingetragen|hinzugefügt|erstellt|angelegt|gespeichert|gebucht|"
-    r"geändert|gelöscht|added|created|scheduled|saved|booked|changed|deleted)\b"
-    r"|"
-    r"\b(?:termin|appointment|event|ereignis|kalendereintrag|calendar\s+entry)\b"
-    r"[^.!?\n]{0,80}"
-    r"\b(?:ist|wurde|has\s+been|was|is\s+now)\b"
-    r"[^.!?\n]{0,60}"
-    r"\b(?:eingetragen|hinzugefügt|erstellt|angelegt|gespeichert|gebucht|"
-    r"geändert|gelöscht|added|created|scheduled|saved|booked|changed|deleted)\b"
-    r"|"
-    r"^\s*(?:done|erledigt|fertig)\s*[.!]?$"
+    r"\beintragen\b|\beingetragen\b|\bhinzufügen\b|\bhinzugefügt\b|"
+    r"\berstellen\b|\berstellt\b|\banlegen\b|\bangelegt\b|"
+    r"\bspeichern\b|\bgespeichert\b|\bbuchen\b|\bgebucht\b|"
+    r"\bändern\b|\bgeändert\b|\blöschen\b|\bgelöscht\b|"
+    r"\bverschieben\b|\bverschoben\b|\bplanen\b|\bgeplant\b|"
+    r"\badd\b|\badded\b|\bcreate\b|\bcreated\b|"
+    r"\bschedule\b|\bscheduled\b|\bsave\b|\bsaved\b|"
+    r"\bbook\b|\bbooked\b|\bchange\b|\bchanged\b|"
+    r"\bdelete\b|\bdeleted\b|\bremove\b|\bremoved\b|"
+    r"\bmove\b|\bmoved\b|\bupdate\b|\bupdated\b"
     r")",
     re.IGNORECASE,
 )
+
+
+def _is_calendar_action_request(request_text: str) -> bool:
+    return bool(
+        _CALENDAR_CONTEXT_RE.search(request_text)
+        and _CALENDAR_ACTION_RE.search(request_text)
+    )
 
 
 def enforce_local_chat_action_truth(
@@ -35,26 +40,21 @@ def enforce_local_chat_action_truth(
     request_text: str,
     response: AgentResponse,
 ) -> AgentResponse:
-    """Block unverified calendar-action completion claims in local chat.
+    """Fail closed when a calendar action request produces free model text.
 
-    The current local-chat slice does not execute external actions. Therefore a
-    free-text completion claim about a calendar action can never be authoritative.
-    Typed drafts/proposals remain separate and are preserved unchanged.
+    The current local-chat slice does not execute external actions. A calendar
+    action request must therefore become a typed draft/proposal path. If the
+    model instead returns free text, Ada must not trust or forward any claimed
+    status, including phrasings a deny-list did not anticipate.
     """
 
-    if not response.text:
-        return response
-
-    context = f"{request_text}\n{response.text}"
-    if not _CALENDAR_CONTEXT_RE.search(context):
-        return response
-    if not _COMPLETION_CLAIM_RE.search(response.text):
+    if not response.text or not _is_calendar_action_request(request_text):
         return response
 
     return AgentResponse(
         text=(
-            "I cannot confirm that calendar action as completed. "
-            "No calendar action was executed."
+            "I could not safely turn that calendar action request into a "
+            "typed draft. No calendar action was executed."
         ),
         drafts=response.drafts,
         proposals=response.proposals,
