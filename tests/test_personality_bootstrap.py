@@ -39,6 +39,9 @@ class PersonalityBootstrapTests(unittest.TestCase):
         self.assertIn("Ada Lovelace", profile.inspiration)
         self.assertTrue(profile.traits)
         self.assertTrue(profile.boundaries)
+        self.assertTrue(
+            any("self-referential" in item for item in profile.interaction_style)
+        )
 
     def test_empty_memory_is_seeded_exactly_once(self) -> None:
         memory = FakePersonalityMemory()
