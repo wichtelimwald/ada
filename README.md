@@ -45,7 +45,7 @@ The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned ag
 Local validation:
 
 ```bash
-python -m pip install --editable .
+python3 -m pip install --editable .
 sh scripts/validate.sh
 ```
 
