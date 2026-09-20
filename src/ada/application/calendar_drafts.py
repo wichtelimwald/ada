@@ -58,6 +58,24 @@ def _source_explicitly_supports_date(
     return any(re.search(pattern, source_text) for pattern in patterns)
 
 
+def _source_explicitly_supports_calendar(
+    calendar_id: str,
+    source_text: str,
+) -> bool:
+    """Require an Ada-known calendar target to be explicit in the user text."""
+
+    normalized = calendar_id.strip().lower()
+    if normalized == "family":
+        return bool(
+            re.search(
+                r"(?:\bfamilienkalender\b|\bfamily\s+calendar\b)",
+                source_text,
+                re.IGNORECASE,
+            )
+        )
+    return False
+
+
 def _valid_time(value: str | None) -> bool:
     return bool(value and _TIME_RE.fullmatch(value.strip()))
 
@@ -65,7 +83,7 @@ def _valid_time(value: str | None) -> bool:
 def assess_calendar_create_draft(
     draft: CreateCalendarEventDraft,
     *,
-    source_text: str | None = None,
+    source_text: str,
 ) -> CalendarDraftAssessment:
     """Identify material information still required before proposal creation."""
 
@@ -77,7 +95,7 @@ def assess_calendar_create_draft(
     parsed_date = _parse_iso_date(draft.date)
     if parsed_date is None:
         missing.append("date_with_year")
-    elif source_text is not None and not _source_explicitly_supports_date(
+    elif not _source_explicitly_supports_date(
         parsed_date,
         source_text,
     ):
@@ -99,7 +117,14 @@ def assess_calendar_create_draft(
             # is not later than the start cannot be treated as complete.
             missing.append("end_time")
 
-    if not draft.calendar_id or not draft.calendar_id.strip():
+    if (
+        not draft.calendar_id
+        or not draft.calendar_id.strip()
+        or not _source_explicitly_supports_calendar(
+            draft.calendar_id,
+            source_text,
+        )
+    ):
         missing.append("calendar")
 
     # Model-generated unresolved metadata is advisory only. Ada owns the
@@ -152,7 +177,7 @@ _EN_LABELS = {
 def render_calendar_draft_response(
     draft: CreateCalendarEventDraft,
     *,
-    source_text: str | None = None,
+    source_text: str,
 ) -> str:
     """Render a safe user-facing result without implying external execution."""
 
