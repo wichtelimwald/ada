@@ -127,6 +127,47 @@ class CliTests(unittest.TestCase):
             joined,
         )
 
+    def test_chat_sanitizes_terminal_controls_before_status_marker(self) -> None:
+        reply = "Looks fine.\x1b[8mHIDDEN"
+        inputs = iter(("hello", "/quit"))
+        output: list[str] = []
+
+        result = _chat_loop(
+            TextRuntime(reply),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertNotIn("\x1b", joined)
+        self.assertIn("Looks fine.[8mHIDDEN", joined)
+        self.assertIn(
+            "Conversation only: no external action was executed in this turn.",
+            joined,
+        )
+
+    def test_chat_marks_standalone_erledigt_as_conversation_only(self) -> None:
+        inputs = iter((
+            "Zahnarzttermin morgen um 16 Uhr",
+            "/quit",
+        ))
+        output: list[str] = []
+
+        result = _chat_loop(
+            StandaloneDoneRuntime(),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertIn("Erledigt.", joined)
+        self.assertIn(
+            "Conversation only: no external action was executed in this turn.",
+            joined,
+        )
+
     def test_chat_marks_all_free_text_as_non_authoritative(self) -> None:
         replies = (
             "I added the appointment.",
