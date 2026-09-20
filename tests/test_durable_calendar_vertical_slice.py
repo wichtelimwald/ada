@@ -20,6 +20,7 @@ from ada.application.calendar_actions import (
 from ada.core.action_outcomes import (
     BusinessOutcomeStatus,
     OperationId,
+    OperationIdentityConflictError,
     ProviderCapability,
     ProviderOutcomeStatus,
 )
@@ -63,12 +64,13 @@ class FixedTravelTime:
 
 def proposal(
     *,
+    title: str = "Parent-teacher meeting",
     start: datetime | None = None,
     end: datetime | None = None,
     location: str = "School North",
 ) -> CreateCalendarEventProposal:
     return CreateCalendarEventProposal(
-        title="Parent-teacher meeting",
+        title=title,
         start=start or datetime(2026, 10, 12, 16, 0, tzinfo=timezone.utc),
         end=end or datetime(2026, 10, 12, 16, 30, tzinfo=timezone.utc),
         calendar_id="family",
@@ -204,12 +206,38 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         self.assertEqual(first.execution, second.execution)
         self.assertEqual(calendar.create_attempts, 1)
 
-    def test_provider_commit_before_local_checkpoint_is_reconciled(self) -> None:
+    def test_same_operation_id_rejects_different_action_payload(self) -> None:
+        calendar = InMemoryCalendarAdapter()
+        durable = self.launch_adapter(calendar)
+        service = CalendarActionService(
+            guard=self.guard(),
+            durable_actions=durable,
+        )
+        operation_id = OperationId("op-bound-action")
+
+        first = service.create_event(
+            proposal(),
+            operation_id=operation_id,
+            authorization=authorization(),
+        )
+        self.assertIsNotNone(first.execution)
+
+        with self.assertRaises(OperationIdentityConflictError):
+            service.create_event(
+                proposal(title="Different appointment"),
+                operation_id=operation_id,
+                authorization=authorization(),
+            )
+
+        self.assertEqual(calendar.create_attempts, 1)
+        self.assertEqual(calendar.effect_count, 1)
+
+    def test_preexisting_provider_commit_is_reconciled_without_create(self) -> None:
         calendar = InMemoryCalendarAdapter()
         operation_id = OperationId("op-crash-window")
 
-        # Simulate the critical C3 window: the provider committed, then Ada
-        # crashed before DBOS could checkpoint the step result.
+        # Unit-level reconciliation check. The process-level hard-crash path
+        # is covered separately in test_durable_calendar_crash_recovery.py.
         direct = calendar.create_event(
             proposal(),
             operation_id=str(operation_id),
@@ -255,6 +283,65 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
             ProviderOutcomeStatus.COMMITTED,
         )
         self.assertEqual(calendar.create_attempts, 1)
+
+    def test_confirmed_provider_failure_maps_to_failed_business_outcome(self) -> None:
+        calendar = InMemoryCalendarAdapter(reject_creates=True)
+        durable = self.launch_adapter(calendar)
+        service = CalendarActionService(
+            guard=self.guard(),
+            durable_actions=durable,
+        )
+
+        response = service.create_event(
+            proposal(),
+            operation_id=OperationId("op-provider-rejected"),
+            authorization=authorization(),
+        )
+
+        assert response.execution is not None
+        self.assertEqual(
+            response.execution.provider.status,
+            ProviderOutcomeStatus.FAILED,
+        )
+        self.assertEqual(
+            response.execution.business.status,
+            BusinessOutcomeStatus.FAILED,
+        )
+        self.assertEqual(calendar.create_attempts, 1)
+        self.assertEqual(calendar.effect_count, 0)
+        self.assertEqual(
+            render_calendar_action_response(proposal(), response),
+            "I could not create the calendar event: Parent-teacher meeting.",
+        )
+
+    def test_idempotent_provider_retry_commits_one_external_effect(self) -> None:
+        calendar = InMemoryCalendarAdapter(
+            create_capability=ProviderCapability.IDEMPOTENT,
+            ambiguous_after_commit_once=True,
+        )
+        durable = self.launch_adapter(calendar)
+        service = CalendarActionService(
+            guard=self.guard(),
+            durable_actions=durable,
+        )
+
+        response = service.create_event(
+            proposal(),
+            operation_id=OperationId("op-idempotent-provider-retry"),
+            authorization=authorization(),
+        )
+
+        assert response.execution is not None
+        self.assertEqual(
+            response.execution.provider.status,
+            ProviderOutcomeStatus.COMMITTED,
+        )
+        self.assertEqual(
+            response.execution.business.status,
+            BusinessOutcomeStatus.COMMITTED,
+        )
+        self.assertEqual(calendar.create_attempts, 2)
+        self.assertEqual(calendar.effect_count, 1)
 
     def test_provider_without_duplicate_safety_fails_closed_as_ambiguous(self) -> None:
         calendar = InMemoryCalendarAdapter(
