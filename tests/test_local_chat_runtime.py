@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import json
 import unittest
 from typing import Any, Sequence
 from unittest.mock import patch
 
 import pydantic_ai
+from pydantic_ai import Agent, NativeOutput
+from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
+from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from ada.adapters.local_ollama import (
     LocalModelConfigurationError,
@@ -116,6 +120,73 @@ class LocalChatRuntimeTests(unittest.TestCase):
         self.assertEqual(response.drafts, (draft,))
         self.assertEqual(response.proposals, ())
         self.assertEqual(response.text, "")
+
+    def test_real_agent_native_output_and_reset_round_trip(self) -> None:
+        captured_histories: list[list[ModelMessage]] = []
+
+        def respond(
+            messages: list[ModelMessage],
+            info: AgentInfo,
+        ) -> ModelResponse:
+            captured_histories.append(list(messages))
+            self.assertIsNotNone(
+                info.model_request_parameters.output_object
+            )
+            return ModelResponse(
+                parts=[
+                    TextPart(
+                        content=json.dumps(
+                            {
+                                "result": {
+                                    "kind": "AgentTextReply",
+                                    "data": {
+                                        "text": "Hallo aus dem echten Agent-Pfad.",
+                                        "response_type": "chat.reply",
+                                    },
+                                }
+                            }
+                        )
+                    )
+                ]
+            )
+
+        previous_banner = pydantic_ai.BANNER_ENABLED
+        try:
+            pydantic_ai.BANNER_ENABLED = False
+            agent = Agent(
+                FunctionModel(function=respond),
+                output_type=NativeOutput(
+                    [AgentTextReply, CreateCalendarEventDraft],
+                    name="ada_local_response",
+                ),
+            )
+            runtime = PydanticAIRuntime(
+                agent,
+                keep_session_history=True,
+            )
+
+            first = runtime.run(AgentRequest(text="first"))
+            second = runtime.run(AgentRequest(text="second"))
+            runtime.reset_session()
+            third = runtime.run(AgentRequest(text="after reset"))
+        finally:
+            pydantic_ai.BANNER_ENABLED = previous_banner
+
+        self.assertEqual(
+            first.text,
+            "Hallo aus dem echten Agent-Pfad.",
+        )
+        self.assertEqual(second.text, first.text)
+        self.assertEqual(third.text, first.text)
+        self.assertEqual(len(captured_histories), 3)
+        self.assertGreater(
+            len(captured_histories[1]),
+            len(captured_histories[0]),
+        )
+        self.assertEqual(
+            len(captured_histories[2]),
+            len(captured_histories[0]),
+        )
 
     def test_local_runtime_configures_native_structured_output(self) -> None:
         captured: dict[str, Any] = {}

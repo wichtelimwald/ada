@@ -44,6 +44,27 @@ class DraftRuntime:
         )
 
 
+class TextRuntime:
+    def __init__(self, text: str) -> None:
+        self.text = text
+
+    def run(self, request: AgentRequest) -> AgentResponse:
+        del request
+        return AgentResponse(text=self.text)
+
+
+class FalseCompletionRuntime:
+    def run(self, request: AgentRequest) -> AgentResponse:
+        del request
+        return AgentResponse(text="Ich habe den Termin eingetragen.")
+
+
+class StandaloneDoneRuntime:
+    def run(self, request: AgentRequest) -> AgentResponse:
+        del request
+        return AgentResponse(text="Erledigt.")
+
+
 class FailingRuntime:
     def run(self, request: AgentRequest) -> AgentResponse:
         del request
@@ -85,6 +106,96 @@ class CliTests(unittest.TestCase):
         self.assertNotIn("Termin wurde eingetragen", joined)
         self.assertNotIn("appointment was created", joined)
 
+    def test_chat_marks_false_completion_as_conversation_only(self) -> None:
+        inputs = iter((
+            "Kannst du den Termin in den Kalender eintragen?",
+            "/quit",
+        ))
+        output: list[str] = []
+
+        result = _chat_loop(
+            FalseCompletionRuntime(),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertIn("Ich habe den Termin eingetragen.", joined)
+        self.assertIn(
+            "Conversation only: no external action was executed in this turn.",
+            joined,
+        )
+
+    def test_chat_sanitizes_terminal_controls_before_status_marker(self) -> None:
+        reply = "Looks fine.\x1b[8mHIDDEN"
+        inputs = iter(("hello", "/quit"))
+        output: list[str] = []
+
+        result = _chat_loop(
+            TextRuntime(reply),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertNotIn("\x1b", joined)
+        self.assertIn("Looks fine.[8mHIDDEN", joined)
+        self.assertIn(
+            "Conversation only: no external action was executed in this turn.",
+            joined,
+        )
+
+    def test_chat_marks_standalone_erledigt_as_conversation_only(self) -> None:
+        inputs = iter((
+            "Zahnarzttermin morgen um 16 Uhr",
+            "/quit",
+        ))
+        output: list[str] = []
+
+        result = _chat_loop(
+            StandaloneDoneRuntime(),
+            read=lambda prompt: next(inputs),
+            write=output.append,
+        )
+
+        self.assertEqual(result, 0)
+        joined = "\n".join(output)
+        self.assertIn("Erledigt.", joined)
+        self.assertIn(
+            "Conversation only: no external action was executed in this turn.",
+            joined,
+        )
+
+    def test_chat_marks_all_free_text_as_non_authoritative(self) -> None:
+        replies = (
+            "I added the appointment.",
+            "Added to your calendar.",
+            "Your calendar has been updated.",
+            "Which calendar should I use?",
+            "A calendar is a way to organize dates and events.",
+        )
+
+        for reply in replies:
+            with self.subTest(reply=reply):
+                inputs = iter(("ordinary free text turn", "/quit"))
+                output: list[str] = []
+
+                result = _chat_loop(
+                    TextRuntime(reply),
+                    read=lambda prompt: next(inputs),
+                    write=output.append,
+                )
+
+                self.assertEqual(result, 0)
+                joined = "\n".join(output)
+                self.assertIn(reply, joined)
+                self.assertIn(
+                    "Conversation only: no external action was executed in this turn.",
+                    joined,
+                )
+
     def test_chat_recovers_from_runtime_error_without_action_claim(self) -> None:
         inputs = iter(("calendar request", "/quit"))
         output: list[str] = []
@@ -121,7 +232,14 @@ class CliTests(unittest.TestCase):
         self.assertEqual(runtime.requests, ["hello", "again"])
         self.assertEqual(runtime.reset_count, 1)
         self.assertEqual(prompts, ["you> "] * 4)
-        self.assertIn("Ada: echo:hello", output)
+        self.assertTrue(
+            any(
+                item.startswith("Ada: echo:hello\n")
+                and "Conversation only: no external action was executed in this turn."
+                in item
+                for item in output
+            )
+        )
         self.assertIn("Ada: Session context cleared.", output)
 
 

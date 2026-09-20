@@ -9,6 +9,7 @@ from collections.abc import Callable
 
 from ada import __version__
 from ada.application.calendar_drafts import render_calendar_draft_response
+from ada.application.local_chat_safety import render_conversation_only_reply
 from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest, AgentRuntimePort
 
@@ -64,7 +65,7 @@ def _chat_loop(
             continue
 
         if response.text:
-            write(f"Ada: {response.text}")
+            write(f"Ada: {render_conversation_only_reply(response.text)}")
         for draft in response.drafts:
             if isinstance(draft, CreateCalendarEventDraft):
                 write(f"Ada: {render_calendar_draft_response(draft, source_text=text)}")
