@@ -19,7 +19,13 @@ def _semantic_view(value: dict[str, Any] | None) -> dict[str, Any] | None:
     if kind == "interval":
         return {
             key: value.get(key)
-            for key in ("kind", "start", "end")
+            for key in (
+                "kind",
+                "start",
+                "end",
+                "start_wall_time_status",
+                "end_wall_time_status",
+            )
         }
     return value
 
