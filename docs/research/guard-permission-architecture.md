@@ -369,11 +369,11 @@ The backend is a trusted security component, **not** a normal third-party plugin
 
 Changing the backend requires the Guard conformance/security test suite to pass.
 
-## 8. Proposed decision criteria — not yet agreed
+## 8. Agreed decision criteria
 
-Per Ada's process, do not score until weights are agreed with the maintainer.
+Weights were agreed with the maintainer before scoring.
 
-| Criterion | Proposed weight | Why it matters |
+| Criterion | Weight | Why it matters |
 | --- | ---: | --- |
 | Bypass resistance / fail-closed security | **30%** | Guard is the last deterministic boundary before privileged effects/disclosures. |
 | Semantic fit to Ada authority model | **20%** | Actor, audience, subject, provenance, representation and channel assurance must stay understandable. |
@@ -384,7 +384,40 @@ Per Ada's process, do not score until weights are agreed with the maintainer.
 | License / dependency / integration fit | **5%** | Keep the stack distributable and the root security boundary auditable. |
 | **Total** | **100%** | |
 
-## 9. Evidence summary before scoring
+## 9. Evidence-based scoring
+
+Scale:
+
+- **5 — Excellent:** strongly fits Ada with little compensation.
+- **4 — Good:** solid fit with bounded caveats.
+- **3 — Adequate:** workable but meaningful compensation remains.
+- **2 — Weak:** significant mismatch or integration burden.
+- **1 — Poor:** unattractive for this security boundary.
+
+| Criterion | Weight | A Ada evaluator | B Cedar | C PyCasbin | D OPA/Rego |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Bypass resistance / fail-closed security | 30% | **5** | **5** | 4 | **5** |
+| Semantic fit to Ada authority model | 20% | **5** | **5** | 3 | 4 |
+| Auditability / explainability / testability | 15% | **5** | **5** | 4 | **5** |
+| Maintainability / simplicity | 15% | 4 | 3 | **4** | 2 |
+| Extensibility / replaceability | 10% | 4 | **5** | 4 | **5** |
+| Policy administration / human readability | 5% | 4 | **5** | 4 | 4 |
+| License / dependency / integration fit | 5% | **5** | 2 | 4 | 2 |
+| **Weighted total / 100** | **100%** | **94** | **91** | **76** | **83** |
+
+### Score rationale
+
+**A — Ada evaluator (94):** highest fit because the MVP semantics are narrow but unusual, the evaluator can be fail-closed and deny-overrides without a general expression language, and the entire root security path stays directly auditable in the Python codebase. Its main risk is future scope creep into a home-grown policy DSL.
+
+**B — Cedar (91):** strongest general authorization model. Cedar natively uses principal/action/resource/context, denies when no permit matches, and an applicable `forbid` overrides permits. It also provides useful diagnostics and schema tooling. The main penalty is integration/lifecycle complexity in Ada's Python-first runtime: the Cedar project currently lists community-maintained Python authorization bindings, while its official Python work in `cedar-for-agents` is focused on MCP schema/request generation rather than a canonical Python authorizer embedding path.
+
+**C — PyCasbin (76):** mature and easy to embed in Python, with ABAC/ReBAC and deny-capable effect models. Ada's provenance, audience, representation and channel-assurance semantics would, however, become custom matcher/model configuration, making the root boundary less directly aligned with Ada's domain.
+
+**D — OPA/Rego (83):** very strong general policy engine with REST and Wasm integration choices, but the operational/policy-language complexity is high for Ada's present scope. Python-first integration typically means another process or a Wasm/community layer.
+
+The close A-vs-B result is deliberate: Cedar is the preferred escalation engine if Ada's policy semantics outgrow the intentionally small evaluator.
+
+## 9a. Evidence summary
 
 | Property | A Ada evaluator | B Cedar | C PyCasbin | D OPA/Rego |
 | --- | --- | --- | --- | --- |
@@ -423,9 +456,9 @@ If this remains small and clear, the custom option is viable.
 
 If the rules become awkward or require a general expression language, stop and prototype Cedar rather than growing a custom DSL.
 
-## 11. Preliminary direction
+## 11. Direction before conformance prototype
 
-Before scoring, the strongest architecture appears to be:
+The agreed scoring supports:
 
 > **Ada owns AuthorizationRequest / GuardDecision and starts with a deliberately small typed evaluator, while keeping Cedar as the first escalation option if policy expressiveness outgrows the simple model.**
 
