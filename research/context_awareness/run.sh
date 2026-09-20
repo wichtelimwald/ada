@@ -5,6 +5,13 @@ HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 ROOT=$(CDPATH= cd -- "$HERE/../.." && pwd)
 VERBOSE=${VERBOSE:-0}
 
+if [ "${ADA_RESEARCH_SANDBOX:-0}" != "1" ]; then
+  echo "Refusing direct host execution of the context-awareness research harness." >&2
+  echo "It installs a dynamically resolved third-party graph and imports the pinned Quickadd pickle model during research conversion." >&2
+  echo "Use: sh research/context_awareness/run_sandboxed.sh" >&2
+  exit 2
+fi
+
 if [ -x "$ROOT/.venv/bin/python" ]; then
   BASE_PYTHON=${PYTHON:-"$ROOT/.venv/bin/python"}
 else
