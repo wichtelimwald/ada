@@ -1,6 +1,6 @@
 # Technology evaluation — Action Ledger / recovery semantics
 
-**Status:** Research framing complete; weights not yet agreed, so no scoring yet  
+**Status:** Research active — weights agreed; custom control passed; mature durable-execution candidates added  
 **Date checked:** 2026-09-20  
 **Depends on:** ADR-0002, ADR-0003, ADR-0004, representative scenarios S1/S2
 
@@ -100,7 +100,7 @@ Reconcile before any retry.
 
 Store the minimum structured data needed for recovery and audit.
 
-Likely operation record fields:
+Likely operation record/view fields:
 
 ```text
 operation_id
@@ -113,8 +113,20 @@ guard_reason
 proposal_digest
 provider_kind
 provider_reference?
+provider_outcome?
+business_outcome?
 last_error_code?
 ```
+
+Provider outcome and business outcome are intentionally different.
+
+For example:
+
+- a phone provider reporting `call completed` proves a technical call outcome;
+- it does **not** prove that an appointment was successfully booked;
+- an order API returning a durable order ID can prove provider acceptance, while later delivery/cancellation is a separate business state.
+
+The ledger must never claim a stronger outcome than the provider or another verifiable source actually proves.
 
 The ledger may need a minimal structured action envelope for deterministic recovery, but it must not become a copy of:
 
@@ -137,78 +149,127 @@ For the current CalendarPort this means:
 
 The provider adapter must not report `committed` merely because the API call returned without a local exception.
 
-## 7. Candidate storage approaches
+## 7. Candidate architecture approaches
 
-### A — Ada-owned state machine + Python stdlib SQLite
+The initial research framed this too narrowly as a database choice. The custom SQLite prototype and maintainer review showed that the broader problem belongs to the **durable execution / workflow recovery / idempotency** domain.
 
-Use Python's built-in `sqlite3` and explicit Ada-owned SQL/state transitions.
+SQLite remains a valid control implementation, but mature durable-execution systems must be compared before Ada owns this machinery.
+
+### A — Ada-owned state machine + Python stdlib SQLite (control)
+
+Ada directly implements operation states, compare-and-set transitions, recovery discovery, transition history and provider reconciliation. SQLite is only the persistence backend.
 
 **Advantages**
 
-- no new runtime dependency;
-- SQLite provides transactional atomic commit;
-- file-based, local, low-resource, easy backup/inspection;
-- fits the single-host container-first MVP;
-- explicit schema keeps the security-critical state model directly reviewable;
-- WAL can improve reader/writer concurrency if later needed.
+- no runtime dependency;
+- exact Ada semantics and privacy minimization;
+- direct, reviewable transaction boundaries;
+- small resource footprint;
+- proven viable by the hard-crash control experiment.
 
 **Risks**
 
-- Ada owns migrations and SQL;
-- state-transition correctness must be thoroughly tested;
-- careless transaction boundaries can break the intended guarantees.
+- Ada owns security/recovery-critical state-machine code;
+- Ada owns schema migrations, concurrency behavior and recovery evolution;
+- future durable waiting, scheduling, signals and long-running workflows would add more custom machinery.
 
-### B — Ada-owned state machine + SQLAlchemy/SQLite
+### B — DBOS durable execution library
 
-Same Ada semantics, but use an ORM/database toolkit.
+DBOS is an MIT-licensed Python durable-execution library. It runs in-process rather than requiring a separate workflow server.
+
+Current evidence:
+
+- Python >=3.10 including Python 3.14;
+- stable release 2.31.1 checked 2026-09-20;
+- SQLite can be the system database and is the default for local/simple deployments;
+- workflows resume from the last completed durable step;
+- stable workflow IDs act as idempotency keys for workflow invocation;
+- workflow/step status is inspectable;
+- native PydanticAI durable-execution integration exists.
+
+**Important boundary**
+
+DBOS steps that call external providers are still at-least-once across a crash that occurs after the external effect but before the step checkpoint. External provider calls therefore still require Ada operation IDs plus idempotency/reconciliation.
 
 **Advantages**
 
-- migrations/query abstractions can become easier as schema grows;
-- future database replacement is less invasive.
+- removes much custom recovery/checkpoint machinery;
+- in-process Python fit;
+- SQLite-first local path matches Ada's current topology;
+- MIT;
+- existing PydanticAI integration may later reduce duplicated durability glue;
+- supports durable sleep, messages, events and human-in-the-loop patterns that Ada is likely to need.
 
 **Risks**
 
-- additional dependency and abstraction in a small state machine;
-- ORM behavior can obscure exact transaction/locking semantics;
-- likely more machinery than the initial schema requires.
+- durable workflow semantics/decorators can leak into Ada if not isolated;
+- larger dependency set than stdlib SQLite;
+- DBOS persists workflow arguments/results/step state, so privacy/data-minimization must be reviewed explicitly;
+- provider/business outcome semantics remain Ada-owned.
 
-### C — Event-sourcing library + SQLite
+### C — Restate durable execution runtime
 
-Use a mature event-sourcing package and model operation transitions as events.
+Restate provides durable execution, keyed state, workflows, timers/signals and a PydanticAI integration. The self-hosted runtime is a separate single binary and does not require an external database.
 
 **Advantages**
 
-- append-only history and recovery concepts are first-class;
-- existing SQLite persistence.
+- purpose-built durable execution;
+- strong recovery/orchestration primitives;
+- PydanticAI integration;
+- can grow into long-running/human-approval workflows.
 
 **Risks**
 
-- introduces event-sourcing architecture beyond Ada's current need;
-- operation state and provider reconciliation are still Ada-specific;
-- larger conceptual and dependency surface.
+- additional runtime process and operational boundary;
+- Restate server uses BSL 1.1 rather than an OSI-open-source license; Python SDK is MIT;
+- more infrastructure than Ada currently needs;
+- still cannot manufacture exactly-once external-provider effects without idempotency/reconciliation.
 
-### D — PydanticAI/Harness persistence as Action Ledger
+### D — Temporal
 
-Use runtime persistence/checkpoints as the primary consequential-action store.
+Temporal is a mature durable workflow platform with Python support and strong crash/recovery semantics.
 
 **Advantages**
 
-- less additional persistence code.
+- mature, well-established durable execution;
+- strong observability, workflow history and long-running workflow support;
+- self-hosted or managed deployment.
 
-**Hard problem**
+**Risks**
 
-Targeted recovery research already showed that runtime persistence cannot establish side-effect truth after a hard process death. Provider reconciliation and stable Ada operation identity remain necessary.
+- separate service/worker architecture is heavy for Ada's single-host MVP;
+- larger operational footprint and conceptual surface;
+- provider idempotency/reconciliation remains necessary for external effects.
 
-**Current interpretation:** useful runtime evidence, but not a viable source of truth for the Action Ledger.
+### E — Lower-level ORM/event-sourcing/runtime-persistence variants
 
-## 8. SQLite evidence
+SQLAlchemy+SQLite, event-sourcing libraries, and PydanticAI/Harness persistence remain useful references but are no longer primary candidates:
 
-SQLite transactions provide atomic commit semantics, including recovery from interrupted commits. Python 3.14's `sqlite3` module is part of the standard library and recommends explicit transaction control using the connection's `autocommit` behavior.
+- SQLAlchemy changes storage abstraction, not the durable-execution problem;
+- event sourcing gives history but does not by itself solve external side-effect recovery;
+- PydanticAI persistence already failed as a standalone source of external side-effect truth in the hard-crash experiment.
 
-SQLite WAL mode is optional. It allows readers and writers to proceed with more concurrency but requires all processes using the database to be on the same host.
+## 8. Reference-system evidence
 
-That constraint matches Ada's initial single-host runtime. WAL is not required merely to get atomic commit.
+### OpenJarvis
+
+OpenJarvis currently has several adjacent mechanisms:
+
+- SQLite-backed scheduled-task persistence and task-run logs;
+- an append-only SQLite security audit log with a hash chain;
+- an EventBus for lifecycle events.
+
+These are useful references for scheduling/audit, but no general provider-side-effect Action Ledger with durable idempotency/reconciliation was found.
+
+Its cross-device example explicitly notes that stable task IDs do not themselves provide durable deduplication or exactly-once delivery, and calls out persistent task state, action idempotency and timeout reconciliation as future requirements before retrying uncertain writes.
+
+### Mark LIV
+
+Only public product/README behavior is considered because Mark LIV is a clean-room product/UX reference for Ada.
+
+Its public README documents an Undo stack for local reversible actions and says desktop organization journals file moves so they can be reversed.
+
+No public evidence used here shows a crash-durable external-provider transaction/reconciliation system. This is an undo/reversibility mechanism, not evidence of exactly-once external action recovery.
 
 ## 9. Agreed decision criteria
 
@@ -217,102 +278,98 @@ That constraint matches Ada's initial single-host runtime. WAL is not required m
 | Recovery / duplicate-side-effect safety | **30%** | This is the primary purpose of the ledger. |
 | Crash durability / atomic transition clarity | **20%** | State must survive abrupt termination predictably. |
 | Maintainer simplicity / reviewability | **20%** | Security-critical code should remain understandable. |
-| Privacy / data minimization | **10%** | Ledger data is sensitive operational history. |
+| Privacy / data minimization | **10%** | Durable execution state is sensitive operational history. |
 | Local resource / portability fit | **10%** | Must fit M1/16 GB and later Linux/server deployment. |
-| Replaceability / integration clarity | **10%** | Storage implementation must not become domain semantics. |
+| Replaceability / integration clarity | **10%** | Durable infrastructure must not become Ada's domain semantics. |
 | **Total** | **100%** | |
 
-## 10. Scoring
+## 10. Scoring status
 
-Scale:
+**Scoring is reopened.**
 
-- **5 — Excellent:** directly supports Ada's recovery contract with little compensating complexity.
-- **4 — Good:** strong fit with bounded caveats.
-- **3 — Adequate:** workable, but meaningful extra machinery or opacity remains.
-- **2 — Weak:** significant mismatch with Ada's recovery or maintainability goals.
-- **1 — Poor:** unsuitable as the Action Ledger source of truth.
+The earlier storage-only scoring is retained only as historical evidence; it is no longer sufficient for an architecture decision because DBOS, Restate and Temporal solve a larger fraction of the actual problem.
 
-| Criterion | Weight | A stdlib SQLite | B SQLAlchemy + SQLite | C event sourcing | D runtime persistence |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Recovery / duplicate-side-effect safety | 30% | **5** | **5** | **5** | 2 |
-| Crash durability / atomic transition clarity | 20% | **5** | 4 | 4 | 2 |
-| Maintainer simplicity / reviewability | 20% | 4 | **4** | 2 | 4 |
-| Privacy / data minimization | 10% | **5** | **5** | 4 | 3 |
-| Local resource / portability fit | 10% | **5** | 4 | 3 | **5** |
-| Replaceability / integration clarity | 10% | 4 | **5** | 4 | 2 |
-| **Weighted total / 100** | **100%** | **94** | **90** | **76** | **56** |
+Do not assign a final score until the DBOS hard-crash prototype is complete.
 
-### Score rationale
+The custom SQLite result remains the control baseline:
 
-**A — stdlib SQLite (94):** fits the single-host/container-first MVP without another dependency, exposes transaction boundaries directly, supports atomic state changes, and keeps the initial ledger schema small and reviewable. It is not perfect: Ada owns schema migrations and hand-written SQL, and direct SQL creates some storage coupling. The score does not imply that SQLite alone creates exactly-once semantics; provider reconciliation remains mandatory.
+- technically viable;
+- minimal;
+- 5/5 control tests passed;
+- but Ada owns all durable execution mechanics.
 
-**B — SQLAlchemy + SQLite (90):** preserves the same underlying database guarantees and improves storage abstraction/migration options, but adds dependency and ORM/toolkit surface before the schema/query complexity justifies it. The close score means it should be reconsidered if the ledger grows beyond a small, explicit state machine.
+## 11. Custom SQLite control prototype
 
-**C — event sourcing (75):** conceptually compatible with operation history, but adds a larger architectural model than the current requirement. Ada still must implement provider reconciliation and operation semantics.
+A standard-library-only prototype exercised the critical crash window:
 
-**D — PydanticAI/runtime persistence (54):** useful supporting evidence, but prior crash tests already showed it cannot be the source of truth for external side effects. It cannot replace Ada-owned stable operation IDs and reconciliation.
+```text
+authorized
+ -> executing (durable)
+ -> provider commits
+ -> os._exit()
+ -> restart sees executing
+ -> provider reconciliation
+ -> committed
+```
 
-## 10a. Evidence table
+Result: **5/5 tests passed**.
 
-| Property | A stdlib SQLite | B SQLAlchemy + SQLite | C event sourcing | D runtime persistence |
-| --- | --- | --- | --- | --- |
-| Ada owns state semantics | yes | yes | partly shaped by library | no / framework-shaped |
-| Atomic local transitions | yes | yes | yes | framework-dependent |
-| Extra dependency | no | yes | yes | already present |
-| Direct transaction visibility | strongest | medium | medium | weakest |
-| Append-only history | simple extra table | simple extra table | native | runtime history, not action truth |
-| Provider reconciliation still required | yes | yes | yes | yes |
-| MVP complexity | lowest | medium | highest | deceptively low |
-| Current hard-crash evidence | suitable by design | suitable by design | suitable if modeled correctly | insufficient as source of truth |
+Validated:
 
-## 11. Prototype gate
+- provider commit followed by hard process death recovers without a duplicate effect;
+- denied action creates zero provider effects;
+- illegal transitions are rejected;
+- stale concurrent transition cannot double-claim the operation;
+- provider with no reconciliation capability becomes `ambiguous` and is not blindly retried.
 
-Do not prototype every storage option.
+The fake provider deliberately supports stable operation identity/reconciliation. This experiment does not claim SQLite can create exactly-once semantics for an arbitrary external provider.
 
-The highest-value prototype is the smallest complete crash/recovery slice using option A:
+## 12. Next prototype gate — DBOS
 
-1. create operation;
-2. record Guard allow;
-3. transition to executing;
-4. fake provider commits using operation ID;
-5. simulate crash before ledger commit;
-6. restart;
-7. discover in-flight operation;
-8. reconcile provider;
-9. record committed;
-10. prove provider write count remains exactly one.
+DBOS is the only additional candidate that currently appears capable of materially changing the decision while still fitting Ada's small single-process/container-first architecture.
 
-Also test:
+Test DBOS 2.31.1 against the same hard-crash contract:
 
-- denied operation causes zero provider writes;
-- illegal state transitions are rejected;
-- two concurrent attempts cannot both claim the same operation;
-- ambiguous provider without reconciliation support is not retried automatically.
+1. use Ada operation ID as the DBOS workflow ID;
+2. run a provider operation as a durable step;
+3. provider commits;
+4. process dies before DBOS can checkpoint the step result;
+5. restart DBOS with the same SQLite system database;
+6. observe whether/how the step is retried;
+7. use provider idempotency/reconciliation so provider effect count remains one;
+8. inspect what durable workflow state/status DBOS exposes for Ada audit/recovery;
+9. verify an unreconcilable external provider still requires an Ada `ambiguous` outcome rather than a blind retry.
 
-If the direct SQLite implementation becomes awkward or migration/query needs dominate, revisit SQLAlchemy before adding more hand-written persistence machinery.
+The experiment must answer two separate questions:
 
-## 12. Direction before crash/recovery prototype
+- **Can DBOS replace Ada-owned recovery/checkpoint/state-machine plumbing?**
+- **What minimal Ada-owned Action Ledger semantics must remain for provider outcome and business outcome truth?**
 
-The agreed weighting and scoring support:
+If DBOS requires substantial Ada-specific state machinery around it, prefer the smaller control implementation.
 
-> **Ada-owned Action Ledger state machine persisted with Python stdlib SQLite, with provider reconciliation as a mandatory part of side-effect safety.**
+If DBOS removes most recovery machinery while preserving Ada-owned operation/outcome semantics behind a narrow boundary, prefer reuse over custom durable-execution infrastructure.
 
-SQLite is the initial persistence implementation, not the domain boundary.
+## 13. Architectural invariant independent of implementation
 
-The important architectural commitment is the state/recovery contract:
+Whichever implementation wins:
 
-- stable Ada operation ID before provider execution;
-- durable state transition before/after external calls;
-- `executing` after restart is treated as ambiguous;
-- reconcile before retry;
-- automatic retry only when idempotency/reconciliation makes it safe;
-- no framework persistence is accepted as external side-effect truth.
+- Ada owns the operation ID and semantic action/outcome model;
+- Guard decision remains separate;
+- technical provider outcome is separate from business outcome;
+- an external provider's uncertain write is reconciled before retry;
+- no durable-execution framework may reinterpret an unknown provider outcome as success;
+- authoritative user Memory remains separate from workflow/ledger state;
+- only minimal data required for recovery/audit should be persisted.
 
-The next gate is the crash/recovery prototype.
-
-## 13. Primary references
+## 14. Primary references
 
 - Python 3.14 sqlite3 documentation: https://docs.python.org/3.14/library/sqlite3.html
 - SQLite atomic commit: https://www.sqlite.org/atomiccommit.html
 - SQLite WAL: https://www.sqlite.org/wal.html
-- Python eventsourcing SQLite persistence: https://eventsourcing.readthedocs.io/
+- DBOS Python documentation: https://docs.dbos.dev/python/programming-guide
+- DBOS PydanticAI integration: https://docs.dbos.dev/integrations/pydantic-ai
+- Restate: https://restate.dev/
+- Restate PydanticAI integration: https://restate.dev/blog/durable-orchestration-for-ai-agents-with-restate-and-pydantic-ai
+- Temporal: https://docs.temporal.io/
+- OpenJarvis: https://github.com/open-jarvis/OpenJarvis
+- Mark LIV public README: https://github.com/FatihMakes/Mark-LIV/blob/main/readme.md
