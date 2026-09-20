@@ -241,6 +241,6 @@ The real local-chat acceptance run using the default qwen3.5:9b profile also con
 - session context works and reset semantics remain non-persistent;
 - the native structured-output path handles a partial German calendar request without retry failure;
 - Ada does not claim calendar execution;
-- Ada-owned clarification logic asks only for the material fields actually required by policy: full date including year and end time/duration.
+- Ada-owned clarification logic asks only for material fields required by policy. In general these are title/purpose, target calendar, full valid date including year, start time, and end time/duration. In the final acceptance example, title/purpose, target calendar, and start time were already present, so only full date including year and end time/duration were requested.
 
 With those checks complete, self-hosted Ollama with qwen3.5:9b is accepted as Ada's initial local model-serving baseline. The model remains configurable and replaceable.
