@@ -66,11 +66,25 @@ type RequestContext = {
     nowEpochMs: Long
 };
 
-action "calendar.create",
-       "approval.simple",
-       "calendar.disclose.busy",
-       "calendar.disclose.detail"
-appliesTo {
+action "calendar.create" appliesTo {
+    principal: Actor,
+    resource: AdaResource,
+    context: RequestContext
+};
+
+action "approval.simple" appliesTo {
+    principal: Actor,
+    resource: AdaResource,
+    context: RequestContext
+};
+
+action "calendar.disclose.busy" appliesTo {
+    principal: Actor,
+    resource: AdaResource,
+    context: RequestContext
+};
+
+action "calendar.disclose.detail" appliesTo {
     principal: Actor,
     resource: AdaResource,
     context: RequestContext
