@@ -81,3 +81,22 @@ The final ADR decision matrix should combine:
 7. redundancy/availability value.
 
 A failed hard gate excludes a candidate; it cannot be compensated by a high weighted score.
+
+
+## Diagnostic Run 2
+
+After Run 1, two targeted diagnostics were added:
+
+1. **dateparser metadata** — the adapter now uses `DateDataParser` and records parser period/granularity plus locale, with given language order enforced. This helps distinguish a plausible datetime from a parser type mismatch.
+2. **quickadd-safe** — a third isolated environment patches only Quickadd's default scorer initialization to use `DummyScorer` instead of loading the bundled pickled Naive Bayes model. This is research only; it tests whether the probabilistic scorer is needed for Ada's representative corpus.
+
+The second comparison therefore answers a concrete hardening question:
+
+- if `quickadd` and `quickadd-safe` stay semantically equivalent on the corpus, a no-pickle integration/fork becomes technically plausible;
+- if behavior degrades materially, the scoring model is part of the functionality Ada would need to preserve through a safer serialization/loading design.
+
+Re-run the same command:
+
+~~~sh
+sh research/context_awareness/run.sh
+~~~
