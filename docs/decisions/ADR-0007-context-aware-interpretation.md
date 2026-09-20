@@ -475,7 +475,7 @@ Run 1 also confirmed that quickadd installs and executes on Ada's target Python 
 | Local/offline operation | PASS | PASS |
 | Privacy/security fit | PASS in current review | **CONDITIONAL PASS** — Run 3 proves a no-pickle JSON scorer path with identical characterized semantics; production integration strategy still required |
 | Supported target deployment | PASS — documented Python 3.14 | PASS on target Mac by characterization; Linux still to retain as supported path |
-| Reproducible dependency path | PASS — pinned release | PASS — pinned Git commit, but weaker distribution ergonomics |
+| Reproducible dependency path | **CONDITIONAL** — top-level release pinned; transitive dependencies are still dynamically resolved | **CONDITIONAL** — Git commit pinned; transitive dependencies are still dynamically resolved |
 
 Quickadd is not yet eligible for final selection until the safe JSON loader/source-artifact strategy is made reproducible and auditable; the feasibility itself is now demonstrated.
 
@@ -645,7 +645,7 @@ Each resolver result is mapped into an Ada-owned canonical evidence record:
 ~~~text
 ResolverEvidence
   resolver_id / version
-  health_state
+  operational_state
   parse_state
   semantic_kind / granularity
   normalized_value
