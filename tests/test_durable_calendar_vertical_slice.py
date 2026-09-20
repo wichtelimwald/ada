@@ -220,8 +220,13 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
     def test_invalid_calendar_proposals_stop_before_provider_execution(self) -> None:
         calendar = InMemoryCalendarAdapter()
         durable = self.launch_adapter(calendar)
+        class GuardMustNotBeCalled:
+            def authorize(self, request: AuthorizationRequest) -> None:
+                del request
+                raise AssertionError("invalid proposal reached AdaGuard")
+
         service = CalendarActionService(
-            guard=self.guard(),
+            guard=GuardMustNotBeCalled(),
             durable_actions=durable,
         )
         start = datetime(2026, 10, 12, 16, 0, tzinfo=timezone.utc)
