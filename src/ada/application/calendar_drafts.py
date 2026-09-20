@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 import re
 
 from ada.core.actions import CreateCalendarEventDraft
 
 
-_FULL_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-_EXPLICIT_YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +19,43 @@ class CalendarDraftAssessment:
     @property
     def complete(self) -> bool:
         return not self.missing
+
+
+def _parse_iso_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(value.strip())
+    except ValueError:
+        return None
+
+
+def _source_explicitly_supports_date(
+    value: date,
+    source_text: str,
+) -> bool:
+    """Require the model's full date to be explicitly present in the user text.
+
+    Be conservative: only recognize common complete numeric date forms where
+    day/month/year occur together. A year-shaped room number or price elsewhere
+    in the request must not validate a model-invented year.
+    """
+
+    year = str(value.year)
+    short_year = year[-2:]
+    month = str(value.month)
+    day = str(value.day)
+
+    patterns = (
+        rf"(?<!\d){year}\s*[-/.]\s*0?{month}\s*[-/.]\s*0?{day}(?!\d)",
+        rf"(?<!\d)0?{day}\s*[-/.]\s*0?{month}\s*[-/.]\s*{year}(?!\d)",
+        rf"(?<!\d)0?{day}\s*[-/.]\s*0?{month}\s*[-/.]\s*{short_year}(?!\d)",
+    )
+    return any(re.search(pattern, source_text) for pattern in patterns)
+
+
+def _valid_time(value: str | None) -> bool:
+    return bool(value and _TIME_RE.fullmatch(value.strip()))
 
 
 def assess_calendar_create_draft(
@@ -34,23 +70,30 @@ def assess_calendar_create_draft(
     if not draft.title or not draft.title.strip():
         missing.append("title")
 
-    if not draft.date or not _FULL_DATE_RE.fullmatch(draft.date.strip()):
+    parsed_date = _parse_iso_date(draft.date)
+    if parsed_date is None:
         missing.append("date_with_year")
-    elif source_text is not None and not _EXPLICIT_YEAR_RE.search(source_text):
-        # The model must not silently invent a year that the user never supplied.
+    elif source_text is not None and not _source_explicitly_supports_date(
+        parsed_date,
+        source_text,
+    ):
+        # The model must not silently invent or substitute a year/date.
         missing.append("date_with_year")
 
-    if (
-        not draft.start_time
-        or not _TIME_RE.fullmatch(draft.start_time.strip())
-    ):
+    start_valid = _valid_time(draft.start_time)
+    end_valid = _valid_time(draft.end_time)
+
+    if not start_valid:
         missing.append("start_time")
-
-    if (
-        not draft.end_time
-        or not _TIME_RE.fullmatch(draft.end_time.strip())
-    ):
+    if not end_valid:
         missing.append("end_time")
+    elif start_valid:
+        assert draft.start_time is not None
+        assert draft.end_time is not None
+        if draft.end_time.strip() <= draft.start_time.strip():
+            # Drafts currently describe one calendar date, so an end time that
+            # is not later than the start cannot be treated as complete.
+            missing.append("end_time")
 
     if not draft.calendar_id or not draft.calendar_id.strip():
         missing.append("calendar")
@@ -81,22 +124,22 @@ def assess_calendar_create_draft(
 
 _DE_LABELS = {
     "title": "Titel/Anlass",
-    "date_with_year": "vollständiges Datum mit Jahr",
+    "date_with_year": "vollständiges und gültiges Datum mit Jahr",
     "year": "Jahr",
     "date": "Datum",
     "start_time": "Startzeit",
-    "end_time": "Endzeit oder Dauer",
+    "end_time": "gültige Endzeit oder Dauer",
     "calendar": "Zielkalender",
     "calendar_id": "Zielkalender",
 }
 
 _EN_LABELS = {
     "title": "title/purpose",
-    "date_with_year": "full date including year",
+    "date_with_year": "full valid date including year",
     "year": "year",
     "date": "date",
     "start_time": "start time",
-    "end_time": "end time or duration",
+    "end_time": "valid end time or duration",
     "calendar": "target calendar",
     "calendar_id": "target calendar",
 }
