@@ -55,9 +55,15 @@ It must preserve the distinction:
 
 Exact identity representation remains open.
 
+### Action draft
+
+A typed but **non-executable** representation of model-derived intent that may still contain missing or unresolved material details.
+
+A draft is not an action proposal. It cannot be authorized or executed as-is. Ada-owned application logic must resolve required information and create a valid proposal explicitly.
+
 ### Action proposal
 
-A typed description of a consequential operation the model or deterministic application logic proposes.
+A typed, complete description of a consequential operation proposed for authorization/execution.
 
 A proposal is not permission and is not evidence of execution.
 
