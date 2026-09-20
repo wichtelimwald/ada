@@ -87,3 +87,30 @@ This is diagnostics translation only; authorization semantics were already corre
 ### Production implication
 
 Ada-generated grants/policies should assign unique, stable `@id` values derived from Ada's own grant/rule identifiers. Cedar's internal policy IDs remain engine-local details.
+
+
+## Target-Mac run 3 — final
+
+After mapping Cedar's parser-generated policy IDs through `diagnostics.id_annotations_by_reason`, the complete conformance suite passed:
+
+```text
+Ran 10 tests in 0.031s
+
+OK
+```
+
+Final result:
+
+- **10/10 tests passed**
+- Python 3.14 target path works
+- cedarpy 4.12.0 installation works on the target Mac/container architecture
+- real Cedar 4.12.0 authorization semantics satisfy the tested Ada MVP cases
+- no sidecar required
+- no Ada-owned Rust bridge required
+- the Ada adapter remains mapping/fail-closed logic only
+
+### Final experiment conclusion
+
+Cedar via cedarpy is viable for Ada's Guard boundary and removes the strongest practical objection identified in the initial evaluation: Python integration complexity.
+
+The experiment does not prove cedarpy is permanently risk-free. It does show that the current community binding is a sufficiently thin and functional integration layer to justify selecting Cedar while keeping AdaGuard stable and replaceable.
