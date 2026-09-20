@@ -7,6 +7,10 @@ from datetime import datetime
 from typing import Literal, Protocol
 
 
+class CalendarProposalValidationError(ValueError):
+    """Calendar proposal is incomplete or internally inconsistent."""
+
+
 class ActionProposal(Protocol):
     """Marker contract for typed proposals returned by an agent runtime."""
 
@@ -30,8 +34,44 @@ class CreateCalendarEventProposal:
         return "calendar.create"
 
 
+def validate_calendar_create_proposal(
+    proposal: CreateCalendarEventProposal,
+) -> None:
+    """Validate Ada-owned invariants before authorization or execution."""
+
+    if not isinstance(proposal.title, str) or not proposal.title.strip():
+        raise CalendarProposalValidationError("calendar event title is required")
+    if not isinstance(proposal.calendar_id, str) or not proposal.calendar_id.strip():
+        raise CalendarProposalValidationError("calendar_id is required")
+    if not isinstance(proposal.start, datetime) or not isinstance(proposal.end, datetime):
+        raise CalendarProposalValidationError(
+            "calendar event start and end must be datetimes"
+        )
+    if (
+        proposal.start.tzinfo is None
+        or proposal.start.utcoffset() is None
+        or proposal.end.tzinfo is None
+        or proposal.end.utcoffset() is None
+    ):
+        raise CalendarProposalValidationError(
+            "calendar event start and end must be timezone-aware"
+        )
+    if proposal.end <= proposal.start:
+        raise CalendarProposalValidationError(
+            "calendar event end must be after start"
+        )
+    if proposal.location is not None and (
+        not isinstance(proposal.location, str) or not proposal.location.strip()
+    ):
+        raise CalendarProposalValidationError(
+            "calendar event location must be non-empty when provided"
+        )
+
+
 def calendar_create_action_binding(proposal: CreateCalendarEventProposal) -> str:
     """Canonical immutable identity for one calendar-create action payload."""
+
+    validate_calendar_create_proposal(proposal)
 
     payload = {
         "kind": proposal.kind,
