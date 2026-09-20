@@ -78,6 +78,7 @@
 - trusted Guard-owned clock for expiry evaluation rather than caller/model-provided time,
 - privileged grant/policy mutation separate from policy evaluation,
 - stable Ada operation IDs reused as durable workflow identities,
+- each operation ID bound to canonical immutable action metadata and mismatched replays rejected before returning a durable result,
 - provider-native idempotency/reconciliation preferred before retrying consequential writes,
 - unreconcilable external outcomes fail to explicit `ambiguous` rather than blind retry,
 - DBOS isolated behind an Ada-owned durable-action port,
