@@ -161,8 +161,9 @@ if run_backend quickadd "$HERE/requirements-quickadd.txt" "$QUICKADD_RESULT" def
   if ! run_quiet quickadd-export "$TMP/quickadd-venv/bin/python" \
     "$HERE/export_quickadd_model_json.py" --output "$QUICKADD_MODEL_JSON"; then
     echo "WARN: quickadd model JSON export failed." >&2
+    INVARIANT_OK=0
   fi
-elif [ -f "$QUICKADD_RESULT" ]; then
+else
   INVARIANT_OK=0
 fi
 
@@ -172,29 +173,38 @@ fi
 
 if [ -f "$QUICKADD_MODEL_JSON" ]; then
   detail "==> quickadd-json: create isolated environment"
-  "$BASE_PYTHON" -m venv "$TMP/quickadd-json-venv"
-
-  detail "==> quickadd-json: install research dependency"
-  if "$TMP/quickadd-json-venv/bin/python" -m pip install --disable-pip-version-check -q -r "$HERE/requirements-quickadd.txt"; then
-    detail "==> quickadd-json: install safe JSON scorer model"
-    if run_quiet quickadd-json-prepare "$TMP/quickadd-json-venv/bin/python" \
-      "$HERE/prepare_quickadd_json.py" --model-json "$QUICKADD_MODEL_JSON"; then
-      detail "==> quickadd-json: characterize"
-      "$TMP/quickadd-json-venv/bin/python" "$HERE/run_characterization.py" \
-        --backend quickadd-json --output "$QUICKADD_JSON_RESULT" \
-        --summary --require-all-expected \
-        2>"$TMP/quickadd-json-warnings.log"
-      status=$?
-      if [ "$status" -eq 0 ]; then
-        QUICKADD_JSON_OK=1
+  if ! "$BASE_PYTHON" -m venv "$TMP/quickadd-json-venv"; then
+    echo "WARN: quickadd-json environment creation failed." >&2
+    INVARIANT_OK=0
+  else
+    detail "==> quickadd-json: install research dependency"
+    if "$TMP/quickadd-json-venv/bin/python" -m pip install --disable-pip-version-check -q -r "$HERE/requirements-quickadd.txt"; then
+      detail "==> quickadd-json: install safe JSON scorer model"
+      if run_quiet quickadd-json-prepare "$TMP/quickadd-json-venv/bin/python" \
+        "$HERE/prepare_quickadd_json.py" --model-json "$QUICKADD_MODEL_JSON"; then
+        detail "==> quickadd-json: characterize"
+        "$TMP/quickadd-json-venv/bin/python" "$HERE/run_characterization.py" \
+          --backend quickadd-json --output "$QUICKADD_JSON_RESULT" \
+          --summary --require-all-expected \
+          2>"$TMP/quickadd-json-warnings.log"
+        status=$?
+        if [ "$status" -eq 0 ]; then
+          QUICKADD_JSON_OK=1
+        else
+          cat "$TMP/quickadd-json-warnings.log" >&2
+          INVARIANT_OK=0
+        fi
       else
-        cat "$TMP/quickadd-json-warnings.log" >&2
+        echo "WARN: quickadd-json safe preparation failed." >&2
         INVARIANT_OK=0
       fi
+    else
+      echo "WARN: quickadd-json installation failed." >&2
+      INVARIANT_OK=0
     fi
-  else
-    echo "WARN: quickadd-json installation failed." >&2
   fi
+else
+  INVARIANT_OK=0
 fi
 
 echo
