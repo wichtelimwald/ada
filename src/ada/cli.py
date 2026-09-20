@@ -124,8 +124,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     chat.add_argument(
         "--model",
-        default=os.getenv("ADA_OLLAMA_MODEL", "qwen3:8b"),
-        help="Local Ollama model name (default: qwen3:8b).",
+        default=os.getenv("ADA_OLLAMA_MODEL", "qwen3.5:9b"),
+        help="Local Ollama model name (default: qwen3.5:9b).",
     )
     chat.add_argument(
         "--ollama-url",
