@@ -1,6 +1,6 @@
 # ADR-0006: Use self-hosted Ollama as the initial local model-serving baseline
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-20
 
 ## Context
@@ -134,9 +134,9 @@ Re-open this decision if:
 - Linux/server deployment becomes incompatible with the chosen setup;
 - a different model runtime provides clearly better privacy, lifecycle, or target-hardware performance without increasing maintenance burden.
 
-## Validation required before acceptance
+## Acceptance validation
 
-Before changing this ADR from Proposed to Accepted:
+Accepted after the following target-hardware checks:
 
 1. ada chat must complete a multi-turn local conversation on the target Mac.
 2. The session must make no non-loopback model request.
@@ -170,7 +170,7 @@ The run also exposed issues that block acceptance:
 
 PR #22 now suppresses the framework banner and routes calendar-create requests through a typed, **non-executable `CreateCalendarEventDraft`** output path. Materially missing details stay unresolved instead of being invented to satisfy the executable proposal schema. Ada renders clarification deterministically and still executes nothing. Only a later application step may convert a complete draft into a `CreateCalendarEventProposal`.
 
-ADR-0006 remains **Proposed** until the corrected path is re-tested.
+The issues above were treated as acceptance blockers and corrected before this ADR was accepted.
 
 For session-history validation, use an unambiguous semantic test rather than a self-referential question:
 
@@ -190,7 +190,7 @@ A second target-hardware run confirmed 41/41 automated tests and clean banner-fr
 
 The branch now strengthens the standing personality instruction against invented session recall and separates `CreateCalendarEventDraft` from executable proposals. The draft schema permits missing fields, while Ada-owned deterministic code identifies required clarifications such as missing year or end time/duration.
 
-ADR-0006 remains Proposed pending one more real-model re-test of those two corrected behaviors.
+Those issues were corrected and re-tested before acceptance.
 
 
 ### Structured local-chat response transport
@@ -214,3 +214,33 @@ Observed maintainer feedback:
 Based on that direct target-hardware evidence, qwen3.5:9b becomes the default local baseline while qwen3:8b remains a tested lower-footprint fallback.
 
 This is a model-profile choice, not a new architecture dependency; the model remains configurable.
+
+
+## Final acceptance run
+
+The final target-Mac validation on 2026-09-20 passed:
+
+```text
+Ran 50 tests in 15.814s
+
+OK
+
+{
+  "status": "ok",
+  "ada_version": "0.0.1",
+  "python": "3.14.6",
+  "platform": "Darwin",
+  "architecture": "arm64"
+}
+```
+
+The real local-chat acceptance run using the default qwen3.5:9b profile also confirmed:
+
+- local chat starts without framework banner noise;
+- the Lovelace-inspired personality is visible without historical impersonation;
+- session context works and reset semantics remain non-persistent;
+- the native structured-output path handles a partial German calendar request without retry failure;
+- Ada does not claim calendar execution;
+- Ada-owned clarification logic asks only for the material fields actually required by policy: full date including year and end time/duration.
+
+With those checks complete, self-hosted Ollama with qwen3.5:9b is accepted as Ada's initial local model-serving baseline. The model remains configurable and replaceable.
