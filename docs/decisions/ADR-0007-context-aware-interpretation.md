@@ -400,6 +400,92 @@ Also characterize:
 - thread safety;
 - dependency footprint and installation on Python 3.14 / target Mac.
 
+## Characterization evidence — Run 1
+
+The first target-Mac run completed successfully with both initial candidates installed in isolated Python 3.14 environments.
+
+For the 11 cases with an explicit expected result:
+
+- **quickadd:** 11/11 matched expected;
+- **dateparser:** 8/11 matched expected.
+
+Across all 15 cases, semantic comparison produced:
+
+- 10 agreements;
+- 3 interpretation conflicts;
+- 2 degraded-single-resolver cases;
+- 0 cases unresolved by both.
+
+Material conflicts:
+
+| Expression | Expected | dateparser 1.4.3 | quickadd 0.6.5 |
+| --- | --- | --- | --- |
+| `21.10.` | 2026-10-21 | interpreted as 21:10 on reference day | correct |
+| `morgen um 16 Uhr` | 2026-09-21 16:00 | 2026-09-21 12:00 | correct |
+| `Freitag 9-11` | Friday 09:00-11:00 interval | 2026-11-09 point | correct interval |
+
+These are not minor edge cases: the first two are representative Ada interaction patterns.
+
+Run 1 also confirmed that quickadd installs and executes on Ada's target Python 3.14 Mac despite its stale packaging metadata. That removes one uncertainty but does not establish long-term maintenance fitness.
+
+### Provisional hard-gate status
+
+| Gate | dateparser | quickadd |
+| --- | --- | --- |
+| License compatibility | PASS — BSD-3-Clause | PASS — MIT |
+| Local/offline operation | PASS | PASS |
+| Privacy/security fit | PASS in current review | **TBD** — import-time pickle loading of bundled scoring model requires explicit hardening decision |
+| Supported target deployment | PASS — documented Python 3.14 | PASS on target Mac by characterization; Linux still to retain as supported path |
+| Reproducible dependency path | PASS — pinned release | PASS — pinned Git commit, but weaker distribution ergonomics |
+
+Because TBD is not a pass, quickadd is **not yet eligible for final selection** despite its stronger behavioral result.
+
+### Provisional weighted view
+
+This is informative only; final scoring occurs after all hard gates pass.
+
+| Criterion | Weight | dateparser | quickadd | Evidence note |
+| --- | ---: | ---: | ---: | --- |
+| Ada characterization behavior | 30% | 2 | 5 | dateparser missed 3/11 expected cases including two core interactions; quickadd hit 11/11 |
+| Runtime / packaging fit | 15% | 5 | 3 | quickadd works on Python 3.14 but is Git-pinned with stale packaging metadata |
+| Integration and provenance quality | 15% | 3 | 4 | quickadd exposes richer temporal types/spans; dateparser granularity metadata still to characterize |
+| German/English and ambiguity handling | 10% | 3 | 5 | quickadd handled core German and mixed-language cases better in Run 1 |
+| Maintenance and release health | 10% | 5 | 2 | dateparser is actively maintained; quickadd's last substantive code changes are materially older |
+| Operational complexity | 10% | 5 | 4 | both are Python-local; quickadd adds bundled probabilistic model handling |
+| Availability / redundancy contribution | 10% | 4 | 4 | each resolves cases the other may miss; policy still TBD |
+
+Provisional weighted score **if all hard gates passed**:
+
+- dateparser: **3.50 / 5.00**;
+- quickadd: **4.05 / 5.00**.
+
+Do not interpret these numbers as the decision while quickadd's security gate remains TBD.
+
+### Security / maintenance finding: quickadd model loading
+
+Quickadd loads its bundled Naive Bayes scoring model through Python `pickle.load()` during normal module import. The dependency is pinned, so this is not equivalent to accepting arbitrary runtime input, but it is an unsafe-deserialization/supply-chain surface and the model artifact is opaque.
+
+This matters particularly because dateparser 1.4.0 explicitly removed its own import-time pickle loading as a security hardening change.
+
+Before quickadd can pass the security hard gate, characterize at least one of:
+
+1. a safe non-pickle model/scorer path;
+2. a minimal maintained patch/fork with safe serialization;
+3. a documented integrity/hardening approach that is acceptable for Ada's threat model.
+
+### Redundancy implication from Run 1
+
+Strict dual consensus for every context-derived temporal value is **not** supported by the evidence. It would block normal phrases where quickadd is correct and dateparser is not.
+
+The strongest strategy to investigate next is:
+
+- quickadd-like semantics as the primary path if its security/maintenance gate can be satisfied;
+- a second resolver as shadow/fallback for characterized compatible classes;
+- typed expected temporal kind/granularity so a resolver returning `time` for an expected `date`, or `point` for an expected `interval`, fails safely rather than becoming a plausible wrong value;
+- selective consensus only where both resolvers have demonstrated comparable semantics.
+
+Detailed raw-result analysis is recorded in `research/context_awareness/RESULTS-2026-09-20.md`.
+
 ## Acceptance criteria for the implementation choice
 
 The candidate can be accepted only if:
