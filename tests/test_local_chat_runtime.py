@@ -92,7 +92,9 @@ class LocalChatRuntimeTests(unittest.TestCase):
             title="Zahnarzt",
             date="21.09.",
             start_time="16:00",
+            end_time=None,
             calendar_id="family",
+            location=None,
             language="de",
             unresolved=("year", "end_time"),
         )
