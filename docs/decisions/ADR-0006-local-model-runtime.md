@@ -151,3 +151,31 @@ Before changing this ADR from Proposed to Accepted:
 - Ollama runtime: https://github.com/ollama/ollama
 - llama.cpp: https://github.com/ggml-org/llama.cpp
 - MLX-LM: https://github.com/ml-explore/mlx-lm
+
+
+## First target-hardware validation
+
+A first manual run on the target Mac confirmed:
+
+- Ollama is available locally with both `qwen3:8b` and the earlier `ada-qwen3-8b-4k` profile;
+- `ada chat` successfully produced a Lovelace-inspired modern self-description;
+- `/reset` cleared the adapter's session context path.
+
+The run also exposed issues that block acceptance:
+
+1. PydanticAI printed its first-run observability banner into the product CLI.
+2. The self-referential prompt "What did I just ask you?" did not reliably demonstrate prior-turn recall on qwen3:8b.
+3. Most importantly, the model falsely answered "I've added..." to a calendar-create request even though this slice executed no action.
+
+PR #22 now suppresses the framework banner and configures calendar-create requests as a typed `CreateCalendarEventProposal` output path, with explicit model instructions never to claim execution. The application still does not execute proposals.
+
+ADR-0006 remains **Proposed** until the corrected path is re-tested.
+
+For session-history validation, use an unambiguous semantic test rather than a self-referential question:
+
+1. "For this session, remember the word cobalt."
+2. "What word did I ask you to remember?"
+3. `/reset`
+4. "What word did I ask you to remember before the reset?"
+
+The second answer should be "cobalt"; after reset Ada should state that the previous session context is unavailable rather than inventing an answer.
