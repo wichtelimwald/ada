@@ -191,7 +191,14 @@ class CliTests(unittest.TestCase):
         self.assertEqual(runtime.requests, ["hello", "again"])
         self.assertEqual(runtime.reset_count, 1)
         self.assertEqual(prompts, ["you> "] * 4)
-        self.assertIn("Ada: echo:hello", output)
+        self.assertTrue(
+            any(
+                item.startswith("Ada: echo:hello\n")
+                and "Conversation only: no external action was executed in this turn."
+                in item
+                for item in output
+            )
+        )
         self.assertIn("Ada: Session context cleared.", output)
 
 
