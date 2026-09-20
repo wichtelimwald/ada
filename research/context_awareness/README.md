@@ -38,8 +38,18 @@ The script currently:
 3. runs the shared characterization corpus;
 4. exports the pinned Quickadd scorer to primitive JSON when the normal Quickadd run succeeds;
 5. creates a fourth isolated Quickadd environment that loads that JSON scorer without runtime pickle deserialization;
-6. prints all available raw JSON results;
-7. prints pairwise semantic comparisons for dateparser vs Quickadd, Quickadd vs DummyScorer, and Quickadd vs JSON-backed scorer when the relevant runs succeed.
+6. prints a compact human-readable summary by default;
+7. writes full raw JSON and comparison payloads in the temporary run directory for the duration of the run;
+8. prints pairwise semantic comparison counts for dateparser vs Quickadd, Quickadd vs DummyScorer, and Quickadd vs JSON-backed scorer when the relevant runs succeed;
+9. treats Quickadd's explicitly expected corpus and Quickadd-vs-JSON semantic equivalence as regression gates.
+
+Use `VERBOSE=1` to print the full raw JSON, comparison payloads, preparation details, and captured warnings:
+
+~~~sh
+VERBOSE=1 sh research/context_awareness/run.sh
+~~~
+
+Known Python 3.14 invalid-escape `SyntaxWarning` messages from patched ctparse research environments are collapsed to one compact warning in the default output. Unexpected warnings remain visible and can be expanded with `VERBOSE=1`.
 
 The requirements files pin the **top-level candidates only**. Transitive dependencies are still resolved by pip at run time. Therefore these research runs do not by themselves close ADR-0007's reproducible-dependency hard gate.
 
