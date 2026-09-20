@@ -163,7 +163,11 @@ class LocalChatRuntimeTests(unittest.TestCase):
         self.assertIsInstance(runtime, PydanticAIRuntime)
         output_type = captured["output_type"]
         self.assertEqual(type(output_type).__name__, "NativeOutput")
-        self.assertIn("ada_local_response", repr(output_type))
+        self.assertEqual(output_type.name, "ada_local_response")
+        self.assertEqual(
+            list(output_type.outputs),
+            [AgentTextReply, CreateCalendarEventDraft],
+        )
         self.assertIn("Do not invent material details", captured["instructions"])
         self.assertIn("Never claim that a calendar event was created", captured["instructions"])
 
