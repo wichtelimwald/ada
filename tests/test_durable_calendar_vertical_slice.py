@@ -203,6 +203,37 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         self.assertEqual(first.execution, second.execution)
         self.assertEqual(calendar.create_attempts, 1)
 
+    def test_provider_commit_before_local_checkpoint_is_reconciled(self) -> None:
+        calendar = InMemoryCalendarAdapter()
+        operation_id = OperationId("op-crash-window")
+
+        # Simulate the critical C3 window: the provider committed, then Ada
+        # crashed before DBOS could checkpoint the step result.
+        direct = calendar.create_event(
+            proposal(),
+            operation_id=str(operation_id),
+        )
+        self.assertIsNotNone(direct.event)
+        self.assertEqual(calendar.create_attempts, 1)
+
+        durable = self.launch_adapter(calendar)
+        service = CalendarActionService(
+            guard=self.guard(),
+            durable_actions=durable,
+        )
+        recovered = service.create_event(
+            proposal(),
+            operation_id=operation_id,
+            authorization=authorization(),
+        )
+
+        assert recovered.execution is not None
+        self.assertEqual(
+            recovered.execution.provider.status,
+            ProviderOutcomeStatus.COMMITTED,
+        )
+        self.assertEqual(calendar.create_attempts, 1)
+
     def test_ambiguous_provider_response_reconciles_existing_commit(self) -> None:
         calendar = InMemoryCalendarAdapter(ambiguous_after_commit_once=True)
         durable = self.launch_adapter(calendar)
