@@ -42,25 +42,31 @@ def _normalize_point(value: datetime, zone_name: str) -> dict[str, Any]:
 
 
 def _run_dateparser(expression: str, context: dict[str, Any]) -> dict[str, Any] | None:
-    import dateparser
+    from dateparser.date import DateDataParser
 
     reference = datetime.fromisoformat(context["reference"]).replace(tzinfo=None)
     locale = context["locale"]
     languages = [locale.split("-")[0], "en"]
-    parsed = dateparser.parse(
-        expression,
+    parser = DateDataParser(
         languages=languages,
+        use_given_order=True,
         settings={
             "RELATIVE_BASE": reference,
             "PREFER_DATES_FROM": context["policy"]["prefer_dates_from"],
             "DATE_ORDER": context["policy"]["date_order"],
             "PREFER_LOCALE_DATE_ORDER": False,
             "RETURN_AS_TIMEZONE_AWARE": False,
+            "RETURN_TIME_AS_PERIOD": True,
         },
     )
+    data = parser.get_date_data(expression)
+    parsed = data.date_obj
     if parsed is None:
         return None
-    return _normalize_point(parsed, context["timezone"])
+    result = _normalize_point(parsed, context["timezone"])
+    result["parser_period"] = data.period
+    result["parser_locale"] = data.locale
+    return result
 
 
 def _time_to_local(value: Any) -> str | None:
@@ -175,7 +181,11 @@ def _matches_expected(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", choices=("dateparser", "quickadd"), required=True)
+    parser.add_argument(
+        "--backend",
+        choices=("dateparser", "quickadd", "quickadd-safe"),
+        required=True,
+    )
     parser.add_argument(
         "--cases",
         type=Path,
