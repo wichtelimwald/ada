@@ -23,13 +23,17 @@ They are installed into **separate temporary virtual environments**. Neither is 
 
 Keeping them isolated is intentional: installation or runtime failure of one candidate must not prevent evidence collection for the other. A parser returning no result is **not** treated as proof that the resolver is operationally unavailable; runtime health is a separate future signal.
 
-## Run on the target Mac
+## Run safely
 
-From the repository root, with Ada's Python 3.14 environment already available:
+Do **not** execute `run.sh` directly on the host. The research harness installs a dynamically resolved third-party dependency graph and the normal Quickadd research path imports its bundled pickle model during conversion.
+
+Run the characterization in the disposable Docker build sandbox instead:
 
 ~~~sh
-sh research/context_awareness/run.sh
+sh research/context_awareness/run_sandboxed.sh
 ~~~
+
+The Docker build context is restricted to this `research/context_awareness/` directory. Third-party install/build/import code therefore does not receive the user's home directory, credentials, or the rest of the Ada repository. This improves execution isolation; it does **not** close the dependency reproducibility gate.
 
 The script currently:
 
@@ -47,7 +51,7 @@ The script currently:
 Use `VERBOSE=1` to print the full raw JSON, comparison payloads, preparation details, and captured warnings:
 
 ~~~sh
-VERBOSE=1 sh research/context_awareness/run.sh
+VERBOSE=1 sh research/context_awareness/run_sandboxed.sh
 ~~~
 
 Known Python 3.14 invalid-escape `SyntaxWarning` messages from patched ctparse research environments are collapsed to one compact warning in the default output. Unexpected warnings remain visible and can be expanded with `VERBOSE=1`.
@@ -105,7 +109,7 @@ A failed hard gate excludes a candidate; it cannot be compensated by a high weig
 
 The normal `quickadd` characterization path imports the pinned upstream package and therefore executes its bundled `pickle.load()` model-loading path. The JSON export experiment also uses that normal environment once to convert the pinned model.
 
-This is deliberate **research evidence**, not an Ada production design. Anyone re-running the harness should treat the pinned Quickadd source/model as executable third-party code. The proposed production direction explicitly removes pickle deserialization from Ada's normal build/runtime path and requires a reviewed, versioned, integrity-checked JSON artifact.
+This is deliberate **research evidence**, not an Ada production design. Anyone re-running the harness should treat the pinned Quickadd source/model as executable third-party code. Direct host execution is intentionally blocked; use `run_sandboxed.sh` so this research-only conversion happens in a disposable least-privilege Docker build context. The proposed production direction explicitly removes pickle deserialization from Ada's normal build/runtime path and requires a reviewed, versioned, integrity-checked JSON artifact.
 
 ## Diagnostic Run 2
 
@@ -119,10 +123,10 @@ The second comparison therefore answers a concrete hardening question:
 - if `quickadd` and `quickadd-safe` stay semantically equivalent on the corpus, a no-pickle integration/fork becomes technically plausible;
 - if behavior degrades materially, the scoring model is part of the functionality Ada would need to preserve through a safer serialization/loading design.
 
-Re-run the same command:
+Re-run through the same sandboxed entry point:
 
 ~~~sh
-sh research/context_awareness/run.sh
+sh research/context_awareness/run_sandboxed.sh
 ~~~
 
 
