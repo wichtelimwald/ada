@@ -159,8 +159,9 @@ After Ada answers, the user asks a follow-up that depends on the immediately pre
 2. Ada's tone reflects the personality baseline: analytical, imaginative, calm, concise, and practical.
 3. Ada can use prior turns from the current process-local session to answer the follow-up coherently.
 4. Ada does not imply that the session history is persistent authoritative Memory.
-5. The first local profile sends model requests only to the configured loopback model service.
-6. No consequential action is executed merely because the conversation model proposes or mentions one.
+5. On an installation with empty authoritative Memory, Ada may start from the distribution personality seed; once seeded, the active personality comes from Memory and can be user-corrected/evolved.
+6. The first local profile sends model requests only to the configured loopback model service.
+7. No consequential action is executed merely because the conversation model proposes or mentions one.
 
 ### Unacceptable behavior
 
@@ -168,7 +169,9 @@ After Ada answers, the user asks a follow-up that depends on the immediately pre
 - presenting temporary conversation history as durable Memory;
 - sending the "local" chat to a non-loopback model endpoint;
 - treating model confidence, personality, or conversation history as authority;
-- directly executing privileged tools from the chat model.
+- reapplying the repository personality seed over an existing Memory profile;
+- directly executing privileged tools from the chat model;
+- claiming an action was completed when no confirmed action outcome exists.
 
 ---
 
