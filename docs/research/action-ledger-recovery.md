@@ -204,8 +204,36 @@ DBOS steps that call external providers are still at-least-once across a crash t
 
 - durable workflow semantics/decorators can leak into Ada if not isolated;
 - larger dependency set than stdlib SQLite;
-- DBOS persists workflow arguments/results/step state, so privacy/data-minimization must be reviewed explicitly;
-- provider/business outcome semantics remain Ada-owned.
+- DBOS persists workflow inputs, workflow outputs and step outputs in its system database; Python uses pickle-based serialization by default;
+- provider/business outcome semantics remain Ada-owned;
+- DBOS recommends Postgres for general production deployments, while Ada's initial single-host personal runtime is intentionally evaluating whether SQLite remains sufficient.
+
+### Ada privacy constraint if DBOS is selected
+
+DBOS durable state must be treated as privacy-sensitive operational state, not as Ada Memory.
+
+Do not pass/store raw:
+
+- full email/message bodies;
+- model prompts/transcripts;
+- private documents;
+- secrets/tokens;
+- authoritative long-term Memory
+
+as workflow or step inputs/outputs merely for convenience.
+
+Prefer minimal recovery envelopes such as:
+
+```text
+operation_id
+action_kind
+provider_kind
+provider_reference?
+opaque content/store reference?
+minimal typed outcome
+```
+
+If durable recovery needs sensitive content, store it in the appropriate Ada-owned encrypted/private store and pass only a stable reference through DBOS where practical.
 
 ### C — Restate durable execution runtime
 
@@ -271,7 +299,25 @@ Its public README documents an Undo stack for local reversible actions and says 
 
 No public evidence used here shows a crash-durable external-provider transaction/reconciliation system. This is an undo/reversibility mechanism, not evidence of exactly-once external action recovery.
 
-## 9. Agreed decision criteria
+## 9. License / distribution hard gate
+
+License and distribution fit is evaluated before scoring.
+
+Current candidate status:
+
+| Candidate | License / distribution status | Gate |
+| --- | --- | --- |
+| Ada-owned control | follows Ada project license | pass |
+| DBOS Python | MIT | pass |
+| Temporal OSS server / Python SDK | MIT | pass |
+| Restate Python SDK | MIT | pass |
+| Restate runtime/server | BSL 1.1 with production-use grant; change license Apache-2.0 after the defined change period | conditional |
+
+Restate is not automatically excluded: its current BSL additional-use grant permits ordinary production deployments of workflows owned by the licensee. However, it is not an OSI open-source runtime today and restricts offering a public Restate platform service. That makes distribution, ecosystem expectations, and future hosted-platform use an explicit architectural cost for Ada.
+
+Any future candidate must pass the same license/distribution gate before final scoring.
+
+## 10. Agreed decision criteria
 
 | Criterion | Weight | Why it matters |
 | --- | ---: | --- |
@@ -283,7 +329,7 @@ No public evidence used here shows a crash-durable external-provider transaction
 | Replaceability / integration clarity | **10%** | Durable infrastructure must not become Ada's domain semantics. |
 | **Total** | **100%** | |
 
-## 10. Scoring status
+## 11. Scoring status
 
 **Scoring is reopened.**
 
@@ -298,7 +344,7 @@ The custom SQLite result remains the control baseline:
 - 5/5 control tests passed;
 - but Ada owns all durable execution mechanics.
 
-## 11. Custom SQLite control prototype
+## 12. Custom SQLite control prototype
 
 A standard-library-only prototype exercised the critical crash window:
 
@@ -324,7 +370,7 @@ Validated:
 
 The fake provider deliberately supports stable operation identity/reconciliation. This experiment does not claim SQLite can create exactly-once semantics for an arbitrary external provider.
 
-## 12. Next prototype gate — DBOS
+## 13. Next prototype gate — DBOS
 
 DBOS is the only additional candidate that currently appears capable of materially changing the decision while still fitting Ada's small single-process/container-first architecture.
 
@@ -349,7 +395,7 @@ If DBOS requires substantial Ada-specific state machinery around it, prefer the 
 
 If DBOS removes most recovery machinery while preserving Ada-owned operation/outcome semantics behind a narrow boundary, prefer reuse over custom durable-execution infrastructure.
 
-## 13. Architectural invariant independent of implementation
+## 14. Architectural invariant independent of implementation
 
 Whichever implementation wins:
 
@@ -361,15 +407,19 @@ Whichever implementation wins:
 - authoritative user Memory remains separate from workflow/ledger state;
 - only minimal data required for recovery/audit should be persisted.
 
-## 14. Primary references
+## 15. Primary references
 
 - Python 3.14 sqlite3 documentation: https://docs.python.org/3.14/library/sqlite3.html
 - SQLite atomic commit: https://www.sqlite.org/atomiccommit.html
 - SQLite WAL: https://www.sqlite.org/wal.html
 - DBOS Python documentation: https://docs.dbos.dev/python/programming-guide
+- DBOS system database: https://docs.dbos.dev/explanations/system-tables
+- DBOS license: https://github.com/dbos-inc/dbos-transact-py/blob/main/LICENSE
 - DBOS PydanticAI integration: https://docs.dbos.dev/integrations/pydantic-ai
 - Restate: https://restate.dev/
+- Restate runtime license: https://github.com/restatedev/restate/blob/main/LICENSE
 - Restate PydanticAI integration: https://restate.dev/blog/durable-orchestration-for-ai-agents-with-restate-and-pydantic-ai
 - Temporal: https://docs.temporal.io/
+- Temporal open-source project: https://temporal.io/
 - OpenJarvis: https://github.com/open-jarvis/OpenJarvis
 - Mark LIV public README: https://github.com/FatihMakes/Mark-LIV/blob/main/readme.md
