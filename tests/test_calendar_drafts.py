@@ -15,7 +15,9 @@ class CalendarDraftTests(unittest.TestCase):
             title="Zahnarzt",
             date="21.09.",
             start_time="16:00",
+            end_time=None,
             calendar_id="family",
+            location=None,
             language="de",
             unresolved=("year", "end_time"),
         )
@@ -37,7 +39,9 @@ class CalendarDraftTests(unittest.TestCase):
             start_time="16:00",
             end_time="16:30",
             calendar_id="family",
+            location=None,
             language="en",
+            unresolved=(),
         )
 
         assessment = assess_calendar_create_draft(draft)
@@ -54,6 +58,7 @@ class CalendarDraftTests(unittest.TestCase):
             start_time="16:00",
             end_time="16:30",
             calendar_id="family",
+            location=None,
             language="en",
             unresolved=("participant",),
         )
