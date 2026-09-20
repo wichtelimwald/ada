@@ -1,6 +1,6 @@
 # Technology / governance evaluation — Ada project license
 
-**Status:** Research framing complete; no license change made  
+**Status:** Research scored with maintainer-agreed weights; no license change made  
 **Date checked:** 2026-09-20
 
 ## 1. Question
@@ -99,6 +99,26 @@ Permissive OSI-approved control option.
 - provides little benefit over MIT for Ada's specific concerns;
 - somewhat less common than MIT in Ada's immediate Python/AI dependency ecosystem.
 
+### D — OSC License 1.0
+
+New OSI-approved permissive license whose canonical text is German and whose permission grant is intentionally close to MIT, with liability language written specifically for German-law constraints.
+
+**Strengths**
+
+- OSI approved in 2025;
+- permissive commercial/private use;
+- simple MIT-like permission model;
+- liability language explicitly designed for German law.
+
+**Trade-offs**
+
+- very new compared with MIT/Apache/BSD;
+- canonical license text is German, while Ada is intended as an international OSS project;
+- materially less familiar to companies, contributors and tooling ecosystems today;
+- no explicit patent grant in the license text.
+
+Because Ada's hard gates include being internationally practical and widely understood, OSC is retained as a useful control/reference but is not currently a finalist.
+
 ## 5. Dependency compatibility
 
 Ada's own project license does not need to match every dependency license.
@@ -115,39 +135,68 @@ Both MIT and Apache-2.0 can generally coexist with these permissive dependencies
 
 Third-party code remains under its own license even if Ada's project-owned code uses a different permissive license.
 
-## 6. Proposed decision criteria — weights not yet agreed
+## 6. Agreed decision criteria
 
-| Criterion | Proposed weight | Rationale |
+The maintainer explicitly reduced the weight of patent concerns and increased the importance of simple use, including commercial use.
+
+| Criterion | Weight | Rationale |
 | --- | ---: | --- |
-| Patent/IP clarity for contributors and downstream users | **30%** | Ada is infrastructure/security software and may be adopted commercially. |
-| Adoption / commercial friendliness | **20%** | Keep use by individuals, companies and academia straightforward. |
-| Simplicity / contributor understandability | **20%** | Ada should remain approachable to occasional OSS contributors. |
+| Patent/IP clarity for contributors and downstream users | **20%** | Still relevant, but not the dominant concern. |
+| Adoption / commercial friendliness | **25%** | Individuals and companies should be able to use Ada commercially without unusual friction. |
+| Simplicity / contributor understandability | **25%** | License obligations should be easy for users and occasional contributors to understand. |
 | Distribution / compliance burden | **15%** | Avoid unnecessary release/admin friction for a small-maintainer project. |
 | Ecosystem / dependency compatibility | **10%** | Must fit the Python/AI/open-source stack cleanly. |
 | Future relicensing / governance practicality | **5%** | Early choice should age well as contributors accumulate. |
 | **Total** | **100%** | |
 
-## 7. Preliminary qualitative comparison
+## 7. Qualitative comparison
 
-| Property | MIT | Apache-2.0 | BSD-3-Clause |
-| --- | --- | --- | --- |
-| OSI approved | yes | yes | yes |
-| Permissive commercial use | yes | yes | yes |
-| Explicit patent grant | no explicit clause | **yes** | no explicit clause |
-| Patent-litigation termination | no | **yes** | no |
-| Explicit contribution treatment | minimal | **stronger** | minimal |
-| Text/administrative simplicity | **strongest** | lowest of these three | strong |
-| NOTICE mechanism | no special NOTICE mechanism | **yes** | no special NOTICE mechanism |
-| Non-endorsement clause | no | no | **yes** |
-| Typical corporate familiarity | high | **high** | high |
+| Property | MIT | Apache-2.0 | BSD-3-Clause | OSC-1.0 |
+| --- | --- | --- | --- | --- |
+| OSI approved | yes | yes | yes | yes |
+| Permissive commercial use | yes | yes | yes | yes |
+| Explicit patent grant | no explicit clause | **yes** | no explicit clause | no explicit clause |
+| Patent-litigation termination | no | **yes** | no | no |
+| Explicit contribution treatment | minimal | **stronger** | minimal | minimal |
+| Text/administrative simplicity | **strongest** | lowest of the finalists | strong | MIT-like permission model, longer liability text |
+| Special NOTICE mechanism | no | **yes** | no | no |
+| Non-endorsement clause | no | no | **yes** | no |
+| Typical international familiarity | **very high** | **very high** | high | low / new |
+| Canonical language | English | English | English | German |
 
-## 8. Questions to answer before scoring
+## 8. Scoring
 
-1. How much do we value explicit patent clarity relative to a shorter contributor-facing license?
-2. Do we expect commercial/company adoption to be a significant goal?
-3. Do we want every contribution to carry Apache-2.0's explicit patent grant as a deliberate project policy?
-4. Are Apache NOTICE/modification obligations acceptable for Ada's small-maintainer release process?
-5. Does the maintainer prefer minimal legal text unless a concrete benefit justifies more complexity?
+Scale:
+
+- **5 — excellent fit**
+- **4 — good fit**
+- **3 — acceptable with meaningful trade-offs**
+- **2 — weak on this criterion**
+- **1 — poor fit**
+
+The scores below assess license text and practical project use. They are architecture/governance judgment, not legal advice.
+
+| Criterion | Weight | MIT | Apache-2.0 | BSD-3-Clause |
+| --- | ---: | ---: | ---: | ---: |
+| Patent/IP clarity | 20% | 2 | **5** | 2 |
+| Adoption / commercial friendliness | 25% | **5** | **5** | 4.5 |
+| Simplicity / contributor understandability | 25% | **5** | 3 | 4 |
+| Distribution / compliance burden | 15% | **5** | 3 | 4.5 |
+| Ecosystem / dependency compatibility | 10% | **5** | **5** | 4.5 |
+| Governance / contribution clarity | 5% | 3 | **5** | 3 |
+| **Weighted total / 100** | **100%** | **86** | **84** | **76** |
+
+OSC-1.0 is not included in the finalist score because it currently misses Ada's own “widely understood / international public project” hard-gate intent. It remains a useful German-law reference and should be reconsidered if adoption/familiarity materially increases.
+
+### Interpretation
+
+**MIT — 86:** best match to the maintainer's stated preference for uncomplicated private and commercial use, short obligations, low distribution overhead and broad ecosystem familiarity. Its main weakness is the lack of an explicit patent grant/contribution framework in the license text.
+
+**Apache-2.0 — 84:** nearly tied. It is strong for commercial adoption and materially clearer on patent and contribution rights, but imposes more text, redistribution conditions and NOTICE/modification handling. Under the maintainer's reduced patent weighting, those advantages no longer outweigh the simplicity cost.
+
+**BSD-3-Clause — 76:** valid and mature, but does not materially improve Ada's patent/contribution position over MIT and adds the non-endorsement condition without solving a current Ada problem.
+
+The MIT/Apache difference is small enough that the score should not be treated as mathematical certainty. The practical tie-break is whether Ada deliberately wants Apache-2.0's explicit patent/contribution framework enough to accept its additional compliance surface.
 
 ## 9. Migration timing
 
@@ -164,4 +213,5 @@ No license change should be made until this evaluation is accepted explicitly.
 - Apache patent-grant FAQ: https://www.apache.org/licenses/cla-faq.html
 - MIT License (OSI): https://opensource.org/license/mit
 - BSD 3-Clause (OSI): https://opensource.org/license/BSD-3-clause
+- OSC License 1.0 (OSI): https://opensource.org/license/osc-1.0
 - OSI approved licenses: https://opensource.org/licenses
