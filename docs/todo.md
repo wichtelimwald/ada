@@ -20,6 +20,7 @@ Before final capability ADRs, document integration constraints that could make i
 
 - [x] Runtime/process topology and IPC expectations ([ADR-0003](decisions/ADR-0003-execution-topology-containerization.md)).
 - [ ] Packaging, installation, startup/background-operation, and update constraints.
+- [x] Project license strategy — retain MIT after evaluating Apache-2.0, BSD-3-Clause, and OSC-1.0 reference.
 - [ ] Shared resource budgets and model/artifact distribution constraints.
 - [ ] Security/privacy boundaries that every capability must respect.
 
