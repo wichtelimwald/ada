@@ -67,7 +67,7 @@ def _chat_loop(
             write(f"Ada: {response.text}")
         for draft in response.drafts:
             if isinstance(draft, CreateCalendarEventDraft):
-                write(f"Ada: {render_calendar_draft_response(draft)}")
+                write(f"Ada: {render_calendar_draft_response(draft, source_text=text)}")
             else:
                 write(
                     "Ada: I formed an incomplete action draft, but nothing "
