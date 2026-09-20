@@ -5,7 +5,7 @@ import subprocess
 import sys
 import unittest
 
-from ada.cli import _chat_loop
+from ada.cli import _chat_loop, build_parser
 from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest, AgentResponse
 
@@ -50,6 +50,11 @@ class FailingRuntime:
 
 
 class CliTests(unittest.TestCase):
+    def test_chat_defaults_to_qwen35_9b(self) -> None:
+        args = build_parser().parse_args(["chat"])
+
+        self.assertEqual(args.model, "qwen3.5:9b")
+
     def test_doctor(self) -> None:
         result = subprocess.run(
             [sys.executable, "-m", "ada", "doctor"],
