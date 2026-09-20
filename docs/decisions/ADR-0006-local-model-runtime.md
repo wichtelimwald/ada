@@ -5,7 +5,7 @@
 
 ## Context
 
-Ada's confirmed MVP requires local text chat. ADR-0002 already selected PydanticAI behind an Ada-owned runtime boundary and recorded a successful target-hardware prototype using Ollama with qwen3:8b on the MacBook Air M1 / 16 GB baseline.
+Ada's confirmed MVP requires local text chat. ADR-0002 already selected PydanticAI behind an Ada-owned runtime boundary and recorded a successful target-hardware prototype using Ollama with qwen3:8b and later qwen3.5:9b on the MacBook Air M1 / 16 GB baseline.
 
 The remaining question is the first concrete local model-serving substrate. This decision should minimize new maintenance work while preserving:
 
@@ -64,7 +64,7 @@ This means:
 
 - Ada connects only to a loopback Ollama endpoint in the first local-chat profile;
 - Ollama remains outside Ada's domain model and behind the PydanticAI runtime adapter;
-- qwen3:8b is the first **validated baseline model**, not a permanent product model;
+- qwen3.5:9b is the current **target-hardware baseline model**, selected after a direct A/B test against qwen3:8b;
 - the model name and endpoint are configuration, not hard architectural dependencies;
 - cloud-hosted Ollama or arbitrary remote OpenAI-compatible endpoints are not part of this local profile.
 
@@ -72,10 +72,10 @@ The first runtime profile is:
 
 - PydanticAI: 2.46.0
 - Ollama endpoint: http://localhost:11434/v1
-- model baseline: qwen3:8b
-- Qwen3 reasoning disabled for ordinary chat using the model setting already validated in ADR-0002.
+- model baseline: qwen3.5:9b
+- Qwen-family reasoning disabled for ordinary chat using the model setting already validated in ADR-0002.
 
-Current Ollama metadata lists qwen3:8b at roughly 5.2 GB and identifies the model license as Apache-2.0. The artifact is downloaded by the user through Ollama and is not redistributed by Ada.
+Current Ollama metadata lists qwen3.5:9b as a 9.65B-parameter Q4_K_M artifact at roughly 6.6 GB with Apache License 2.0. The earlier qwen3:8b (roughly 5.2 GB) remains a tested fallback. Model artifacts are downloaded by the user through Ollama and are not redistributed by Ada.
 
 ## Session history
 
@@ -101,7 +101,7 @@ Personality instructions are operator-authored model instructions. They are not 
 ### Positive
 
 - fastest path from the existing foundation to a genuinely interactive local Ada;
-- reuses a model/runtime combination already proven on target hardware;
+- reuses a model/runtime combination proven on target hardware, with qwen3.5:9b selected after a direct qwen3:8b comparison;
 - no new Python dependency is required because the existing PydanticAI OpenAI extra supports Ollama;
 - simple Mac/Linux path;
 - external model-process lifecycle stays out of Ada core.
@@ -111,7 +111,7 @@ Personality instructions are operator-authored model instructions. They are not 
 - users must install and run Ollama separately;
 - Ollama becomes an MVP operational dependency even though it remains architecturally replaceable;
 - OpenAI-compatible behavior is not identical across all models/providers and needs regression testing;
-- the baseline qwen3:8b model may later be superseded after quality/latency evaluation.
+- the baseline qwen3.5:9b model remains replaceable and may be superseded after future quality/latency evaluation.
 
 ## Alternatives
 
@@ -147,7 +147,8 @@ Before changing this ADR from Proposed to Accepted:
 ## Evidence references
 
 - PydanticAI Ollama integration: https://ai.pydantic.dev/models/ollama/
-- Ollama model metadata for qwen3:8b: https://ollama.com/library/qwen3:8b
+- Ollama model metadata for qwen3.5:9b: https://ollama.com/library/qwen3.5:9b
+- Earlier fallback metadata for qwen3:8b: https://ollama.com/library/qwen3:8b
 - Ollama runtime: https://github.com/ollama/ollama
 - llama.cpp: https://github.com/ggml-org/llama.cpp
 - MLX-LM: https://github.com/ml-explore/mlx-lm
@@ -197,3 +198,19 @@ ADR-0006 remains Proposed pending one more real-model re-test of those two corre
 PydanticAI 2.46.0 documents that self-hosted Ollama v0.5.0+ enforces JSON Schema through its grammar-constrained decoder when `NativeOutput` is used. After target-hardware testing exposed retry failures on the default tool-output path, PR #22 switched the local chat response envelope to `NativeOutput([AgentTextReply, CreateCalendarEventDraft])`.
 
 This keeps ordinary replies and calendar drafts type-safe without relying on output-tool calling. Calendar draft fields are all schema-required but nullable where information may legitimately be missing; the model must therefore explicitly represent missing information rather than omitting arbitrary fields.
+
+
+## Model A/B validation
+
+The target Mac was used to compare qwen3:8b with qwen3.5:9b using the same local-chat acceptance flow.
+
+Observed maintainer feedback:
+
+- qwen3.5:9b was not materially slower on the MacBook Air M1 / 16 GB target;
+- German interaction felt more natural and coherent;
+- post-reset uncertainty handling was better;
+- the larger model still worked comfortably enough for the intended interactive development loop.
+
+Based on that direct target-hardware evidence, qwen3.5:9b becomes the default local baseline while qwen3:8b remains a tested lower-footprint fallback.
+
+This is a model-profile choice, not a new architecture dependency; the model remains configurable.
