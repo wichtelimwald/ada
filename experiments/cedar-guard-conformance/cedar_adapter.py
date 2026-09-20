@@ -156,11 +156,21 @@ class CedarGuard:
         if result.diagnostics.errors:
             return self._deny("cedar_evaluation_error")
 
+        matched_rule_ids = tuple(
+            sorted(
+                result.diagnostics.id_annotations_by_reason.get(
+                    policy_id,
+                    policy_id,
+                )
+                for policy_id in result.diagnostics.reasons
+            )
+        )
+
         if result.decision == Decision.Allow:
             return GuardDecision(
                 effect=Effect.ALLOW,
                 reason_code="matching_grant",
-                matched_rule_ids=tuple(sorted(result.diagnostics.reasons)),
+                matched_rule_ids=matched_rule_ids,
                 policy_version=self._policy_version,
             )
 
@@ -173,7 +183,7 @@ class CedarGuard:
             return GuardDecision(
                 effect=Effect.DENY,
                 reason_code=reason,
-                matched_rule_ids=tuple(sorted(result.diagnostics.reasons)),
+                matched_rule_ids=matched_rule_ids,
                 policy_version=self._policy_version,
             )
 
