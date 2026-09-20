@@ -7,7 +7,7 @@ from urllib.parse import urlparse, urlunparse
 from urllib.request import urlopen
 
 import pydantic_ai
-from pydantic_ai import Agent
+from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.models.ollama import OllamaModel
 from pydantic_ai.models.openai import OpenAIChatModelSettings
 from pydantic_ai.providers.ollama import OllamaProvider
@@ -15,6 +15,7 @@ from pydantic_ai.providers.ollama import OllamaProvider
 from ada.adapters.pydantic_ai import PydanticAIRuntime
 from ada.bootstrap.personality import load_bootstrap_personality
 from ada.core.actions import CreateCalendarEventDraft
+from ada.ports.agent_runtime import AgentTextReply
 from ada.core.personality import (
     PersonalityProfile,
     render_personality_instructions,
@@ -127,7 +128,7 @@ def build_local_ollama_runtime(
     )
     instructions = render_personality_instructions(active_personality) + """
 
-For ordinary conversation, return normal text.
+For ordinary conversation, return an AgentTextReply.
 
 When the user asks to create or add a calendar event, return a typed
 CreateCalendarEventDraft, even when details are missing. A draft is intentionally
@@ -154,7 +155,14 @@ execution.
     agent = Agent(
         model,
         instructions=instructions,
-        output_type=[str, CreateCalendarEventDraft],
+        output_type=NativeOutput(
+            [AgentTextReply, CreateCalendarEventDraft],
+            name="ada_local_response",
+            description=(
+                "Return either a conversational reply or a non-executable "
+                "calendar draft."
+            ),
+        ),
     )
     return PydanticAIRuntime(
         agent,
