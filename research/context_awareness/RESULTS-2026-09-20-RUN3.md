@@ -10,7 +10,7 @@ The JSON-backed scorer reproduced the normal Quickadd result on **all 15 charact
 
 - quickadd vs quickadd-json: **15 agreements**
 - interpretation conflicts: **0**
-- degraded-single-resolver cases: **0**
+- single_resolver_result cases: **0**
 
 For the 11 cases with explicit expected results:
 
