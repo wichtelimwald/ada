@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Literal, Protocol
 
 from ada.core.actions import ActionDraft, ActionProposal
+
+
+@dataclass(frozen=True, slots=True)
+class AgentTextReply:
+    """Schema-friendly conversational reply produced by a model runtime."""
+
+    text: str
+    response_type: Literal["chat.reply"] = "chat.reply"
 
 
 @dataclass(frozen=True, slots=True)
