@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol
 
+from ada.core.actions import ActionProposal
 from ada.ports.agent_runtime import AgentRequest, AgentResponse, AgentRuntimePort
 
 
@@ -25,4 +26,9 @@ class PydanticAIRuntime(AgentRuntimePort):
 
     def run(self, request: AgentRequest) -> AgentResponse:
         result = self._agent.run_sync(request.text)
-        return AgentResponse(text=str(result.output))
+        output = result.output
+
+        if isinstance(output, ActionProposal):
+            return AgentResponse(text="", proposals=(output,))
+
+        return AgentResponse(text=str(output))

@@ -47,7 +47,7 @@ Current examples:
 | Agent runtime | PydanticAI behind an Ada-owned replaceable adapter | MIT; accepted |
 | Permissions / authorization | Cedar behind AdaGuard | Apache-2.0; accepted |
 | Python Cedar integration | `cedarpy` around the Cedar Rust engine | Apache-2.0; implemented behind AdaGuard |
-| Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, implementation pending |
+| Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, first calendar adapter implemented |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
 
@@ -71,7 +71,7 @@ Potential upstream components such as Open Interpreter, Letta, local speech/mode
 
 Repository language is English. Project discussions with the maintainer are normally in German.
 
-The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter and Cedar/cedarpy pinned behind AdaGuard. Development can run through the Dev Container or a local Python environment.
+The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter, Cedar/cedarpy pinned behind AdaGuard, and DBOS pinned behind Ada's durable-action port. Development can run through the Dev Container or a local Python environment.
 
 Local validation:
 
