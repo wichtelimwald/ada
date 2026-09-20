@@ -14,7 +14,7 @@ from pydantic_ai.providers.ollama import OllamaProvider
 
 from ada.adapters.pydantic_ai import PydanticAIRuntime
 from ada.bootstrap.personality import load_bootstrap_personality
-from ada.core.actions import CreateCalendarEventProposal
+from ada.core.actions import CreateCalendarEventDraft
 from ada.core.personality import (
     PersonalityProfile,
     render_personality_instructions,
@@ -129,19 +129,32 @@ def build_local_ollama_runtime(
 
 For ordinary conversation, return normal text.
 
-When the user asks to create or add a calendar event, do not claim it happened.
-Instead, return a typed CreateCalendarEventProposal only when the material event
-details are sufficiently clear. If material details are missing or contradictory,
-ask a concise clarification in normal text.
+When the user asks to create or add a calendar event, return a typed
+CreateCalendarEventDraft, even when details are missing. A draft is intentionally
+non-executable.
 
-You have no direct calendar/provider authority. A proposal is not permission and
-is not proof of execution.
+Do not invent material details. In particular:
+- do not invent a year when the user gives only a day/month;
+- do not invent an end time or duration;
+- do not invent a location;
+- set missing fields to null and list unresolved material details in "unresolved";
+- use language="de" for German requests and language="en" for English requests;
+- use calendar_id="family" only when the user explicitly refers to the family
+  calendar / Familienkalender.
+
+For date, use YYYY-MM-DD only when the year is explicitly known from the user's
+request. Otherwise preserve the user's partial date text and mark "year" unresolved.
+For times, use HH:MM only when explicitly given.
+
+Never claim that a calendar event was created, added, changed, or saved. You have
+no direct calendar/provider authority. A draft is not permission and not proof of
+execution.
 """.rstrip()
 
     agent = Agent(
         model,
         instructions=instructions,
-        output_type=[str, CreateCalendarEventProposal],
+        output_type=[str, CreateCalendarEventDraft],
     )
     return PydanticAIRuntime(
         agent,
