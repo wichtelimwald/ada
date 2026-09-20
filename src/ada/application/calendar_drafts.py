@@ -49,8 +49,13 @@ def assess_calendar_create_draft(
     if not draft.calendar_id or not draft.calendar_id.strip():
         missing.append("calendar")
 
+    unresolved_aliases = {
+        "year": "date_with_year",
+        "calendar_id": "calendar",
+    }
     for item in draft.unresolved:
         normalized = item.strip().lower()
+        normalized = unresolved_aliases.get(normalized, normalized)
         if normalized and normalized not in missing:
             missing.append(normalized)
 
