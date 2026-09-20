@@ -13,7 +13,7 @@ from ada.adapters.local_ollama import (
     validate_local_ollama_base_url,
 )
 from ada.adapters.pydantic_ai import PydanticAIRuntime
-from ada.core.actions import CreateCalendarEventProposal
+from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest
 
 
@@ -66,7 +66,7 @@ class LocalChatRuntimeTests(unittest.TestCase):
         runtime.run(AgentRequest(text="after reset"))
         self.assertIsNone(agent.calls[2][1])
 
-    def test_local_runtime_configures_typed_calendar_proposal_output(self) -> None:
+    def test_local_runtime_configures_non_executable_calendar_draft_output(self) -> None:
         captured: dict[str, Any] = {}
 
         class FakeProvider:
@@ -114,9 +114,10 @@ class LocalChatRuntimeTests(unittest.TestCase):
         self.assertIsInstance(runtime, PydanticAIRuntime)
         self.assertEqual(
             captured["output_type"],
-            [str, CreateCalendarEventProposal],
+            [str, CreateCalendarEventDraft],
         )
-        self.assertIn("do not claim it happened", captured["instructions"])
+        self.assertIn("Do not invent material details", captured["instructions"])
+        self.assertIn("Never claim that a calendar event was created", captured["instructions"])
 
     def test_local_ollama_profile_rejects_non_loopback_endpoints(self) -> None:
         for url in (
