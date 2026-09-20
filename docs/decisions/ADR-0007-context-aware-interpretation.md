@@ -288,11 +288,11 @@ A future implementation should define a small Ada-owned TemporalResolverPort (na
 
 ### 6. Do not adopt a temporal library until characterization passes
 
-dateparser is the **preferred first candidate**, not yet an accepted dependency.
+Quickadd/ctparse semantics with a safe JSON-backed scorer is now the **preferred primary candidate**, subject to closing the conditional hard gate with a reproducible no-pickle artifact/loader strategy.
 
-quickadd is the most interesting specialist benchmark for Ada's appointment-oriented language.
+dateparser is the preferred **independent shadow/fallback candidate** for characterized compatible classes.
 
-Duckling and Microsoft Recognizers-Text remain reference benchmarks.
+Duckling remains a future/reference benchmark but is excluded from the initial resolver path on deployment/maintenance grounds. Microsoft Recognizers-Text remains deferred.
 
 ## Decision gates and scoring
 
@@ -311,6 +311,41 @@ A failed gate excludes a candidate; it cannot be compensated by a high score els
 | Reproducible dependency path | Version/source must be pinnable and auditable |
 
 Unknowns remain TBD until characterized; TBD is not a pass.
+
+
+### Candidate hard-gate status after characterization
+
+| Candidate | License | Local/offline | Privacy/security | Deployment path | Reproducible source | Gate result |
+| --- | --- | --- | --- | --- | --- | --- |
+| dateparser 1.4.3 | PASS — BSD-3-Clause | PASS | PASS | PASS — Python 3.14 target Mac | PASS — pinned release | **PASS** |
+| Quickadd 0.6.5 + safe JSON scorer | PASS — MIT | PASS | **CONDITIONAL PASS** — no runtime pickle; production artifact path still to formalize | PASS — Python 3.14 target Mac; Linux validation remains | PASS — pinned commit + versioned JSON artifact required | **CONDITIONAL** |
+| Duckling 59a13ff8 | PASS — BSD-3-Clause | PASS | PASS in reviewed design | **FAIL for initial Ada use** — pinned upstream Dockerfile does not build without modernization | PASS — pinned commit | **EXCLUDED before scoring** |
+| Microsoft Recognizers-Text | PASS — MIT | PASS | PASS in reviewed design | TBD — stale Python distribution path | TBD | **DEFERRED** |
+| HeidelTime | **FAIL for Ada's MIT distribution strategy** — GPL-3.0 | PASS | PASS in reviewed design | Java/UIMA burden | PASS | **EXCLUDED before scoring** |
+
+A conditional gate is not equivalent to a pass. Quickadd becomes eligible only after Ada defines a reproducible no-pickle model artifact and loader strategy.
+
+
+### Current scored candidates
+
+Only candidates that have not failed a hard gate are compared below. Quickadd's score remains provisional until its conditional security/deployment gate is closed.
+
+| Criterion | Weight | dateparser | Quickadd + safe JSON |
+| --- | ---: | ---: | ---: |
+| Ada characterization behavior | 30% | 2 | 5 |
+| Runtime / packaging fit | 15% | 5 | 3 |
+| Integration and provenance quality | 15% | 3 | 4 |
+| German/English and ambiguity handling | 10% | 3 | 5 |
+| Maintenance and release health | 10% | 5 | 2 |
+| Operational complexity | 10% | 5 | 4 |
+| Availability / redundancy contribution | 10% | 4 | 4 |
+| **Weighted score** | **100%** | **3.50 / 5.00** | **4.05 / 5.00** |
+
+Interpretation:
+
+- **dateparser** is the stronger maintenance/packaging choice but materially weaker on Ada's appointment-language corpus.
+- **Quickadd + safe JSON scorer** is the stronger semantic fit and current primary candidate, but Ada would own a small hardened integration surface.
+- **Duckling is not scored** because it failed the deployment hard gate for the initial Ada path; a low weighted score would incorrectly imply that strong semantics could compensate for that blocker.
 
 ### Weighted decision matrix
 
