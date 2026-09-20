@@ -90,6 +90,12 @@ The final ADR decision matrix should combine:
 A failed hard gate excludes a candidate; it cannot be compensated by a high weighted score.
 
 
+## Security note for the research harness
+
+The normal `quickadd` characterization path imports the pinned upstream package and therefore executes its bundled `pickle.load()` model-loading path. The JSON export experiment also uses that normal environment once to convert the pinned model.
+
+This is deliberate **research evidence**, not an Ada production design. Anyone re-running the harness should treat the pinned Quickadd source/model as executable third-party code. The proposed production direction explicitly removes pickle deserialization from Ada's normal build/runtime path and requires a reviewed, versioned, integrity-checked JSON artifact.
+
 ## Diagnostic Run 2
 
 After Run 1, two targeted diagnostics were added:
