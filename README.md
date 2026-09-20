@@ -2,7 +2,7 @@
 
 Ada is a local-first, privacy-first personal AI assistant project named after Ada Lovelace.
 
-> **Status:** Initial implementation foundation. Product scope is confirmed; ADR-0002 selects PydanticAI as the first replaceable agent-runtime adapter and ADR-0003 selects a Python-first, container-first modular monolith.
+> **Status:** Initial implementation foundation. ADR-0002 selects PydanticAI as the first replaceable agent-runtime adapter, ADR-0003 selects a Python-first container-first modular monolith, and ADR-0004 selects Cedar behind the Ada-owned Guard boundary.
 
 ## Vision
 
@@ -40,7 +40,7 @@ Potential upstream components such as Open Interpreter, Letta, local speech/mode
 
 Repository language is English. Project discussions with the maintainer are normally in German.
 
-The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter. Development can run through the Dev Container or a local Python environment.
+The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned agent adapter and Cedar/cedarpy pinned behind AdaGuard. Development can run through the Dev Container or a local Python environment.
 
 Local validation:
 
