@@ -31,12 +31,18 @@ The project is currently in discovery. Do not assume:
 
 For significant choices:
 
-1. Define requirements and decision criteria.
-2. Research credible alternatives using current primary sources where possible.
-3. State cross-capability integration assumptions.
-4. Use a documented decision matrix.
-5. Record the decision, consequences, and re-open triggers in an ADR.
-6. Only then implement.
+1. Define requirements and hard gates.
+2. Search the problem domain for credible maintained existing systems before proposing custom infrastructure.
+3. Review licenses/distribution constraints for every serious candidate.
+4. Research the candidates using current primary sources where possible.
+5. State cross-capability integration assumptions.
+6. Use a documented decision matrix and decision-changing prototypes where useful.
+7. Reopen the comparison if new evidence or a newly discovered credible system could change the outcome.
+8. Record the decision, consequences, fallback/re-open triggers, and license status in an ADR.
+9. Summarize user-relevant decisions in plain language in the top-level README.
+10. Only then implement.
+
+Custom infrastructure requires an explicit explanation of why an existing library/framework/service cannot satisfy the requirement behind an Ada-owned boundary.
 
 ## Security and privacy
 

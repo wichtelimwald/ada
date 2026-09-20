@@ -17,6 +17,9 @@ This file applies to coding and review agents working in this repository.
 - Do not add GitHub Actions unless explicitly approved.
 - Do not start application implementation before product discovery defines the relevant scope.
 - Non-trivial technology choices require documented alternatives and an ADR.
+- Before proposing custom infrastructure, search for credible maintained systems that solve the same problem and document why reuse/adaptation is insufficient.
+- License/distribution review is a hard gate for every serious third-party candidate before adoption or final scoring.
+- User-relevant accepted architecture decisions must also be summarized in plain language in the top-level `README.md`.
 - Never weaken a security/privacy boundary merely to simplify implementation.
 - Never execute or install an unreviewed third-party skill, plugin, MCP server, binary, hook, or script.
 - Never expose secrets or personal data in prompts, logs, fixtures, tests, issues, or commits.
