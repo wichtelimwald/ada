@@ -90,12 +90,17 @@ class CedarGuard:
     ) -> None:
         self._policy_version = policy_version
         self._schema = Schema.from_str(schema_text)
-        self._policies = PolicySet.from_str(policies)
 
-        validation = validate_policies(self._policies, self._schema)
+        # cedarpy 4.12.0 accepts a reusable Schema handle here, but
+        # validate_policies() still expects Cedar policy text rather than a
+        # PolicySet handle. Validate the source first, then parse it once for
+        # repeated authorization calls.
+        validation = validate_policies(policies, self._schema)
         if not validation.validation_passed:
             errors = "; ".join(str(error) for error in validation.errors)
             raise ValueError(f"invalid Cedar policy set: {errors}")
+
+        self._policies = PolicySet.from_str(policies)
 
     def authorize(self, request: AuthorizationRequest) -> GuardDecision:
         if not request.actor or not request.action or not request.resource or not request.channel:
