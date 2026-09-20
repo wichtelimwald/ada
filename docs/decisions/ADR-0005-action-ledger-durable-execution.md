@@ -1,4 +1,4 @@
-# ADR-0005: Use DBOS behind Ada's Action Ledger semantics
+# ADR-0005: Use DBOS behind Ada action/outcome semantics
 
 - **Status:** Proposed
 - **Date:** 2026-09-20
@@ -94,15 +94,17 @@ The probe showed:
 
 ## Decision
 
-Use **DBOS as Ada's initial durable-execution substrate behind an Ada-owned Action Ledger semantic boundary**.
+Use **DBOS as Ada's initial durable-execution substrate behind Ada-owned action/outcome semantics**.
+
+“Action Ledger” is a logical Ada domain concept, not a requirement for a separate Ada database or workflow engine.
 
 This is not:
 
-> DBOS is Ada's Action Ledger.
+> Ada builds a second durable-execution system beside DBOS.
 
 It is:
 
-> Ada owns operation/outcome semantics; DBOS initially owns durable execution/checkpoint/recovery plumbing.
+> Ada owns the meaning of operations and outcomes; DBOS initially owns durable execution/checkpoint/recovery plumbing. Provider-native idempotency/reconciliation is reused before Ada adds custom recovery mechanisms.
 
 The boundary is:
 
@@ -111,7 +113,7 @@ Ada action proposal
         |
 AdaGuard
         |
-Ada Action Ledger semantics
+Ada action/outcome semantics
         |
 Ada DurableActionPort
         |
@@ -139,6 +141,8 @@ Ada owns at least:
 
 DBOS workflow status is execution evidence, not automatically provider/business truth.
 
+These semantics may initially be represented through minimal typed DBOS workflow/step state plus Ada-owned types. A separate Ada persistence table is **not** required unless the implementation proves it necessary for audit, queryability, privacy separation, or provider reconciliation.
+
 ## Provider capability model
 
 Before allowing automatic durable retry of a consequential external action, the provider integration must declare whether it supports:
@@ -150,6 +154,13 @@ Before allowing automatic durable retry of a consequential external action, the 
 ### Idempotent/reconcilable providers
 
 DBOS durable steps may be retried, provided the provider adapter uses the stable Ada operation ID and reconciliation/idempotency correctly.
+
+Current primary-source evidence shows this is not hypothetical:
+
+- Google Calendar lets clients choose the event ID specifically to prevent duplicate creation after a request succeeds in the Calendar backend but the client fails before receiving the response.
+- Microsoft Graph exposes `transactionId` specifically to avoid redundant event-create POSTs on retry.
+- CalDAV/iCalendar defines persistent globally unique UIDs; CalDAV also defines UID-conflict behavior and conditional creation with `If-None-Match: *`.
+- Gmail send does not document an equivalent idempotency key. A stable RFC822 `Message-ID` can be searched after an ambiguous send, so positive reconciliation is possible; absence of a match is not automatically proof that the message was never sent and may remain `ambiguous`.
 
 ### Providers with neither capability
 
@@ -192,7 +203,7 @@ DBOS may use SQLite for Ada's initial local/single-host profile.
 
 SQLite is an implementation choice inside the DBOS adapter, not the Ada domain boundary.
 
-If later deployment requirements make another DBOS-supported system database preferable, the Ada Action Ledger semantics must remain unchanged.
+If later deployment requirements make another DBOS-supported system database preferable, Ada's action/outcome semantics must remain unchanged.
 
 ## Licensing
 
@@ -221,7 +232,7 @@ License fit remains a mandatory gate for future durable-execution candidates.
 - DBOS adds a non-trivial dependency set;
 - durable workflow state must be treated as privacy-sensitive;
 - DBOS semantics/decorators must be isolated behind Ada-owned interfaces;
-- external provider safety still requires Ada-specific idempotency/reconciliation rules;
+- external provider safety still requires provider-specific idempotency/reconciliation handling, but Ada should reuse provider-native mechanisms rather than reimplement them;
 - providers without safe reconciliation need explicit ambiguous/manual recovery handling;
 - upgrades require crash/recovery regression testing.
 
@@ -267,8 +278,9 @@ If accepted:
 1. define Ada-owned `OperationId`, provider capability and outcome types;
 2. define `DurableActionPort` independent of DBOS;
 3. integrate DBOS 3.0.0 only behind its adapter;
-4. promote hard-crash cases into permanent regression tests;
-5. implement explicit unreconcilable-provider recovery to `ambiguous`;
-6. keep DBOS payloads minimal/privacy-safe;
-7. expose a minimal user/audit operation view without copying full workflow journals;
-8. update README with the plain-language user guarantee: Ada recovers actions after crashes but never claims or retries uncertain real-world outcomes blindly.
+4. for the first calendar adapter, map `OperationId` to the provider's native duplicate-prevention mechanism where supported;
+5. promote hard-crash cases into permanent regression tests;
+6. implement explicit unreconcilable-provider recovery to `ambiguous` only where provider-native idempotency/reconciliation is insufficient;
+7. keep DBOS payloads minimal/privacy-safe;
+8. add a separate Ada operation persistence/view only if DBOS state plus provider evidence proves insufficient;
+9. update README with the plain-language user guarantee: Ada recovers actions after crashes but never claims or retries uncertain real-world outcomes blindly.
