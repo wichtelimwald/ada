@@ -21,7 +21,7 @@ The expressions are intentionally short temporal fragments. The target Ada archi
 
 They are installed into **separate temporary virtual environments**. Neither is added to Ada's product dependencies.
 
-Keeping them isolated is intentional: installation or runtime failure of one candidate must not prevent evidence collection for the other. This also lets the benchmark observe a potential future degraded-single-resolver availability mode.
+Keeping them isolated is intentional: installation or runtime failure of one candidate must not prevent evidence collection for the other. A parser returning no result is **not** treated as proof that the resolver is operationally unavailable; runtime health is a separate future signal.
 
 ## Run on the target Mac
 
@@ -31,13 +31,17 @@ From the repository root, with Ada's Python 3.14 environment already available:
 sh research/context_awareness/run.sh
 ~~~
 
-The script:
+The script currently:
 
-1. creates two disposable virtual environments;
-2. installs each pinned research dependency independently;
-3. runs the same characterization corpus against both;
-4. prints each raw JSON result;
-5. if both are available, prints a semantic comparison.
+1. creates isolated environments for dateparser, normal Quickadd, and Quickadd with the scorer disabled;
+2. installs the top-level research candidates independently;
+3. runs the shared characterization corpus;
+4. exports the pinned Quickadd scorer to primitive JSON when the normal Quickadd run succeeds;
+5. creates a fourth isolated Quickadd environment that loads that JSON scorer without runtime pickle deserialization;
+6. prints all available raw JSON results;
+7. prints pairwise semantic comparisons for dateparser vs Quickadd, Quickadd vs DummyScorer, and Quickadd vs JSON-backed scorer when the relevant runs succeed.
+
+The requirements files pin the **top-level candidates only**. Transitive dependencies are still resolved by pip at run time. Therefore these research runs do not by themselves close ADR-0007's reproducible-dependency hard gate.
 
 No GitHub Actions are used.
 
@@ -47,8 +51,11 @@ For each case, the comparison reports one of:
 
 - agreement — both resolvers produced the same normalized meaning;
 - interpretation_conflict — both produced a result, but meanings differ;
-- degraded_single_resolver — one produced a result and the other did not;
-- unresolved — neither produced a result.
+- single_resolver_result — one resolver produced a result while the other was healthy enough to run but produced no result;
+- input_error — at least one resolver raised an input-specific error while processing the expression;
+- unresolved — neither produced a result and neither reported an input error.
+
+These comparison states do not represent operational health. In particular, `single_resolver_result` must not be interpreted as degraded availability.
 
 These states are evidence, not final Ada execution policy.
 
@@ -56,7 +63,7 @@ In particular:
 
 - agreement increases interpretation confidence but does **not** prove truth;
 - disagreement is at least a correctness/safety signal and may become security-relevant if crafted input can create parser differential confusion across a consequential boundary;
-- single-resolver operation may improve availability, but Ada must decide which classes of derived values are safe to accept without corroboration;
+- runtime redundancy may improve availability, but operational health must be established independently of the current expression before fallback is allowed;
 - license/privacy/platform hard gates remain mandatory regardless of characterization score.
 
 ## Case groups
