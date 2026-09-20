@@ -1,6 +1,6 @@
 # Technology evaluation — Guard / permission architecture
 
-**Status:** Research — candidate framing complete; weights not yet agreed, so no scoring yet  
+**Status:** Research complete — conformance prototype supports ADR-0004  
 **Date checked:** 2026-09-20  
 **Depends on:** ADR-0002, ADR-0003, representative MVP scenarios, threat model
 
@@ -431,42 +431,87 @@ The close A-vs-B result is deliberate: Cedar is the preferred escalation engine 
 | Complexity for MVP | lowest | medium | medium | highest |
 | General future expressiveness | intentionally bounded | high | high | very high |
 
-## 10. Prototype questions
+## 10. Typed-evaluator conformance prototype
 
-Do not prototype all engines.
+The targeted prototype implemented a standard-library-only evaluator with:
 
-The only prototype likely to change the decision is:
+- Ada-owned typed authorization request;
+- typed allow/deny rules;
+- actor, action, resource, subject, audience and purpose selectors;
+- provenance and channel selectors;
+- minimum authentication assurance;
+- representation / acting-for selector;
+- validity interval and revocation;
+- default deny;
+- explicit deny override;
+- deterministic reason codes;
+- sorted matched rule IDs;
+- policy version in every decision.
 
-### Typed Ada evaluator conformance slice
+It deliberately did **not** implement arbitrary expressions, callbacks, roles, inheritance, relationship graphs, generic boolean syntax or model-written policies.
 
-Implement just enough to exercise the representative permission cases:
+### Conformance results
 
-1. allowed recognized calendar create;
-2. same create denied without grant;
-3. broad allow overridden by explicit deny;
-4. direct authenticated instruction may approve a simple one-off action;
-5. forwarded/quoted instruction cannot approve;
-6. model-supplied "permission" cannot approve;
-7. expired/revoked grant denies immediately;
-8. private data may contribute busy-time but detailed disclosure to family audience is denied.
+All nine tested cases passed:
 
-The evaluator should return deterministic reason codes and matched rule IDs.
+1. explicit recognized calendar-create grant -> allow;
+2. same action without grant -> default deny;
+3. explicit deny overrides broad allow;
+4. direct authenticated one-off approval -> allow;
+5. forwarded instruction cannot approve;
+6. model-originated "permission" cannot approve;
+7. revoked/expired grants stop authorizing;
+8. private busy-time may be disclosed to family while detailed private content is denied;
+9. malformed request fails closed.
 
-If this remains small and clear, the custom option is viable.
+The same evaluator logic was executed with Python 3.13.5 on Linux x86_64 without third-party dependencies.
 
-If the rules become awkward or require a general expression language, stop and prototype Cedar rather than growing a custom DSL.
+### Prototype interpretation
 
-## 11. Direction before conformance prototype
+The predefined Cedar-escalation condition was **not triggered**.
 
-The agreed scoring supports:
+The confirmed MVP permission cases remain understandable with typed selectors and constraints. No generic policy language is required.
 
-> **Ada owns AuthorizationRequest / GuardDecision and starts with a deliberately small typed evaluator, while keeping Cedar as the first escalation option if policy expressiveness outgrows the simple model.**
+The prototype validates the evaluator shape, not the complete authorization subsystem. Production still needs:
 
-This is not yet the ADR decision.
+- trusted grant/policy storage and mutation paths;
+- authentication claims established outside the Guard;
+- local-only creation path for broad/risky grants;
+- audit persistence;
+- Action Ledger integration;
+- tests that every privileged provider/disclosure path passes through Ada Guard;
+- schema/rule validation and safe migration/version handling.
 
-The reason is not "avoid dependencies". It is that Ada's current security semantics are narrow but unusual, while the stable Ada-owned Guard boundary allows a stronger general policy engine to replace the evaluator later without changing provider or application code.
+## 11. Research conclusion
 
-## 12. Primary references
+The weighted evaluation and prototype evidence support:
+
+> **Ada owns AuthorizationRequest / GuardDecision and initially uses a deliberately small Ada-owned typed policy evaluator behind AdaGuard. Cedar is the explicit escalation option if policy expressiveness outgrows simple selectors/constraints.**
+
+The decision is not "build a new general authorization framework." The accepted scope is intentionally narrower:
+
+- structured policy/grant data;
+- deterministic matching;
+- deny-by-default;
+- explicit deny override;
+- no executable policy data;
+- no general expression language.
+
+If future requirements demand complex relationship traversal, inheritance, richer policy analysis, or custom boolean expressions, re-open the decision before extending the evaluator into a home-grown DSL.
+
+## 12. Re-open / Cedar escalation triggers
+
+Re-open this decision if:
+
+- a rule needs arbitrary boolean/expression syntax rather than typed selectors;
+- policy inheritance, groups or relationship traversal becomes materially complex;
+- policy administration requires static analysis or schema tooling beyond Ada's small model;
+- authorization logic starts accumulating capability-specific special cases inside the evaluator;
+- a future supported Cedar Python integration materially reduces today's integration penalty;
+- the evaluator cannot remain small enough for comprehensive security review and conformance testing;
+- a security incident or bypass indicates the custom evaluator is no longer an acceptable root boundary.
+
+## 13. Primary references
 
 - Cedar language/reference: https://docs.cedarpolicy.com/
 - Cedar implementation: https://github.com/cedar-policy/cedar
