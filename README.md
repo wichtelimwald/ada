@@ -47,9 +47,11 @@ Current examples:
 | Agent runtime | PydanticAI behind an Ada-owned replaceable adapter | MIT; accepted |
 | Permissions / authorization | Cedar behind AdaGuard | Apache-2.0; accepted |
 | Python Cedar integration | `cedarpy` around the Cedar Rust engine | Apache-2.0; implemented behind AdaGuard |
-| Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, first calendar adapter implemented |
+| Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, synthetic calendar slice implemented |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
+
+The current DBOS-backed calendar path is **synthetic/test-only**. No real calendar account or personal event data is connected yet. Before a production provider is added, Ada must review how sensitive event payloads are stored in durable workflow state and minimize or reference them appropriately.
 
 ## Current phase
 
