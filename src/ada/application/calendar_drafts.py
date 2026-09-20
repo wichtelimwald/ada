@@ -7,6 +7,7 @@ import re
 from ada.core.actions import CreateCalendarEventDraft
 
 
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
@@ -24,8 +25,11 @@ class CalendarDraftAssessment:
 def _parse_iso_date(value: str | None) -> date | None:
     if not value:
         return None
+    normalized = value.strip()
+    if not _ISO_DATE_RE.fullmatch(normalized):
+        return None
     try:
-        return date.fromisoformat(value.strip())
+        return date.fromisoformat(normalized)
     except ValueError:
         return None
 
