@@ -117,6 +117,19 @@ class CalendarDraftTests(unittest.TestCase):
 
         self.assertIn("date_with_year", assessment.missing)
 
+    def test_two_digit_year_does_not_corroborate_model_century(self) -> None:
+        draft = _draft(date="2126-09-21")
+
+        assessment = assess_calendar_create_draft(
+            draft,
+            source_text=(
+                "Bitte den Zahnarzttermin am 21.09.26 von 16:00 bis 16:30 "
+                "in den Familienkalender eintragen."
+            ),
+        )
+
+        self.assertIn("date_with_year", assessment.missing)
+
     def test_valid_day_first_date_supports_model_date(self) -> None:
         draft = _draft(date="2026-09-21")
         source = (
