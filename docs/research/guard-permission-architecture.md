@@ -399,35 +399,35 @@ Scale:
 | Bypass resistance / fail-closed security | 30% | **5** | **5** | 4 | **5** |
 | Semantic fit to Ada authority model | 20% | **5** | **5** | 3 | 4 |
 | Auditability / explainability / testability | 15% | **5** | **5** | 4 | **5** |
-| Maintainability / simplicity | 15% | 4 | 3 | **4** | 2 |
+| Maintainability / simplicity | 15% | 4 | **4** | **4** | 2 |
 | Extensibility / replaceability | 10% | 4 | **5** | 4 | **5** |
 | Policy administration / human readability | 5% | 4 | **5** | 4 | 4 |
-| License / dependency / integration fit | 5% | **5** | 2 | 4 | 2 |
-| **Weighted total / 100** | **100%** | **94** | **91** | **76** | **83** |
+| License / dependency / integration fit | 5% | **5** | 3 | 4 | 2 |
+| **Weighted total / 100** | **100%** | **94** | **95** | **76** | **83** |
 
 ### Score rationale
 
 **A — Ada evaluator (94):** highest fit because the MVP semantics are narrow but unusual, the evaluator can be fail-closed and deny-overrides without a general expression language, and the entire root security path stays directly auditable in the Python codebase. Its main risk is future scope creep into a home-grown policy DSL.
 
-**B — Cedar (91):** strongest general authorization model. Cedar natively uses principal/action/resource/context, denies when no permit matches, and an applicable `forbid` overrides permits. It also provides useful diagnostics and schema tooling. The main penalty is integration/lifecycle complexity in Ada's Python-first runtime: the Cedar project currently lists community-maintained Python authorization bindings, while its official Python work in `cedar-for-agents` is focused on MCP schema/request generation rather than a canonical Python authorizer embedding path.
+**B — Cedar (95):** strongest general authorization model and, after prototype evidence, also a practical Python fit. Cedar natively uses principal/action/resource/context, denies when no permit matches, and an applicable `forbid` overrides permits. The community-maintained `cedarpy` 4.12.0 binding wraps the real Cedar 4.12.0 Rust engine through PyO3, supports Python 3.14 / Linux aarch64 and macOS arm64, and provides authorization, diagnostics, schema validation and reusable policy/schema handles. Ada's full conformance probe passed without a sidecar or Ada-owned Rust bridge. The remaining penalty is that the Python integration layer is community-maintained rather than an officially supported Cedar SDK, so it requires pinning, supply-chain review and an explicit fallback path.
 
 **C — PyCasbin (76):** mature and easy to embed in Python, with ABAC/ReBAC and deny-capable effect models. Ada's provenance, audience, representation and channel-assurance semantics would, however, become custom matcher/model configuration, making the root boundary less directly aligned with Ada's domain.
 
 **D — OPA/Rego (83):** very strong general policy engine with REST and Wasm integration choices, but the operational/policy-language complexity is high for Ada's present scope. Python-first integration typically means another process or a Wasm/community layer.
 
-The close A-vs-B result is deliberate: Cedar is the preferred escalation engine if Ada's policy semantics outgrow the intentionally small evaluator.
+The A-vs-B result is deliberately close. The prototype removed enough of Cedar's Python-integration penalty to make Cedar the preferred initial engine by a narrow margin. The small Ada evaluator remains a useful control/fallback, not the selected production direction.
 
 ## 9a. Evidence summary
 
 | Property | A Ada evaluator | B Cedar | C PyCasbin | D OPA/Rego |
 | --- | --- | --- | --- | --- |
-| Native Python | yes | no canonical first-party Python path | yes | no primary Python embedding path |
+| Python integration | native Ada code | community cedarpy binding over official Rust engine; tested on Python 3.14/ARM64 | native | no primary Python embedding path |
 | Default-deny achievable | yes | yes, native model | yes | yes |
 | Explicit deny override | yes, implement directly | yes, native `forbid` | yes, model-dependent | yes |
 | Ada-specific semantics | exact | model via entities/context | custom matcher/model | arbitrary structured input |
 | Human-readable policy | structured Ada data | strong | model + policy files | strong but Rego learning curve |
 | Formal/schema analysis | initially low | strongest | moderate | strong tooling |
-| Extra process required | no | not necessarily, but Python integration complicates | no | common sidecar option |
+| Extra process required | no | no with cedarpy; optional sidecar later | no | common sidecar option |
 | Complexity for MVP | lowest | medium | medium | highest |
 | General future expressiveness | intentionally bounded | high | high | very high |
 
@@ -482,40 +482,142 @@ The prototype validates the evaluator shape, not the complete authorization subs
 - tests that every privileged provider/disclosure path passes through Ada Guard;
 - schema/rule validation and safe migration/version handling.
 
-## 11. Research conclusion
+## 11. Cedar conformance prototype
 
-The weighted evaluation and prototype evidence support:
+Because the initial recommendation was challenged on long-term reuse grounds, Cedar was tested against the same Ada Guard semantics.
 
-> **Ada owns AuthorizationRequest / GuardDecision and initially uses a deliberately small Ada-owned typed policy evaluator behind AdaGuard. Cedar is the explicit escalation option if policy expressiveness outgrows simple selectors/constraints.**
+### Integration path tested
 
-The decision is not "build a new general authorization framework." The accepted scope is intentionally narrower:
+```text
+Ada AuthorizationRequest
+        |
+thin Ada CedarGuard adapter
+        |
+cedarpy 4.12.0
+        |
+cedar-policy 4.12.0 Rust engine
+        |
+Ada GuardDecision
+```
 
-- structured policy/grant data;
-- deterministic matching;
-- deny-by-default;
-- explicit deny override;
-- no executable policy data;
-- no general expression language.
+No Ada-owned Rust bridge or policy sidecar was required.
 
-If future requirements demand complex relationship traversal, inheritance, richer policy analysis, or custom boolean expressions, re-open the decision before extending the evaluator into a home-grown DSL.
+### Binding evidence
 
-## 12. Re-open / Cedar escalation triggers
+The tested `cedarpy` release:
+
+- wraps the real Rust `cedar-policy` engine via PyO3/maturin;
+- supports Python 3.14;
+- publishes Linux aarch64 and macOS arm64 wheels;
+- exposes authorization diagnostics;
+- supports reusable PolicySet and Schema handles;
+- validates policies against Cedar schemas;
+- supports batch authorization and policy-template linking.
+
+It is Apache-2.0 and community-maintained, not officially supported by the Cedar team.
+
+### Target-Mac runs
+
+Run 1 exposed an experiment bug: `validate_policies()` expects policy text rather than a reusable PolicySet handle. The adapter was corrected to validate policy text first and then parse/reuse PolicySet for authorization.
+
+Run 2 reached Cedar authorization. Seven tests passed; three failed only because the test expected human `@id` labels directly in `diagnostics.reasons`. Cedarpy intentionally exposes parser policy IDs there and provides `diagnostics.id_annotations_by_reason` as the label mapping.
+
+The adapter was corrected to translate Cedar determining-policy IDs to Ada-facing stable rule labels.
+
+Run 3:
+
+```text
+Ran 10 tests in 0.031s
+
+OK
+```
+
+### Conformance result
+
+All tested requirements passed:
+
+1. explicit recognized calendar-create grant;
+2. default deny;
+3. explicit forbid overrides permit;
+4. direct authenticated one-off approval;
+5. forwarded content cannot approve;
+6. model-originated content cannot approve;
+7. expired/revoked grants stop authorizing;
+8. private busy-time vs detailed disclosure;
+9. malformed request fails closed;
+10. invalid policy/schema configuration is rejected before privileged use.
+
+The Ada wrapper additionally treats any Cedar evaluation diagnostic error as fail-closed denial.
+
+### Adapter scope
+
+The Ada adapter remains intentionally thin. It owns:
+
+- mapping Ada AuthorizationRequest to Cedar principal/action/resource/context;
+- policy/schema loading and validation;
+- fail-closed interpretation of Cedar errors;
+- translating Cedar diagnostics into Ada GuardDecision / stable rule references.
+
+It does **not** implement authorization matching semantics itself.
+
+## 12. Research conclusion
+
+The weighted evaluation plus both conformance prototypes now support:
+
+> **Ada keeps AdaGuard / AuthorizationRequest / GuardDecision as stable Ada-owned boundaries and uses Cedar as the initial policy engine, integrated through the pinned community `cedarpy` binding.**
+
+The reason Cedar now narrowly outranks the custom evaluator is that the prototype eliminated most of the practical Python integration cost while retaining Cedar's advantages:
+
+- mature policy semantics instead of Ada-owned security logic;
+- schemas and policy validation;
+- future relationship/entity modeling;
+- richer analysis/tooling path;
+- default deny and forbid-overrides-permit as engine semantics;
+- clean future transition to another Cedar integration mode without changing Ada's public Guard boundary.
+
+The `cedarpy` package is an **integration dependency, not Ada's architectural boundary**.
+
+If that community layer becomes unsuitable, Ada can preserve the Cedar policy model and switch the private backend to:
+
+1. a reviewed local Cedar service/sidecar around the official engine;
+2. a minimal Ada-owned PyO3 bridge to the official engine;
+3. another reviewed Cedar SDK as ecosystem support evolves.
+
+The small Ada evaluator remains a regression/control implementation and emergency fallback concept; it is not the preferred production path.
+
+## 13. Community / upstream strategy
+
+Prefer upstream collaboration over an Ada-specific cedarpy fork.
+
+If Ada encounters a small general-purpose binding gap:
+
+1. reproduce it independently;
+2. open an upstream issue/design discussion;
+3. contribute a narrowly scoped implementation and tests when appropriate;
+4. do not make Ada depend on unreleased fork-only behavior;
+5. pin released versions and run the Ada Guard conformance suite during upgrades.
+
+One observed API consistency opportunity is that `is_authorized*` supports reusable PolicySet handles while `validate_policies()` currently accepts policy text plus a reusable Schema handle. This is not an Ada blocker and should only be proposed upstream if the maintainers consider PolicySet validation useful.
+
+## 14. Re-open triggers
 
 Re-open this decision if:
 
-- a rule needs arbitrary boolean/expression syntax rather than typed selectors;
-- policy inheritance, groups or relationship traversal becomes materially complex;
-- policy administration requires static analysis or schema tooling beyond Ada's small model;
-- authorization logic starts accumulating capability-specific special cases inside the evaluator;
-- a future supported Cedar Python integration materially reduces today's integration penalty;
-- the evaluator cannot remain small enough for comprehensive security review and conformance testing;
-- a security incident or bypass indicates the custom evaluator is no longer an acceptable root boundary.
+- cedarpy maintenance or release cadence becomes unsuitable for a root security dependency;
+- supported Python/ARM64 wheels regress;
+- supply-chain review finds an unacceptable risk;
+- Cedar semantics cannot express a confirmed Ada authorization requirement cleanly;
+- Ada starts implementing substantial authorization logic outside Cedar to compensate for engine limitations;
+- a first-party Cedar Python SDK or materially better integration path becomes available;
+- process isolation becomes desirable enough to prefer a local Cedar sidecar;
+- a security incident/bypass undermines confidence in the selected integration.
 
-## 13. Primary references
+## 15. Primary references
 
 - Cedar language/reference: https://docs.cedarpolicy.com/
 - Cedar implementation: https://github.com/cedar-policy/cedar
 - Cedar authorization algorithm: https://docs.cedarpolicy.com/auth/authorization.html
+- cedarpy community binding: https://github.com/k9securityio/cedar-py
 - Open Policy Agent / Rego: https://www.openpolicyagent.org/docs/policy-language
 - OPA integration options: https://www.openpolicyagent.org/docs/integration
 - OPA WebAssembly: https://www.openpolicyagent.org/docs/wasm
