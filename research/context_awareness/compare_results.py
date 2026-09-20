@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Any
 
 
@@ -45,6 +46,17 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("left", type=Path)
     parser.add_argument("right", type=Path)
+    parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print only compact comparison counts.",
+    )
+    parser.add_argument(
+        "--require-all-agreement",
+        action="store_true",
+        help="Fail unless every compared case is semantic agreement.",
+    )
     args = parser.parse_args()
 
     left = json.loads(args.left.read_text(encoding="utf-8"))
@@ -116,7 +128,32 @@ def main() -> int:
         "counts": counts,
         "results": rows,
     }
-    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    rendered = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+    if args.output:
+        args.output.write_text(rendered, encoding="utf-8")
+
+    if args.summary:
+        print(f"{left['backend']} vs {right['backend']}")
+        for state in (
+            "agreement",
+            "interpretation_conflict",
+            "single_resolver_result",
+            "input_error",
+            "unresolved",
+        ):
+            if counts.get(state):
+                print(f"  {state}: {counts[state]}")
+    elif not args.output:
+        print(rendered, end="")
+
+    non_agreement = [row for row in rows if row["state"] != "agreement"]
+    if args.require_all_agreement and non_agreement:
+        print(
+            "ERROR: semantic-equivalence gate failed: "
+            f"{len(non_agreement)} case(s) are not agreement.",
+            file=sys.stderr,
+        )
+        return 1
     return 0
 
 
