@@ -75,12 +75,17 @@ Repository language is English. Project discussions with the maintainer are norm
 
 The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter, Cedar/cedarpy pinned behind AdaGuard, and DBOS pinned behind Ada's durable-action port. Development can run through the Dev Container or a local Python environment.
 
-Local validation:
+Local validation from the repository root:
 
 ```bash
-python3 -m pip install --editable .
+cd "$(git rev-parse --show-toplevel)"
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --editable .
 sh scripts/validate.sh
 ```
+
+A project-local virtual environment is intentional. Do not bypass a Homebrew/PEP 668 externally-managed Python with `--break-system-packages`.
 
 Runtime container sanity check:
 
