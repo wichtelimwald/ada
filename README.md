@@ -85,6 +85,12 @@ python -m pip install --editable .
 sh scripts/validate.sh
 ```
 
+The default validation output is intentionally concise. For per-test output, run:
+
+```bash
+ADA_TEST_VERBOSE=1 sh scripts/validate.sh
+```
+
 A project-local virtual environment is intentional. Do not bypass a Homebrew/PEP 668 externally-managed Python with `--break-system-packages`.
 
 Runtime container sanity check:
