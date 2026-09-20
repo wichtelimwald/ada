@@ -566,6 +566,22 @@ Detailed evidence is recorded in `research/context_awareness/RESULTS-2026-09-20-
 
 The remaining major architecture trade-off is maintenance: carrying a small auditable Quickadd safe-loader adaptation versus adopting a heavier independently maintained specialist such as Duckling. This should be resolved before ADR acceptance.
 
+## Duckling operational characterization
+
+A final independent specialist check was attempted against pinned upstream Duckling commit `59a13ff87b1aa8be6b93d387244f8636b26185c5`.
+
+The upstream Docker build failed before semantic characterization. The current Dockerfile still uses `haskell:8-buster` and `debian:buster`; the runtime stage failed during `apt-get update` / package installation. Debian 10 / Buster is an archived distribution.
+
+This is **not** counted as a temporal-semantic failure or license failure. It is direct operational/maintenance evidence:
+
+- the upstream container path is not reproducibly buildable on the Ada target without modification;
+- Ada would need to maintain a Haskell/service runtime in addition to Python;
+- even the reference packaging path requires modernization before evaluation.
+
+ADR-0007 therefore does not require Ada to patch Duckling merely to complete the benchmark. Duckling remains a future replacement/reference candidate, but is rejected as the preferred initial resolver on runtime/packaging and operational-complexity grounds.
+
+Detailed evidence is recorded in `research/context_awareness/RESULTS-DUCKLING-2026-09-20.md`.
+
 ## Acceptance criteria for the implementation choice
 
 The candidate can be accepted only if:
