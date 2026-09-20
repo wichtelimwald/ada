@@ -150,22 +150,27 @@ class LocalChatRuntimeTests(unittest.TestCase):
                 ]
             )
 
-        agent = Agent(
-            FunctionModel(function=respond),
-            output_type=NativeOutput(
-                [AgentTextReply, CreateCalendarEventDraft],
-                name="ada_local_response",
-            ),
-        )
-        runtime = PydanticAIRuntime(
-            agent,
-            keep_session_history=True,
-        )
+        previous_banner = pydantic_ai.BANNER_ENABLED
+        try:
+            pydantic_ai.BANNER_ENABLED = False
+            agent = Agent(
+                FunctionModel(function=respond),
+                output_type=NativeOutput(
+                    [AgentTextReply, CreateCalendarEventDraft],
+                    name="ada_local_response",
+                ),
+            )
+            runtime = PydanticAIRuntime(
+                agent,
+                keep_session_history=True,
+            )
 
-        first = runtime.run(AgentRequest(text="first"))
-        second = runtime.run(AgentRequest(text="second"))
-        runtime.reset_session()
-        third = runtime.run(AgentRequest(text="after reset"))
+            first = runtime.run(AgentRequest(text="first"))
+            second = runtime.run(AgentRequest(text="second"))
+            runtime.reset_session()
+            third = runtime.run(AgentRequest(text="after reset"))
+        finally:
+            pydantic_ai.BANNER_ENABLED = previous_banner
 
         self.assertEqual(
             first.text,
