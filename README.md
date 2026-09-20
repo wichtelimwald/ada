@@ -2,7 +2,7 @@
 
 Ada is a local-first, privacy-first personal AI assistant project named after Ada Lovelace.
 
-> **Status:** Initial implementation foundation. PydanticAI is the first replaceable agent-runtime adapter, Ada starts as a Python-first container-first modular monolith, and Cedar is the accepted authorization engine behind AdaGuard.
+> **Status:** Initial implementation foundation. PydanticAI is the first replaceable agent-runtime adapter, Ada starts as a Python-first container-first modular monolith, Cedar is implemented behind AdaGuard, and DBOS is the accepted durable-execution substrate behind Ada-owned action/outcome semantics.
 
 ## Vision
 
@@ -47,7 +47,7 @@ Current examples:
 | Agent runtime | PydanticAI behind an Ada-owned replaceable adapter | MIT; accepted |
 | Permissions / authorization | Cedar behind AdaGuard | Apache-2.0; accepted |
 | Python Cedar integration | `cedarpy` around the Cedar Rust engine | Apache-2.0; implemented behind AdaGuard |
-| Durable external actions / recovery | DBOS, Restate, Temporal, and a minimal Ada control are being evaluated | not decided yet |
+| Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, implementation pending |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
 
