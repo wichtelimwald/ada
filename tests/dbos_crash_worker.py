@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from contextlib import closing
 import os
 import sqlite3
 import sys
@@ -53,7 +54,7 @@ class PersistentCrashCalendarAdapter:
     def __init__(self, provider_db: Path, *, crash_after_commit: bool) -> None:
         self._provider_db = provider_db
         self._crash_after_commit = crash_after_commit
-        with _connect(provider_db):
+        with closing(_connect(provider_db)):
             pass
 
     @property
@@ -70,7 +71,7 @@ class PersistentCrashCalendarAdapter:
         return ()
 
     def reconcile_create(self, *, operation_id: str) -> CalendarEvent | None:
-        with _connect(self._provider_db) as con:
+        with closing(_connect(self._provider_db)) as con:
             con.execute("INSERT INTO calls(kind) VALUES ('reconcile')")
             row = con.execute(
                 """
@@ -160,6 +161,8 @@ def _configure(system_db: Path) -> None:
         "name": "ada-hard-crash-regression",
         "application_version": "test",
         "run_admin_server": False,
+        "log_level": "WARNING",
+        "console_log_level": "WARNING",
         "system_database_url": f"sqlite:///{system_db}",
     }
     DBOS(config=config)
