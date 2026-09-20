@@ -210,9 +210,9 @@ SQLite WAL mode is optional. It allows readers and writers to proceed with more 
 
 That constraint matches Ada's initial single-host runtime. WAL is not required merely to get atomic commit.
 
-## 9. Proposed decision criteria — not yet agreed
+## 9. Agreed decision criteria
 
-| Criterion | Proposed weight | Why it matters |
+| Criterion | Weight | Why it matters |
 | --- | ---: | --- |
 | Recovery / duplicate-side-effect safety | **30%** | This is the primary purpose of the ledger. |
 | Crash durability / atomic transition clarity | **20%** | State must survive abrupt termination predictably. |
@@ -222,7 +222,37 @@ That constraint matches Ada's initial single-host runtime. WAL is not required m
 | Replaceability / integration clarity | **10%** | Storage implementation must not become domain semantics. |
 | **Total** | **100%** | |
 
-## 10. Preliminary evidence table
+## 10. Scoring
+
+Scale:
+
+- **5 — Excellent:** directly supports Ada's recovery contract with little compensating complexity.
+- **4 — Good:** strong fit with bounded caveats.
+- **3 — Adequate:** workable, but meaningful extra machinery or opacity remains.
+- **2 — Weak:** significant mismatch with Ada's recovery or maintainability goals.
+- **1 — Poor:** unsuitable as the Action Ledger source of truth.
+
+| Criterion | Weight | A stdlib SQLite | B SQLAlchemy + SQLite | C event sourcing | D runtime persistence |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Recovery / duplicate-side-effect safety | 30% | **5** | **5** | **5** | 2 |
+| Crash durability / atomic transition clarity | 20% | **5** | 4 | 4 | 2 |
+| Maintainer simplicity / reviewability | 20% | **5** | 3 | 2 | 4 |
+| Privacy / data minimization | 10% | **5** | **5** | 4 | 3 |
+| Local resource / portability fit | 10% | **5** | 4 | 3 | **5** |
+| Replaceability / integration clarity | 10% | **5** | 4 | 3 | 2 |
+| **Weighted total / 100** | **100%** | **100** | **84** | **75** | **54** |
+
+### Score rationale
+
+**A — stdlib SQLite (100):** fits the single-host/container-first MVP without another dependency, exposes transaction boundaries directly, supports atomic state changes, and keeps the ledger schema small and reviewable. The score does not imply that SQLite alone creates exactly-once semantics; provider reconciliation remains mandatory.
+
+**B — SQLAlchemy + SQLite (84):** preserves the same database guarantees, but adds an abstraction layer and dependency before the schema/query complexity justifies it. Revisit if migrations/query breadth become costly.
+
+**C — event sourcing (75):** conceptually compatible with operation history, but adds a larger architectural model than the current requirement. Ada still must implement provider reconciliation and operation semantics.
+
+**D — PydanticAI/runtime persistence (54):** useful supporting evidence, but prior crash tests already showed it cannot be the source of truth for external side effects. It cannot replace Ada-owned stable operation IDs and reconciliation.
+
+## 10a. Evidence table
 
 | Property | A stdlib SQLite | B SQLAlchemy + SQLite | C event sourcing | D runtime persistence |
 | --- | --- | --- | --- | --- |
@@ -261,15 +291,24 @@ Also test:
 
 If the direct SQLite implementation becomes awkward or migration/query needs dominate, revisit SQLAlchemy before adding more hand-written persistence machinery.
 
-## 12. Preliminary direction
+## 12. Direction before crash/recovery prototype
 
-Before scoring, the strongest fit appears to be:
+The agreed weighting and scoring support:
 
 > **Ada-owned Action Ledger state machine persisted with Python stdlib SQLite, with provider reconciliation as a mandatory part of side-effect safety.**
 
-This is not yet an ADR decision.
+SQLite is the initial persistence implementation, not the domain boundary.
 
-The important architectural commitment is the state/recovery contract, not SQLite itself.
+The important architectural commitment is the state/recovery contract:
+
+- stable Ada operation ID before provider execution;
+- durable state transition before/after external calls;
+- `executing` after restart is treated as ambiguous;
+- reconcile before retry;
+- automatic retry only when idempotency/reconciliation makes it safe;
+- no framework persistence is accepted as external side-effect truth.
+
+The next gate is the crash/recovery prototype.
 
 ## 13. Primary references
 
