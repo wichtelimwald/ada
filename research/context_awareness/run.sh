@@ -98,9 +98,14 @@ report_warnings() {
 
     if grep -q 'SyntaxWarning:.*invalid escape sequence' "$log"; then
       invalid_escape=1
-    else
+    fi
+
+    if grep 'Warning:' "$log" | grep -qv 'SyntaxWarning:.*invalid escape sequence'; then
       other_warning=1
-      echo "WARN: $backend emitted warnings; use VERBOSE=1 for details." >&2
+      echo "WARN: $backend emitted additional warnings; use VERBOSE=1 for details." >&2
+    elif ! grep -q 'Warning:' "$log"; then
+      other_warning=1
+      echo "WARN: $backend emitted stderr output; use VERBOSE=1 for details." >&2
     fi
 
     if [ "$VERBOSE" = "1" ]; then
