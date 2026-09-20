@@ -4,6 +4,10 @@ from dataclasses import dataclass
 from enum import Enum
 
 
+class OperationIdentityConflictError(ValueError):
+    """One operation ID was reused for different immutable action metadata."""
+
+
 class OperationId(str):
     """Stable Ada identity for one consequential operation."""
 
