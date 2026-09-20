@@ -100,6 +100,7 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         config: DBOSConfig = {
             "name": f"ada-test-{self._counter}",
             "application_version": "test",
+            "run_admin_server": False,
             "system_database_url": (
                 f"sqlite:///{Path(self.tmp.name) / 'dbos.sqlite'}"
             ),
