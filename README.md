@@ -107,10 +107,10 @@ A project-local virtual environment is intentional. Do not bypass a Homebrew/PEP
 
 ### First local chat
 
-Install Ollama separately, then fetch the validated baseline model:
+Install Ollama separately, then fetch the current target-Mac baseline model:
 
 ```bash
-ollama pull qwen3:8b
+ollama pull qwen3.5:9b
 ```
 
 With the local Ollama service running:
@@ -131,10 +131,10 @@ Inside the chat:
 The model and endpoint remain configurable:
 
 ```bash
-ada chat --model qwen3:8b --ollama-url http://localhost:11434/v1
+ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
 ```
 
-This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**, so missing material details can be surfaced without forcing the model to invent them. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
+This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**. Ada-owned deterministic logic — not the model — decides which material fields are actually required and checks them against the original user request, so model-invented requirements or silently invented dates cannot become action requirements. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
 
 Runtime container sanity check:
 
