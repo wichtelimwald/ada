@@ -329,20 +329,43 @@ Any future candidate must pass the same license/distribution gate before final s
 | Replaceability / integration clarity | **10%** | Durable infrastructure must not become Ada's domain semantics. |
 | **Total** | **100%** | |
 
-## 11. Scoring status
+## 11. Final scoring
 
-**Scoring is reopened.**
+The DBOS target-Mac hard-crash prototype is complete, so the reopened comparison can now be scored.
 
-The earlier storage-only scoring is retained only as historical evidence; it is no longer sufficient for an architecture decision because DBOS, Restate and Temporal solve a larger fraction of the actual problem.
+Scale:
 
-Do not assign a final score until the DBOS hard-crash prototype is complete.
+- **5 — Excellent:** strongly satisfies Ada with low compensating cost.
+- **4 — Good:** strong fit with bounded caveats.
+- **3 — Adequate:** workable, but meaningful complexity or mismatch remains.
+- **2 — Weak:** substantial lifetime cost for Ada's MVP.
+- **1 — Poor:** unattractive for this role.
 
-The custom SQLite result remains the control baseline:
+| Criterion | Weight | Custom SQLite control | DBOS 3.0.0 | Restate | Temporal |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Recovery / duplicate-side-effect safety | 30% | **5** | **5** | **5** | **5** |
+| Crash durability / atomic transition clarity | 20% | **5** | **5** | **5** | **5** |
+| Maintainer simplicity / lifetime reviewability | 20% | 3 | **5** | 3 | 2 |
+| Privacy / data minimization | 10% | **5** | 3 | 3 | 3 |
+| Local resource / portability fit | 10% | **5** | 4 | 3 | 2 |
+| Replaceability / integration clarity | 10% | **4** | **4** | 3 | 3 |
+| **Weighted total / 100** | **100%** | **90** | **92** | **80** | **74** |
 
-- technically viable;
-- minimal;
-- 5/5 control tests passed;
-- but Ada owns all durable execution mechanics.
+### Score rationale
+
+**DBOS 3.0.0 — 92:** wins narrowly because the target-Mac experiment proves the required hard-crash recovery path while DBOS removes substantial custom machinery for workflow checkpointing, restart recovery, durable waiting/signals/queues, and stable workflow identity. It stays in-process and can use SQLite, so it fits Ada's container-first single-host MVP. The main penalties are durable payload persistence/privacy and a larger dependency surface.
+
+**Custom SQLite control — 90:** technically excellent for the narrow first slice and provides the smallest privacy/resource footprint. The penalty is lifetime maintenance: Ada would gradually own retries, recovery orchestration, durable waiting, signals, scheduler-like behavior, concurrency, schema migration and workflow evolution. Given Ada's limited maintainer budget, that is a meaningful long-term cost even though the initial implementation is small.
+
+**Restate — 80:** strong durable-execution semantics and a good AI/PydanticAI story, but requires a separate runtime process and currently places the server under BSL 1.1. That is a real packaging/operational/license cost for Ada's initial personal single-host product.
+
+**Temporal — 74:** mature and permissively MIT licensed, with excellent durability, but its service/worker architecture is substantially heavier than Ada currently needs.
+
+### Important scoring boundary
+
+All four approaches still require provider-specific idempotency/reconciliation for external side effects.
+
+The score therefore does **not** reward claims of generic "exactly once" for arbitrary external APIs. The DBOS negative test explicitly demonstrated the boundary: an uncheckpointed unreconcilable provider step executes again after recovery and can duplicate the effect.
 
 ## 12. Custom SQLite control prototype
 
@@ -370,32 +393,68 @@ Validated:
 
 The fake provider deliberately supports stable operation identity/reconciliation. This experiment does not claim SQLite can create exactly-once semantics for an arbitrary external provider.
 
-## 13. Next prototype gate — DBOS
+## 13. DBOS target-Mac prototype
 
-DBOS is the only additional candidate that currently appears capable of materially changing the decision while still fitting Ada's small single-process/container-first architecture.
+DBOS 3.0.0 was executed on the target Mac / Python 3.14.6.
 
-Test DBOS 2.31.1 against the same hard-crash contract:
+Result:
 
-1. use Ada operation ID as the DBOS workflow ID;
-2. run a provider operation as a durable step;
-3. provider commits;
-4. process dies before DBOS can checkpoint the step result;
-5. restart DBOS with the same SQLite system database;
-6. observe whether/how the step is retried;
-7. use provider idempotency/reconciliation so provider effect count remains one;
-8. inspect what durable workflow state/status DBOS exposes for Ada audit/recovery;
-9. verify an unreconcilable external provider still requires an Ada `ambiguous` outcome rather than a blind retry.
+```text
+Ran 3 tests in 21.110s
 
-The experiment must answer two separate questions:
+OK
+```
 
-- **Can DBOS replace Ada-owned recovery/checkpoint/state-machine plumbing?**
-- **What minimal Ada-owned Action Ledger semantics must remain for provider outcome and business outcome truth?**
+The hard-crash cases showed:
 
-If DBOS requires substantial Ada-specific state machinery around it, prefer the smaller control implementation.
+1. **Reconcilable provider:** DBOS retried the uncheckpointed step after restart; provider attempt count became 2 but real provider effect count stayed **1** because Ada operation identity/provider reconciliation found the existing effect.
+2. **Unreconcilable provider:** DBOS retried the uncheckpointed step and produced **2** external effects. This intentionally proves the external-provider boundary.
+3. **Completed workflow replay:** using the same Ada operation ID as DBOS workflow ID returned the durable result without another provider attempt.
 
-If DBOS removes most recovery machinery while preserving Ada-owned operation/outcome semantics behind a narrow boundary, prefer reuse over custom durable-execution infrastructure.
+### Experiment conclusion
 
-## 14. Architectural invariant independent of implementation
+DBOS can replace a substantial amount of Ada-owned recovery/checkpoint/workflow plumbing.
+
+It cannot replace Ada's semantic Action Ledger responsibilities:
+
+- provider capability classification;
+- provider outcome;
+- business outcome;
+- `ambiguous` state;
+- reconcile-before-retry rule;
+- privacy-safe audit representation.
+
+Therefore the intended boundary is:
+
+```text
+Ada Action Ledger semantics
+        |
+Ada DurableActionPort
+        |
+DBOS adapter (initial)
+        |
+provider adapter
+        |
+external system
+```
+
+For providers without safe idempotency/reconciliation, the Ada adapter must not expose DBOS' raw at-least-once retry behavior as a safe consequential action. Recovery must resolve to `ambiguous` / explicit handling instead of blindly repeating the external effect.
+
+## 14. Research conclusion
+
+The evidence supports:
+
+> **Ada keeps an Ada-owned Action Ledger semantic boundary and uses DBOS as the initial durable-execution substrate behind it.**
+
+This is deliberately different from "DBOS is the ledger."
+
+Ada owns the meaning of operations and outcomes. DBOS owns workflow checkpointing/recovery mechanics.
+
+The custom SQLite implementation remains the control/fallback if DBOS later becomes unsuitable.
+
+A separate Ada operation/audit view may be needed even with DBOS, but it should contain only Ada-specific semantics and minimal privacy-safe references rather than duplicate the full DBOS workflow journal.
+
+## 15. Architectural invariant independent of implementation
 
 Whichever implementation wins:
 
@@ -407,7 +466,7 @@ Whichever implementation wins:
 - authoritative user Memory remains separate from workflow/ledger state;
 - only minimal data required for recovery/audit should be persisted.
 
-## 15. Primary references
+## 16. Primary references
 
 - Python 3.14 sqlite3 documentation: https://docs.python.org/3.14/library/sqlite3.html
 - SQLite atomic commit: https://www.sqlite.org/atomiccommit.html
