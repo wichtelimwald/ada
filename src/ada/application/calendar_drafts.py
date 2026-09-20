@@ -62,17 +62,26 @@ def _source_explicitly_supports_calendar(
     calendar_id: str,
     source_text: str,
 ) -> bool:
-    """Require an Ada-known calendar target to be explicit in the user text."""
+    """Require the model's calendar target to be explicit in the user text."""
 
-    normalized = calendar_id.strip().lower()
+    normalized = " ".join(calendar_id.strip().lower().split())
+    if not normalized:
+        return False
+
+    aliases = {normalized}
     if normalized == "family":
-        return bool(
-            re.search(
-                r"(?:\bfamilienkalender\b|\bfamily\s+calendar\b)",
-                source_text,
-                re.IGNORECASE,
-            )
+        aliases.update({"familie", "familien", "family"})
+
+    for alias in aliases:
+        escaped = re.escape(alias)
+        patterns = (
+            rf"(?<!\w){escaped}\s+calendar(?!\w)",
+            rf"(?<!\w)calendar\s+{escaped}(?!\w)",
+            rf"(?<!\w){escaped}\s*kalender(?!\w)",
+            rf"(?<!\w)kalender\s+{escaped}(?!\w)",
         )
+        if any(re.search(pattern, source_text, re.IGNORECASE) for pattern in patterns):
+            return True
     return False
 
 
