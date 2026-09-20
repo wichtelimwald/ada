@@ -19,6 +19,7 @@ Representative scenarios: [`docs/product/representative-scenarios.md`](product/r
 Before final capability ADRs, document integration constraints that could make individually attractive choices incompatible. The accepted modular direction is captured in [`docs/architecture/modular-core-boundaries.md`](architecture/modular-core-boundaries.md); the items below remain open until their concrete constraints are settled:
 
 - [x] Runtime/process topology and IPC expectations ([ADR-0003](decisions/ADR-0003-execution-topology-containerization.md)).
+- [x] Durable action execution / recovery — DBOS behind Ada-owned action/outcome semantics ([ADR-0005](decisions/ADR-0005-action-ledger-durable-execution.md)).
 - [ ] Packaging, installation, startup/background-operation, and update constraints.
 - [x] Project license strategy — retain MIT after evaluating Apache-2.0, BSD-3-Clause, and OSC-1.0 reference.
 - [ ] Shared resource budgets and model/artifact distribution constraints.
