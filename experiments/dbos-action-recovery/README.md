@@ -2,7 +2,7 @@
 
 **Status:** disposable architecture experiment.
 
-This probe compares DBOS 2.31.1 with Ada's custom SQLite Action Ledger control.
+This probe compares DBOS 3.0.0 with Ada's custom SQLite Action Ledger control.
 
 ## Question
 
@@ -10,7 +10,7 @@ Can DBOS remove most of Ada's custom durable-execution/recovery machinery while 
 
 ## Why DBOS
 
-Current DBOS Python:
+Current DBOS Python 3.0.0:
 
 - is MIT licensed;
 - supports Python 3.14;
