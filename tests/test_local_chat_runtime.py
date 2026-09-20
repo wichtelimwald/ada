@@ -14,7 +14,7 @@ from ada.adapters.local_ollama import (
 )
 from ada.adapters.pydantic_ai import PydanticAIRuntime
 from ada.core.actions import CreateCalendarEventDraft
-from ada.ports.agent_runtime import AgentRequest
+from ada.ports.agent_runtime import AgentRequest, AgentTextReply
 
 
 class FakeRunResult:
@@ -66,6 +66,27 @@ class LocalChatRuntimeTests(unittest.TestCase):
         runtime.run(AgentRequest(text="after reset"))
         self.assertIsNone(agent.calls[2][1])
 
+    def test_pydantic_runtime_maps_structured_chat_reply_to_text(self) -> None:
+        reply = AgentTextReply(text="Hallo aus Ada.")
+
+        class ReplyAgent:
+            def run_sync(
+                self,
+                prompt: str,
+                *,
+                message_history: Sequence[Any] | None = None,
+            ) -> FakeRunResult:
+                del prompt, message_history
+                return FakeRunResult(reply, ())
+
+        response = PydanticAIRuntime(ReplyAgent()).run(
+            AgentRequest(text="hello")
+        )
+
+        self.assertEqual(response.text, "Hallo aus Ada.")
+        self.assertEqual(response.drafts, ())
+        self.assertEqual(response.proposals, ())
+
     def test_pydantic_runtime_keeps_calendar_draft_out_of_proposals(self) -> None:
         draft = CreateCalendarEventDraft(
             title="Zahnarzt",
@@ -94,7 +115,7 @@ class LocalChatRuntimeTests(unittest.TestCase):
         self.assertEqual(response.proposals, ())
         self.assertEqual(response.text, "")
 
-    def test_local_runtime_configures_non_executable_calendar_draft_output(self) -> None:
+    def test_local_runtime_configures_native_structured_output(self) -> None:
         captured: dict[str, Any] = {}
 
         class FakeProvider:
@@ -113,7 +134,7 @@ class LocalChatRuntimeTests(unittest.TestCase):
                 model: Any,
                 *,
                 instructions: str,
-                output_type: list[type[Any]],
+                output_type: Any,
             ) -> None:
                 captured["agent_model"] = model
                 captured["instructions"] = instructions
@@ -140,10 +161,9 @@ class LocalChatRuntimeTests(unittest.TestCase):
             pydantic_ai.BANNER_ENABLED = previous_banner
 
         self.assertIsInstance(runtime, PydanticAIRuntime)
-        self.assertEqual(
-            captured["output_type"],
-            [str, CreateCalendarEventDraft],
-        )
+        output_type = captured["output_type"]
+        self.assertEqual(type(output_type).__name__, "NativeOutput")
+        self.assertIn("ada_local_response", repr(output_type))
         self.assertIn("Do not invent material details", captured["instructions"])
         self.assertIn("Never claim that a calendar event was created", captured["instructions"])
 
