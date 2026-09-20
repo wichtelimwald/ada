@@ -183,7 +183,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--backend",
-        choices=("dateparser", "quickadd", "quickadd-safe"),
+        choices=("dateparser", "quickadd", "quickadd-safe", "quickadd-json"),
         required=True,
     )
     parser.add_argument(
