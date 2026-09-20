@@ -434,11 +434,11 @@ Run 1 also confirmed that quickadd installs and executes on Ada's target Python 
 | --- | --- | --- |
 | License compatibility | PASS — BSD-3-Clause | PASS — MIT |
 | Local/offline operation | PASS | PASS |
-| Privacy/security fit | PASS in current review | **TBD** — import-time pickle loading of bundled scoring model requires explicit hardening decision |
+| Privacy/security fit | PASS in current review | **CONDITIONAL PASS** — Run 3 proves a no-pickle JSON scorer path with identical characterized semantics; production integration strategy still required |
 | Supported target deployment | PASS — documented Python 3.14 | PASS on target Mac by characterization; Linux still to retain as supported path |
 | Reproducible dependency path | PASS — pinned release | PASS — pinned Git commit, but weaker distribution ergonomics |
 
-Because TBD is not a pass, quickadd is **not yet eligible for final selection** despite its stronger behavioral result.
+Quickadd is not yet eligible for final selection until the safe JSON loader/source-artifact strategy is made reproducible and auditable; the feasibility itself is now demonstrated.
 
 ### Provisional weighted view
 
@@ -525,6 +525,46 @@ This creates a plausible hardening path: convert the trusted pinned upstream mod
 Until that equivalence is demonstrated, Quickadd's privacy/security hard gate remains **TBD**.
 
 Detailed evidence is recorded in `research/context_awareness/RESULTS-2026-09-20-RUN2.md`.
+
+## Characterization evidence — Run 3
+
+Run 3 tested whether Quickadd's behaviorally important trained scorer can be represented and loaded safely without runtime pickle deserialization.
+
+Result:
+
+- **quickadd vs quickadd-json: 15/15 semantic agreement**;
+- **quickadd-json: 11/11** on cases with explicit expected values;
+- no interpretation conflicts between normal Quickadd and the JSON-backed scorer on the complete current corpus.
+
+This demonstrates that Python pickle is **not required by the model semantics**. The scorer state can be represented transparently as primitive JSON and reconstructed into Quickadd's own CountVectorizer / MultinomialNaiveBayes / CTParsePipeline types without changing characterized behavior.
+
+### Updated hard-gate interpretation
+
+Quickadd's upstream runtime path still fails Ada's preferred security posture because it executes `pickle.load()` during normal import.
+
+However, Run 3 demonstrates a technically viable safe integration path. The privacy/security hard gate therefore changes from **unresolved feasibility** to **conditional pass pending implementation strategy**:
+
+- no pickle deserialization in Ada normal build/runtime;
+- versioned validated JSON model schema;
+- pinned reviewed Quickadd source revision;
+- artifact provenance and integrity hash;
+- regression/characterization equivalence against the selected upstream revision;
+- explicit ownership of the minimal safe-loader patch/fork or upstream contribution.
+
+The research conversion currently imports the pinned upstream artifact once and is therefore evidence only; it must not become the production trust chain.
+
+### Updated candidate direction
+
+Current evidence favors:
+
+1. **Quickadd/ctparse semantics with safe JSON scorer loading** as the primary temporal resolver;
+2. **dateparser** as an independently maintained shadow/fallback for characterized compatible classes;
+3. **Ada-owned typed semantic validation and zoneinfo validation** after parsing;
+4. selective dual consensus rather than universal consensus.
+
+Detailed evidence is recorded in `research/context_awareness/RESULTS-2026-09-20-RUN3.md`.
+
+The remaining major architecture trade-off is maintenance: carrying a small auditable Quickadd safe-loader adaptation versus adopting a heavier independently maintained specialist such as Duckling. This should be resolved before ADR acceptance.
 
 ## Acceptance criteria for the implementation choice
 
