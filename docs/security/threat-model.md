@@ -12,7 +12,8 @@
 - browser/session data,
 - operating-system integrity,
 - user intent and control,
-- durable action/workflow state and provider outcome evidence.
+- durable action/workflow state and provider outcome evidence,
+- ephemeral local-chat conversation context.
 
 ## Initial threat actors
 
@@ -34,7 +35,8 @@
 - AdaGuard ↔ pinned `cedarpy` / embedded Cedar native policy engine,
 - external content ↔ model context,
 - Ada durable-action semantics ↔ DBOS system database / recovery engine,
-- DBOS workflow steps ↔ external providers with their own idempotency/reconciliation semantics.
+- DBOS workflow steps ↔ external providers with their own idempotency/reconciliation semantics,
+- Ada agent-runtime adapter ↔ separately running loopback Ollama/model process.
 
 ## Threats to evaluate
 
@@ -59,7 +61,10 @@
 - duplicate external side effects after crash/recovery,
 - durable workflow payloads retaining more personal data than recovery requires,
 - workflow-ID collision or replay causing the wrong operation result to be reused,
-- provider ambiguity being misreported as success.
+- provider ambiguity being misreported as success,
+- accidental configuration of the "local" model profile to send prompts/history to a non-loopback endpoint,
+- a compromised or malicious local model artifact producing manipulative or privilege-seeking output,
+- ephemeral conversation context being mistaken for authoritative long-term Memory.
 
 ## Initial design targets
 
@@ -83,6 +88,10 @@
 - unreconcilable external outcomes fail to explicit `ambiguous` rather than blind retry,
 - DBOS isolated behind an Ada-owned durable-action port,
 - minimal durable workflow payloads with no raw prompts/messages/secrets merely for convenience,
-- production-provider review of sensitive action-payload storage before real personal data is connected.
+- production-provider review of sensitive action-payload storage before real personal data is connected,
+- first local-model profile restricted in code to loopback HTTP(S) endpoints,
+- local model output remains proposal/data and never becomes authorization,
+- local-chat history remains process-local runtime context until the authoritative Memory design is accepted,
+- model/runtime artifact provenance and pinning reviewed before Ada distributes or auto-provisions model artifacts.
 
 Update this document whenever a new trust boundary, threat actor, data flow, or privileged capability is introduced.
