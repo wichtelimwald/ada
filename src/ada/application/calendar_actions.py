@@ -29,7 +29,7 @@ class CalendarActionResponse:
 
 
 class CalendarActionService:
-    """Authorize first, then hand one typed action to durable execution."""
+    """Validate, authorize, then hand one typed action to durable execution."""
 
     def __init__(self, *, guard: AdaGuard, durable_actions: DurableActionPort) -> None:
         self._guard = guard
