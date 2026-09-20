@@ -1,0 +1,360 @@
+# ADR-0007: Context-aware natural-language interpretation
+
+- **Status:** Proposed
+- **Date:** 2026-09-20
+
+## Context
+
+Ada should understand ordinary human phrasing without requiring users to learn a hidden command grammar.
+
+For example, on 2026-09-20 in Europe/Berlin:
+
+- "Zahnarzt am 21.10. um 16 Uhr" should not require the user to restate the obvious year merely because the model output schema uses an ISO date.
+- "morgen um 16 Uhr" should be resolvable from trusted runtime time context.
+- "in meinen Kalender" may eventually resolve through an explicit user/default-calendar preference.
+- multi-turn clarification such as "morgen um 16 Uhr" after an incomplete calendar request must remain linked to the pending typed action state.
+
+At the same time, Ada's security invariants remain unchanged:
+
+- model interpretation is not authority;
+- context, memory, habits, or learned preferences must not grant permissions;
+- derived values must remain distinguishable from explicit user input;
+- consequential action truth comes from Ada application/provider outcomes, never from free model text.
+
+PR #23 exposed the danger of trying to make natural-language intent recognition itself a deterministic security boundary. Finite verb/keyword lists are both bypassable and hostile to natural interaction. This ADR therefore separates four concerns:
+
+1. semantic interpretation of free language;
+2. injection of trusted runtime/user context;
+3. deterministic normalization and provenance of context-dependent values;
+4. authorization/execution.
+
+## Requirements
+
+The approach must:
+
+- preserve natural German and English interaction;
+- work with Python 3.14 and the current PydanticAI adapter;
+- remain local-first and replaceable;
+- avoid a growing Ada-owned dictionary/regex grammar for general language;
+- support partial and relative temporal expressions;
+- support explicit reference time, timezone, and locale;
+- eventually support known/default calendars and user-controlled preferences;
+- preserve provenance for every derived material value;
+- keep ambiguity visible rather than silently converting uncertain guesses into executable facts;
+- remain independent of AdaGuard authority decisions;
+- fit Ada's low-maintenance, reuse-first development model.
+
+## Reuse patterns reviewed
+
+### Mark LIV
+
+Mark LIV injects current date/time into the model context at session start and explicitly tells the model to use it when calculating reminder times. Its reminder tool then expects canonical date/time parameters.
+
+Useful pattern:
+
+- trusted runtime context is supplied to the model;
+- the model performs semantic interpretation;
+- a structured tool boundary receives canonical arguments.
+
+What Ada should not copy:
+
+- treating model normalization alone as sufficient provenance/validation;
+- coupling Ada's architecture to Mark LIV implementation details or licensing.
+
+Reference:
+- https://github.com/FatihMakes/Mark-LIV
+
+### OpenJarvis
+
+OpenJarvis has an explicit AgentContext, automatic memory context injection, and structured tool-calling agents. Relevant context is retrieved and prepended to the prompt with source attribution; tool calls are separated from final free text.
+
+Useful pattern:
+
+- context injection is a first-class pipeline concern;
+- conversation, tools, memory results, and metadata are distinct runtime inputs;
+- semantic routing/tool selection remains model-driven while execution stays structured.
+
+References:
+- https://github.com/open-jarvis/OpenJarvis/blob/main/docs/architecture/overview.md
+- https://github.com/open-jarvis/OpenJarvis/blob/main/docs/architecture/agents.md
+- https://github.com/open-jarvis/OpenJarvis/blob/main/docs/architecture/query-flow.md
+
+### PydanticAI
+
+PydanticAI already provides typed per-run dependencies through deps / RunContext. Dependencies can be consumed by dynamic instructions, tools, and output validators.
+
+This is a strong fit for supplying Ada-owned trusted context without introducing a second context framework.
+
+Reference:
+- https://pydantic.dev/docs/ai/core-concepts/dependencies/
+
+## Temporal normalization candidates
+
+### dateparser
+
+Current researched version: **1.4.3** (2026-09-03).
+
+Relevant properties:
+
+- BSD-3-Clause;
+- Python 3.14 explicitly supported;
+- pure-Python wheel;
+- actively maintained;
+- multilingual, including German;
+- RELATIVE_BASE supplies a trusted reference datetime;
+- PREFER_DATES_FROM can bias incomplete expressions toward future/past;
+- timezone-aware parsing is supported;
+- incomplete dates are explicitly supported.
+
+Important limitation:
+
+- the documentation warns that date extraction from arbitrary long text can produce false positives;
+- Ada should therefore prefer model-extracted temporal expressions as parser input rather than asking search_dates() to understand the whole user request.
+
+References:
+- https://pypi.org/project/dateparser/
+- https://dateparser.readthedocs.io/en/latest/
+- https://dateparser.readthedocs.io/en/latest/settings.html
+
+### quickadd / ctparse lineage
+
+Acreom's quickadd is an actively maintained fork of the archived Comtravo ctparse project.
+
+Relevant properties:
+
+- MIT;
+- Python implementation;
+- specifically designed for natural-language temporal interpretation;
+- German and English;
+- explicit reference time;
+- future-biased resolution of partial dates;
+- intervals, durations, recurring expressions, subject extraction;
+- the documented behavior explicitly treats e.g. "12.5." as the next 12 May relative to the reference time.
+
+Concerns:
+
+- packaging metadata still advertises old Python versions;
+- installation documentation points to GitHub rather than a mature current PyPI release path;
+- Python 3.14 compatibility is not documented;
+- project maturity/maintenance surface is smaller than dateparser.
+
+Reference:
+- https://github.com/Acreom/quickadd
+
+### Duckling
+
+Relevant properties:
+
+- mature temporal/entity parser;
+- German locale support;
+- explicit referenceTime, locale, and timezone context;
+- BSD-style licensing in source;
+- actively used and still maintained.
+
+Concerns for Ada:
+
+- Haskell runtime/build surface;
+- likely separate service/process or nontrivial embedding work;
+- materially higher operational and packaging cost than a Python library.
+
+Keep as a benchmark, not the default first integration candidate.
+
+Reference:
+- https://github.com/facebook/duckling
+
+### Microsoft Recognizers-Text
+
+Relevant properties:
+
+- MIT;
+- German DateTime support;
+- explicit reference datetime;
+- mature cross-language date/time extraction and resolution.
+
+Concerns for Ada:
+
+- Python packaging is stale: the published recognizers-text-suite package is still an alpha release from 2019 and advertises Python 3.6-era metadata;
+- repository development continues, but the Python distribution story is weak for a Python-3.14 project.
+
+Keep as a benchmark unless the packaging situation changes.
+
+References:
+- https://github.com/microsoft/Recognizers-Text
+- https://pypi.org/project/recognizers-text-suite/
+
+### HeidelTime
+
+Relevant properties:
+
+- strong multilingual temporal tagging and German support;
+- TIMEX3 normalization.
+
+Rejected for this Ada slice because:
+
+- Java/UIMA-oriented integration;
+- GPL-3.0;
+- optimized for document temporal tagging rather than lightweight interactive assistant input.
+
+Reference:
+- https://github.com/HeidelTime/heideltime
+
+## Decision direction
+
+### 1. Do not build an Ada natural-language grammar
+
+Ada will **not** maintain a general regex/keyword dictionary to decide what users mean.
+
+The LLM remains responsible for semantic interpretation into typed intent/draft structures.
+
+Deterministic code validates, normalizes, authorizes, and executes those structures.
+
+### 2. Reuse PydanticAI for trusted run context
+
+Introduce an Ada-owned, framework-neutral context value, provisionally:
+
+~~~
+InterpretationContext
+  now
+  timezone
+  locale
+  known/default calendars
+  later: selected user-controlled preferences/memory facts
+~~~
+
+The PydanticAI adapter supplies this through typed deps / RunContext.
+
+The Ada type remains independent of PydanticAI so another runtime can provide the same information later.
+
+### 3. Separate semantic extraction from deterministic normalization
+
+The desired flow is:
+
+~~~
+user natural language
+        |
+        v
+LLM semantic extraction
+  - typed intent
+  - raw temporal expression(s)
+  - raw target/calendar reference
+        |
+        v
+deterministic resolver adapter
+  - trusted reference time
+  - timezone / locale
+  - explicit resolution policy
+        |
+        v
+resolved draft + provenance
+        |
+        v
+Ada validation
+        |
+        v
+Proposal -> AdaGuard -> durable execution
+~~~
+
+The temporal resolver should receive focused temporal expressions rather than unrestricted full user text where possible.
+
+### 4. Add provenance as an Ada semantic, not a parser feature
+
+A resolved material field must be able to distinguish at least:
+
+- explicit — directly stated by the user/source;
+- context_derived — derived from trusted runtime context;
+- defaulted — filled from an explicit user/system default;
+- later, memory_derived — supplied from authoritative user-controlled Memory.
+
+Example:
+
+~~~
+raw:       "21.10."
+resolved:  2026-10-21
+provenance:
+  kind: context_derived
+  basis:
+    reference_date: 2026-09-20
+    timezone: Europe/Berlin
+    policy: prefer_future
+~~~
+
+Provenance describes why a value is present. It does not grant authority.
+
+### 5. Put temporal parsing behind an Ada port
+
+Do not expose one library's result model through Ada core.
+
+A future implementation should define a small Ada-owned TemporalResolverPort (name provisional) so that dateparser, quickadd, Duckling, or another implementation can be characterized or replaced without changing action semantics.
+
+### 6. Do not adopt a temporal library until characterization passes
+
+dateparser is the **preferred first candidate**, not yet an accepted dependency.
+
+quickadd is the most interesting specialist benchmark for Ada's appointment-oriented language.
+
+Duckling and Microsoft Recognizers-Text remain reference benchmarks.
+
+## Characterization suite required before acceptance
+
+Use a fixed trusted context, initially:
+
+~~~
+reference: 2026-09-20T12:00:00+02:00
+timezone:  Europe/Berlin
+locale:    de-DE
+~~~
+
+At minimum characterize:
+
+| Input / extracted expression | Property to verify |
+| --- | --- |
+| 21.10. | resolves to the next contextually appropriate 21 October |
+| 3.1. | crosses the year boundary rather than forcing the current year |
+| morgen um 16 Uhr | relative day + explicit time |
+| in 30 Minuten | relative duration |
+| Freitag | future weekday semantics |
+| nächsten Dienstag | document library semantics; do not silently accept an Ada policy until ambiguity is understood |
+| 21.10.2026 | explicit year is preserved exactly |
+| explicit past date | must remain explicit past; must not silently roll forward |
+| 21.10.26 | characterize two-digit-year behavior and require explicit Ada policy |
+| 04/05 | locale-sensitive ambiguity must be deterministic/visible |
+| Freitag 9-11 | interval extraction/resolution |
+| recurring phrasing | characterize but do not make recurring events an MVP requirement |
+| DST gap in Europe/Berlin | nonexistent local time must not silently become another time |
+| DST fold in Europe/Berlin | ambiguous local time must remain visible/qualified |
+
+Also characterize:
+
+- output precision and missing-part metadata;
+- input span/source attribution;
+- timezone behavior;
+- failure/ambiguity signaling;
+- determinism across repeated runs;
+- behavior with German/English mixed phrasing;
+- thread safety;
+- dependency footprint and installation on Python 3.14 / target Mac.
+
+## Acceptance criteria for the implementation choice
+
+The candidate can be accepted only if:
+
+1. the characterization suite passes with explicit documented policies;
+2. no Ada-owned natural-language dictionary is required for ordinary date interpretation;
+3. ambiguous or invalid values can fail safely without forcing verbose user input for obvious context;
+4. the dependency runs locally and cleanly on Python 3.14 / target Mac;
+5. license and NOTICE requirements are compatible with Ada;
+6. parser output can be mapped into Ada-owned provenance without leaking framework-specific types into core;
+7. replacement remains practical.
+
+## Likely next step
+
+Create a disposable characterization harness comparing at least:
+
+1. dateparser 1.4.x;
+2. Acreom quickadd;
+3. Duckling where practical;
+4. Microsoft Recognizers-Text where practical.
+
+The harness is research evidence only and should not become product code by default.
+
+After the characterization results, update this ADR with the selected temporal resolver, dependency/version, and explicit ambiguity policies before marking it Accepted.
