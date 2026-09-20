@@ -486,6 +486,46 @@ The strongest strategy to investigate next is:
 
 Detailed raw-result analysis is recorded in `research/context_awareness/RESULTS-2026-09-20.md`.
 
+## Characterization evidence — Run 2
+
+Run 2 tested two targeted questions:
+
+1. whether dateparser exposes enough semantic metadata to fail safely on type mismatches;
+2. whether Quickadd can preserve behavior without its bundled pickled scorer.
+
+Results:
+
+- dateparser remains **8/11** on explicit expected cases;
+- Quickadd with its bundled scorer remains **11/11**;
+- Quickadd with DummyScorer falls to **7/11**;
+- Quickadd vs DummyScorer: **10 agreements / 5 interpretation conflicts**.
+
+Dateparser metadata is useful but insufficient as a sole resolver:
+
+- `21.10.` is explicitly reported as parser period `time`, allowing Ada to reject a date-vs-time mismatch;
+- `morgen um 16 Uhr` still resolves incorrectly to 12:00 while reported only as `day`, so granularity metadata does not recover the lost time;
+- interval semantics remain weak for the representative appointment case.
+
+Quickadd's probabilistic scorer is materially involved in choosing correct parses for intervals, mixed-language time expressions, and full date-time cases. Simply disabling pickle loading and using DummyScorer is therefore not an acceptable production hardening strategy.
+
+### Safe-model feasibility finding
+
+Source inspection shows that Quickadd's trained scorer state consists only of primitive model data:
+
+- n-gram range;
+- string-to-integer vocabulary;
+- alpha;
+- two class-prior floats;
+- negative/positive log-likelihood float arrays.
+
+These values are directly representable in a transparent JSON schema. The model does **not** require an inherently pickle-specific runtime representation.
+
+This creates a plausible hardening path: convert the trusted pinned upstream model once in a controlled research/build step, then load only primitive JSON at runtime. A new `quickadd-json` characterization backend has been added to test whether this preserves exact semantics without runtime `pickle.load()`.
+
+Until that equivalence is demonstrated, Quickadd's privacy/security hard gate remains **TBD**.
+
+Detailed evidence is recorded in `research/context_awareness/RESULTS-2026-09-20-RUN2.md`.
+
 ## Acceptance criteria for the implementation choice
 
 The candidate can be accepted only if:
