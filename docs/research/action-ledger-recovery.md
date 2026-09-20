@@ -180,7 +180,7 @@ DBOS is an MIT-licensed Python durable-execution library. It runs in-process rat
 Current evidence:
 
 - Python >=3.10 including Python 3.14;
-- stable release 2.31.1 checked 2026-09-20;
+- latest release 3.0.0 checked 2026-09-20;
 - SQLite can be the system database and is the default for local/simple deployments;
 - workflows resume from the last completed durable step;
 - stable workflow IDs act as idempotency keys for workflow invocation;
