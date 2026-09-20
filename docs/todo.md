@@ -33,7 +33,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [x] Brain — initial agent-runtime/orchestration foundation ([ADR-0002](decisions/ADR-0002-agent-runtime-foundation.md)).
 - [ ] Memory — human-readable stores, agent memory, dedicated local stores, and credible hybrid alternatives.
 - [ ] Hands — computer control / action runtime.
-- [ ] Guard — permission/policy architecture.
+- [x] Guard — permission/policy architecture ([ADR-0004](decisions/ADR-0004-guard-permission-architecture.md)).
 - [ ] Eyes — screen/camera, only if required.
 - [ ] Local model runtime and model strategy.
 - [ ] Optional cloud/privacy-broker strategy, only if required.
