@@ -294,6 +294,72 @@ quickadd is the most interesting specialist benchmark for Ada's appointment-orie
 
 Duckling and Microsoft Recognizers-Text remain reference benchmarks.
 
+## Decision gates and scoring
+
+### Hard gates
+
+Hard gates are evaluated **before** any weighted scoring.
+
+A failed gate excludes a candidate; it cannot be compensated by a high score elsewhere.
+
+| Gate | Rule |
+| --- | --- |
+| License compatibility | Must be compatible with Ada's licensing/distribution strategy; otherwise reject |
+| Local/offline operation | Must not require a cloud service or external account for core parsing |
+| Privacy/security fit | Must not introduce hidden external egress or weaken Ada's authority boundaries |
+| Supported deployment path | Must be practically runnable on Ada's supported target environments |
+| Reproducible dependency path | Version/source must be pinnable and auditable |
+
+Unknowns remain TBD until characterized; TBD is not a pass.
+
+### Weighted decision matrix
+
+Only candidates that pass all hard gates are scored.
+
+| Criterion | Weight |
+| --- | ---: |
+| Ada characterization behavior | 30% |
+| Runtime / packaging fit | 15% |
+| Integration and provenance quality | 15% |
+| German/English and ambiguity handling | 10% |
+| Maintenance and release health | 10% |
+| Operational complexity | 10% |
+| Availability / redundancy contribution | 10% |
+| **Total** | **100%** |
+
+Scoring uses 1-5:
+
+- **5** — strong fit with little or no Ada-specific compensation;
+- **4** — good fit with small explicit policy/adaptation;
+- **3** — usable but requires meaningful Ada-side handling;
+- **2** — substantial maintenance, operational, or correctness burden;
+- **1** — poor fit; extensive custom behavior would be required.
+
+For the 30% characterization criterion, a candidate loses score when Ada would need to recreate temporal-language rules around it. A library that requires a growing Ada-owned parsing grammar is therefore penalized even if selected examples can be made to pass.
+
+### Redundant resolution as a characterized option
+
+Ada should not assume that every temporal value requires two parsers.
+
+The characterization step will evaluate four operational states:
+
+- **agreement** — both resolvers produce the same normalized semantic result;
+- **interpretation_conflict** — both produce results but disagree semantically;
+- **degraded_single_resolver** — only one resolver is available or can resolve the expression;
+- **unresolved** — neither resolves the expression.
+
+Agreement increases interpretation confidence but is not proof of truth.
+
+Disagreement is at least a correctness/safety signal. It becomes security-relevant when crafted input can create parser-differential confusion across a consequential boundary.
+
+The benchmark will inform which future runtime policy is justified:
+
+1. **single primary** — one resolver is sufficient for the relevant class of input;
+2. **primary + shadow** — one resolver is authoritative for interpretation while another continuously checks for disagreement and provides availability evidence;
+3. **dual consensus** — selected context-derived material values require semantic agreement before automatic execution;
+4. **degraded single-resolver mode** — if one implementation is unavailable, allow the other only for explicitly defined low-risk/unambiguous classes; otherwise ask for clarification.
+
+This allows redundancy to improve both **interpretation safety** and **availability/replaceability** without making Ada depend on two parsers for every explicit date.
 ## Characterization suite required before acceptance
 
 Use a fixed trusted context, initially:
@@ -346,15 +412,27 @@ The candidate can be accepted only if:
 6. parser output can be mapped into Ada-owned provenance without leaking framework-specific types into core;
 7. replacement remains practical.
 
-## Likely next step
+## Characterization harness
 
-Create a disposable characterization harness comparing at least:
+A disposable research harness lives under `research/context_awareness/`.
 
-1. dateparser 1.4.x;
-2. Acreom quickadd;
-3. Duckling where practical;
-4. Microsoft Recognizers-Text where practical.
+Initial executable candidates:
 
-The harness is research evidence only and should not become product code by default.
+1. dateparser 1.4.3;
+2. Acreom quickadd pinned to a concrete commit.
 
-After the characterization results, update this ADR with the selected temporal resolver, dependency/version, and explicit ambiguity policies before marking it Accepted.
+Each candidate is installed into an isolated temporary virtual environment and is not added to Ada's product dependencies.
+
+The harness records normalized results plus the redundancy states `agreement`, `interpretation_conflict`, `degraded_single_resolver`, and `unresolved`.
+
+Duckling and Microsoft Recognizers-Text remain secondary benchmarks where the additional setup cost is justified by unresolved questions from the first comparison.
+
+After the characterization results, update this ADR with:
+
+- hard-gate outcomes;
+- the completed weighted matrix;
+- the selected temporal resolver strategy;
+- whether runtime redundancy is single-primary, primary+shadow, selective dual-consensus, or another explicitly justified policy;
+- dependency/version and ambiguity policies.
+
+Only then should ADR-0007 move from Proposed to Accepted.
