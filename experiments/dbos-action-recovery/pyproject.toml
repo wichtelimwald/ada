@@ -3,5 +3,5 @@ name = "ada-dbos-action-recovery-probe"
 version = "0.0.0"
 requires-python = ">=3.14,<3.15"
 dependencies = [
-    "dbos==2.31.1",
+    "dbos==3.0.0",
 ]
