@@ -37,6 +37,10 @@ For Ada development:
 - Do not keep Mark LIV source code open as an implementation reference while writing equivalent Ada code.
 - If Mark LIV material is quoted, shown, or otherwise reused in documentation where the license permits it, preserve the required CC BY attribution and clearly identify the source and modifications.
 
+## Research-only unresolved artifact review
+
+- **Acreom Quickadd / ctparse, pinned research commit `0b3bfc26a7347a80821e86eb3838556a7adc2a30`** — the repository code is MIT-licensed. Its bundled `ctparse/models/model.pbz` scorer is used only in the disposable research characterization/conversion path. The reviewed source/package metadata does not separately establish the model's origin, training-data provenance, or redistribution terms. Ada therefore does not vendor or redistribute the scorer or its transformed JSON form, and the artifact license/provenance gate remains **CONDITIONAL** pending explicit evidence.
+
 ## Adopted dependencies
 
 - **PydanticAI 2.46.0** — MIT License. Used behind Ada's replaceable agent-runtime adapter.
