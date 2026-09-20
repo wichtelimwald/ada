@@ -617,6 +617,106 @@ ADR-0007 therefore does not require Ada to patch Duckling merely to complete the
 
 Detailed evidence is recorded in `research/context_awareness/RESULTS-DUCKLING-2026-09-20.md`.
 
+## Resolution decision policy
+
+The resolver layer does not return a scalar confidence score. Ada instead makes a deterministic decision from typed semantic expectations, provenance, resolver evidence, and validation state.
+
+### Typed temporal contract
+
+The LLM performs flexible semantic extraction and provides at least:
+
+- raw temporal expression / source span;
+- expected semantic kind: `date`, `time`, `datetime`, `interval`, `duration`, or later `recurrence`;
+- whether material components were explicit or require contextual derivation;
+- a coarse semantic form where policy matters, e.g. absolute date, partial date, relative duration, weekday, or qualified relative weekday.
+
+This typed contract is **not authority** and does not grant permission. It exists so deterministic code can reject incompatible parser output.
+
+Example: for `21.10.` used as an appointment date, the expected kind is `date`. A shadow parser that reports `time` / 21:10 is non-comparable evidence, not a competing valid date.
+
+### Canonical resolver evidence
+
+Each resolver result is mapped into an Ada-owned canonical evidence record:
+
+~~~text
+ResolverEvidence
+  resolver_id / version
+  health_state
+  parse_state
+  semantic_kind / granularity
+  normalized_value
+  source_span
+  parser_metadata
+~~~
+
+Parser-native types never cross the Ada port boundary.
+
+Resolver health and per-input parse outcome are separate concepts:
+
+- **operationally unavailable** — import/startup/health failure independent of the current expression;
+- **resolved** — current expression produced a typed result;
+- **unresolved** — healthy resolver found no result;
+- **input error/timeout** — current expression caused a parser error or resource limit.
+
+Only the first state permits degraded availability fallback. An input-triggered exception/timeout must **not** silently force another resolver path; it fails closed for that interpretation and is observable as a correctness/security signal.
+
+### Evidence comparison
+
+After canonicalization:
+
+- **corroborated** — primary and shadow return semantically equivalent comparable values;
+- **primary_valid_shadow_noncomparable** — primary matches the typed contract; shadow returns a different semantic kind/granularity;
+- **primary_valid_shadow_unresolved** — primary resolves; healthy shadow does not;
+- **material_conflict** — both return comparable values for the expected kind but differ materially;
+- **operational_degraded** — one resolver is independently unavailable before processing the expression;
+- **invalid_or_ambiguous** — deterministic validation finds invalid wall time, unresolved policy ambiguity, impossible date, etc.
+
+### Interpretation assurance levels
+
+The application/policy layer requests an assurance level; the temporal resolver does not decide action risk itself.
+
+| Assurance | Meaning | Initial use |
+| --- | --- | --- |
+| `standard` | one validated primary result may be sufficient unless comparable evidence conflicts | reversible MVP calendar drafting/proposals |
+| `corroborated` | contextual derivation requires two comparable agreeing resolvers, or an explicit deterministically validated value | future higher-consequence actions/policies |
+| `explicit_only` | no contextual temporal derivation is accepted | future domains where inferred timing is unacceptable |
+
+AdaGuard and authority checks remain downstream and independent. Passing interpretation assurance never grants execution permission.
+
+### Decision table
+
+| Situation | `standard` policy | `corroborated` policy |
+| --- | --- | --- |
+| Explicit complete value; deterministic validation passes | proceed; shadow optional | proceed |
+| Primary + shadow agree | proceed | proceed |
+| Primary valid; shadow result is incompatible with expected semantic kind | proceed, record shadow failure | do not count as corroboration; clarify unless value itself was explicit |
+| Primary valid; healthy shadow unresolved | proceed only if typed/validation checks pass and no explicit ambiguity policy applies | clarify |
+| Comparable primary/shadow values conflict | **clarify / no automatic proposal value** | **clarify / no automatic proposal value** |
+| Primary operationally unavailable; shadow valid | degraded operation allowed after typed/deterministic checks | clarify unless value was explicit |
+| Primary healthy but errors/timeouts on this input | **fail closed; do not silently fallback** | **fail closed** |
+| DST nonexistent/ambiguous wall time | clarify | clarify |
+| Explicit semantic ambiguity policy applies | clarify or use an explicit user preference if one exists | clarify |
+| Both unresolved/invalid | clarify | clarify |
+
+### Concrete MVP examples
+
+- **`21.10.`** — Quickadd resolves 2026-10-21; dateparser reports a `time` result (21:10). Expected kind is `date`, so the shadow result is non-comparable. Under `standard`, Ada may use 2026-10-21 with `context_derived` provenance without asking merely because the shadow parser misclassified the expression.
+- **`morgen um 16 Uhr`** — Quickadd returns the expected datetime; dateparser loses the time/granularity. Under `standard`, the valid primary result may proceed; the shadow mismatch is recorded.
+- **two comparable resolvers return 16:00 vs 04:00** — material conflict; Ada asks rather than choosing one.
+- **`nächsten Dienstag`** — the typed semantic form is a qualified relative weekday. German usage can be materially ambiguous, so initial policy is to clarify unless an explicit user-controlled preference later resolves this class.
+- **DST fold/gap** — always clarify; parser agreement does not turn an ambiguous or nonexistent local wall time into a valid instant.
+
+### Degraded availability
+
+Redundancy is also an availability mechanism, but degraded mode is deliberately bounded:
+
+- resolver availability is established independently of the current user expression;
+- if the primary is operationally unavailable, dateparser may serve as fallback under `standard` only when its result matches the typed expected kind/granularity and deterministic validation succeeds;
+- a current input that causes primary failure, timeout, or exception does not qualify as operational degradation;
+- every degraded resolution records resolver/version/provenance so later audit can distinguish it from the normal primary path.
+
+This prevents attacker-controlled or pathological input from deliberately knocking out the primary interpretation path merely to obtain different fallback semantics.
+
 ## Acceptance criteria for the implementation choice
 
 The candidate can be accepted only if:
