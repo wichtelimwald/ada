@@ -1,0 +1,112 @@
+{
+  "reference": "2026-09-20T12:00:00+02:00",
+  "timezone": "Europe/Berlin",
+  "locale": "de-DE",
+  "policy": {
+    "prefer_dates_from": "future",
+    "date_order": "DMY"
+  },
+  "cases": [
+    {
+      "id": "partial-date-october",
+      "group": "core",
+      "expression": "21.10.",
+      "expected": {"kind": "point", "local": "2026-10-21T00:00"},
+      "note": "Missing year should resolve to the next contextually appropriate date."
+    },
+    {
+      "id": "partial-date-year-rollover",
+      "group": "core",
+      "expression": "3.1.",
+      "expected": {"kind": "point", "local": "2027-01-03T00:00"},
+      "note": "Future bias must cross the year boundary."
+    },
+    {
+      "id": "tomorrow-at-16",
+      "group": "core",
+      "expression": "morgen um 16 Uhr",
+      "expected": {"kind": "point", "local": "2026-09-21T16:00"}
+    },
+    {
+      "id": "relative-30-minutes",
+      "group": "core",
+      "expression": "in 30 Minuten",
+      "expected": {"kind": "point", "local": "2026-09-20T12:30"}
+    },
+    {
+      "id": "future-weekday",
+      "group": "core",
+      "expression": "Freitag",
+      "expected": {"kind": "point", "local": "2026-09-25T00:00"}
+    },
+    {
+      "id": "explicit-full-date",
+      "group": "core",
+      "expression": "21.10.2026",
+      "expected": {"kind": "point", "local": "2026-10-21T00:00"}
+    },
+    {
+      "id": "explicit-past-date",
+      "group": "core",
+      "expression": "21.10.2024",
+      "expected": {"kind": "point", "local": "2024-10-21T00:00"},
+      "note": "An explicit past year must not silently roll forward."
+    },
+    {
+      "id": "next-tuesday-policy",
+      "group": "policy",
+      "expression": "nächsten Dienstag",
+      "expected": null,
+      "note": "Record parser semantics; German usage can be ambiguous between the immediately upcoming and following Tuesday."
+    },
+    {
+      "id": "two-digit-year-policy",
+      "group": "policy",
+      "expression": "21.10.26",
+      "expected": null,
+      "note": "Record century inference; Ada must define an explicit policy before automatic execution."
+    },
+    {
+      "id": "slash-date-policy",
+      "group": "policy",
+      "expression": "04/05",
+      "expected": null,
+      "note": "Characterize locale/date-order ambiguity."
+    },
+    {
+      "id": "interval-friday",
+      "group": "extended",
+      "expression": "Freitag 9-11",
+      "expected": {"kind": "interval", "start": "2026-09-25T09:00", "end": "2026-09-25T11:00"},
+      "note": "Informational capability; the LLM may also split date and time interval before resolution."
+    },
+    {
+      "id": "recurring-weekly",
+      "group": "extended",
+      "expression": "jeden Freitag um 16 Uhr",
+      "expected": null,
+      "note": "Recurring events are not an MVP requirement; record capability only."
+    },
+    {
+      "id": "mixed-language",
+      "group": "extended",
+      "expression": "morgen 4pm",
+      "expected": {"kind": "point", "local": "2026-09-21T16:00"},
+      "note": "Characterize common German/English mixing."
+    },
+    {
+      "id": "dst-gap",
+      "group": "safety",
+      "expression": "29.03.2026 02:30",
+      "expected": {"kind": "point", "local": "2026-03-29T02:30", "wall_time_status": "nonexistent"},
+      "note": "Europe/Berlin spring-forward gap. Parser may return the wall time, but Ada must detect that it does not exist."
+    },
+    {
+      "id": "dst-fold",
+      "group": "safety",
+      "expression": "25.10.2026 02:30",
+      "expected": {"kind": "point", "local": "2026-10-25T02:30", "wall_time_status": "ambiguous"},
+      "note": "Europe/Berlin fall-back fold. Ada must not silently choose one instant."
+    }
+  ]
+}
