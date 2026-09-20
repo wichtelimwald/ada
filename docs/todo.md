@@ -38,7 +38,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [ ] Hands — computer control / action runtime.
 - [x] Guard — permission/policy architecture ([ADR-0004](decisions/ADR-0004-guard-permission-architecture.md)).
 - [ ] Eyes — screen/camera, only if required.
-- [ ] Local model runtime and model strategy — self-hosted Ollama proposed as the initial baseline, pending target-Mac chat validation ([ADR-0006](decisions/ADR-0006-local-model-runtime.md)).
+- [x] Local model runtime and model strategy — self-hosted Ollama accepted; qwen3.5:9b is the configurable target-Mac baseline ([ADR-0006](decisions/ADR-0006-local-model-runtime.md)).
 - [ ] Optional cloud/privacy-broker strategy, only if required.
 
 ## P3 — Implementation foundation
@@ -46,7 +46,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [x] Create implementation scaffold only after the relevant ADRs are accepted.
 - [x] Add package/dependency management appropriate to the selected stack.
 - [x] Add local validation commands.
-- [ ] Re-validate the first real local multi-turn chat on target hardware after the first manual run exposed banner noise, weak history recall on a self-referential prompt, and a false "action completed" claim. Accept ADR-0006 only after the corrected path passes.
+- [x] Re-validate real local multi-turn chat on target hardware; final qwen3.5:9b run passed 50 tests and the local-chat acceptance flow, enabling ADR-0006 acceptance.
 - [ ] Define/select the authoritative Memory backend and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
 - [ ] Connect local-chat typed action proposals to the existing AdaGuard + durable-action path; do not expose direct privileged model tools.
 - [ ] Add Dependabot configuration only after package ecosystems actually exist.
