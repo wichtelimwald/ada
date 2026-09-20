@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from importlib import metadata
 import json
 from pathlib import Path
+import sys
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -261,7 +262,7 @@ def main() -> int:
     if args.require_all_expected and failed:
         print(
             f"ERROR: {args.backend} failed {len(failed)} explicitly expected case(s).",
-            file=__import__("sys").stderr,
+            file=sys.stderr,
         )
         return 1
     return 0
