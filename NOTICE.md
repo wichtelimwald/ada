@@ -40,11 +40,8 @@ For Ada development:
 ## Adopted dependencies
 
 - **PydanticAI 2.46.0** — MIT License. Used behind Ada's replaceable agent-runtime adapter.
-
-## Accepted / selected dependencies pending full implementation merge
-
-- **Cedar Policy 4.12.0** — Apache License 2.0. Accepted as Ada's authorization engine by ADR-0004.
-- **cedarpy 4.12.0** — Apache License 2.0. Selected community Python/PyO3 integration layer for Cedar; kept behind AdaGuard and replaceable.
+- **cedarpy 4.12.0** — Apache License 2.0. Community-maintained Python/PyO3 binding used only behind AdaGuard.
+- **Cedar Policy engine 4.12.0** — Apache License 2.0. Embedded by cedarpy as the authorization engine selected by ADR-0004.
 
 Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; third-party code is not relicensed as Ada MIT code. Required license and NOTICE material must be preserved when distribution obligations apply.
 
