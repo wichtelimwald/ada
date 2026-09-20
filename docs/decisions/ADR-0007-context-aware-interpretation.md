@@ -217,8 +217,6 @@ InterpretationContext
   now
   timezone
   locale
-  known/default calendars
-  later: selected user-controlled preferences/memory facts
 ~~~
 
 The PydanticAI adapter supplies this through typed deps / RunContext.
@@ -258,27 +256,30 @@ The temporal resolver should receive focused temporal expressions rather than un
 
 ### 4. Add provenance as an Ada semantic, not a parser feature
 
-A resolved material field must be able to distinguish at least:
+A resolved material field must distinguish how its value was derived.
 
-- explicit — directly stated by the user/source;
-- context_derived — derived from trusted runtime context;
-- defaulted — filled from an explicit user/system default;
-- later, memory_derived — supplied from authoritative user-controlled Memory.
+For this ADR the initial derivation kinds are deliberately limited to:
+
+- explicit — directly and deterministically corroborated from the source;
+- context_derived — derived from trusted runtime context plus an explicit resolution policy;
+- defaulted — filled from an explicit configured default.
+
+Memory-derived values are intentionally deferred to the later Memory architecture decision.
 
 Example:
 
 ~~~
 raw:       "21.10."
 resolved:  2026-10-21
-provenance:
+derivation:
   kind: context_derived
   basis:
     reference_date: 2026-09-20
     timezone: Europe/Berlin
-    policy: prefer_future
+    resolution_policy: temporal-defaults/v1
 ~~~
 
-Provenance describes why a value is present. It does not grant authority.
+Value derivation explains why a value is present. It does not grant authority.
 
 ### 5. Put temporal parsing behind an Ada port
 
@@ -317,18 +318,18 @@ Unknowns remain TBD until characterized; TBD is not a pass.
 
 | Candidate | License | Local/offline | Privacy/security | Deployment path | Reproducible source | Gate result |
 | --- | --- | --- | --- | --- | --- | --- |
-| dateparser 1.4.3 | PASS — BSD-3-Clause | PASS | PASS | PASS — Python 3.14 target Mac | PASS — pinned release | **PASS** |
-| Quickadd 0.6.5 + safe JSON scorer | PASS — MIT | PASS | **CONDITIONAL PASS** — no runtime pickle; production artifact path still to formalize | PASS — Python 3.14 target Mac; Linux validation remains | PASS — pinned commit + versioned JSON artifact required | **CONDITIONAL** |
-| Duckling 59a13ff8 | PASS — BSD-3-Clause | PASS | PASS in reviewed design | **FAIL for initial Ada use** — pinned upstream Dockerfile does not build without modernization | PASS — pinned commit | **EXCLUDED before scoring** |
+| dateparser 1.4.3 | PASS — BSD-3-Clause | PASS | PASS | PASS — Python 3.14 target Mac | **CONDITIONAL** — top-level release pinned, transitive graph not yet locked | **CONDITIONAL** |
+| Quickadd 0.6.5 + safe JSON scorer | PASS — MIT | PASS | **CONDITIONAL PASS** — no runtime pickle; production artifact path still to formalize | PASS — Python 3.14 target Mac; Linux validation remains | **CONDITIONAL** — source commit pinned, transitive graph + JSON artifact provenance not yet fully locked | **CONDITIONAL** |
+| Duckling 59a13ff8 | PASS — BSD-3-Clause | PASS | PASS in reviewed design | **NOT DEMONSTRATED for Ada container path** — pinned upstream Dockerfile fails without modernization; native Haskell path exists upstream | PASS — pinned commit | **DEFERRED / NOT SELECTED** |
 | Microsoft Recognizers-Text | PASS — MIT | PASS | PASS in reviewed design | TBD — stale Python distribution path | TBD | **DEFERRED** |
 | HeidelTime | **FAIL for Ada's MIT distribution strategy** — GPL-3.0 | PASS | PASS in reviewed design | Java/UIMA burden | PASS | **EXCLUDED before scoring** |
 
-A conditional gate is not equivalent to a pass. Quickadd becomes eligible only after Ada defines a reproducible no-pickle model artifact and loader strategy.
+A conditional gate is not equivalent to a pass. Before dependency adoption, Ada must capture a fully resolved dependency graph and, for Quickadd, define a reproducible no-pickle model artifact and loader strategy.
 
 
 ### Current scored candidates
 
-Only candidates that have not failed a hard gate are compared below. Quickadd's score remains provisional until its conditional security/deployment gate is closed.
+The scores below are **provisional research scores**. Neither Python candidate has yet closed the reproducibility gate, and Quickadd additionally has a conditional safe-artifact integration gate.
 
 | Criterion | Weight | dateparser | Quickadd + safe JSON |
 | --- | ---: | ---: | ---: |
@@ -345,7 +346,7 @@ Interpretation:
 
 - **dateparser** is the stronger maintenance/packaging choice but materially weaker on Ada's appointment-language corpus.
 - **Quickadd + safe JSON scorer** is the stronger semantic fit and current primary candidate, but Ada would own a small hardened integration surface.
-- **Duckling is not scored** because it failed the deployment hard gate for the initial Ada path; a low weighted score would incorrectly imply that strong semantics could compensate for that blocker.
+- **Duckling is not scored** because semantic characterization never ran: the pinned upstream container path failed before parsing, while a native/polyglot path would add the exact operational burden ADR-0003 deliberately avoids for the initial topology. This is a defer/not-select decision, not a claim that Duckling is impossible to run.
 
 ### Weighted decision matrix
 
@@ -376,12 +377,15 @@ For the 30% characterization criterion, a candidate loses score when Ada would n
 
 Ada should not assume that every temporal value requires two parsers.
 
-The characterization step will evaluate four operational states:
+The characterization comparison records result states without inferring runtime health:
 
 - **agreement** — both resolvers produce the same normalized semantic result;
 - **interpretation_conflict** — both produce results but disagree semantically;
-- **degraded_single_resolver** — only one resolver is available or can resolve the expression;
-- **unresolved** — neither resolves the expression.
+- **single_resolver_result** — only one resolver resolves the expression and neither reports an input error;
+- **input_error** — at least one resolver raised an input-specific exception/error while processing the expression;
+- **unresolved** — neither resolver resolves the expression and neither reports an input error.
+
+Operational availability is a separate runtime signal and must not be inferred from a parser returning no result.
 
 Agreement increases interpretation confidence but is not proof of truth.
 
@@ -494,7 +498,7 @@ Provisional weighted score **if all hard gates passed**:
 - dateparser: **3.50 / 5.00**;
 - quickadd: **4.05 / 5.00**.
 
-Do not interpret these numbers as the decision while quickadd's security gate remains TBD.
+At Run 1 this security gate was still TBD. Run 3 later demonstrated a behaviorally equivalent JSON-backed scorer; the remaining gate is the reproducible production artifact/loader strategy.
 
 ### Security / maintenance finding: quickadd model loading
 
@@ -557,7 +561,7 @@ These values are directly representable in a transparent JSON schema. The model 
 
 This creates a plausible hardening path: convert the trusted pinned upstream model once in a controlled research/build step, then load only primitive JSON at runtime. A new `quickadd-json` characterization backend has been added to test whether this preserves exact semantics without runtime `pickle.load()`.
 
-Until that equivalence is demonstrated, Quickadd's privacy/security hard gate remains **TBD**.
+At Run 2 the no-pickle equivalence was still unproven. Run 3 later demonstrated equivalent behavior with a JSON-backed scorer; this Run 2 statement is retained only as historical research context.
 
 Detailed evidence is recorded in `research/context_awareness/RESULTS-2026-09-20-RUN2.md`.
 
@@ -613,7 +617,7 @@ This is **not** counted as a temporal-semantic failure or license failure. It is
 - Ada would need to maintain a Haskell/service runtime in addition to Python;
 - even the reference packaging path requires modernization before evaluation.
 
-ADR-0007 therefore does not require Ada to patch Duckling merely to complete the benchmark. Duckling remains a future replacement/reference candidate, but is rejected as the preferred initial resolver on runtime/packaging and operational-complexity grounds.
+ADR-0007 therefore does not require Ada to patch Duckling merely to complete the benchmark. Duckling remains a future replacement/reference candidate and is not selected for the initial resolver because the evaluated container path is stale and a native/polyglot integration conflicts with the simplicity goals already accepted in ADR-0003.
 
 Detailed evidence is recorded in `research/context_awareness/RESULTS-DUCKLING-2026-09-20.md`.
 
@@ -667,7 +671,9 @@ After canonicalization:
 - **corroborated** — primary and shadow return semantically equivalent comparable values;
 - **primary_valid_shadow_noncomparable** — primary matches the typed contract; shadow returns a different semantic kind/granularity;
 - **primary_valid_shadow_unresolved** — primary resolves; healthy shadow does not;
+- **primary_unresolved_shadow_valid** — healthy primary does not resolve; shadow resolves;
 - **material_conflict** — both return comparable values for the expected kind but differ materially;
+- **input_error** — at least one healthy resolver errors or times out on the current expression;
 - **operational_degraded** — one resolver is independently unavailable before processing the expression;
 - **invalid_or_ambiguous** — deterministic validation finds invalid wall time, unresolved policy ambiguity, impossible date, etc.
 
@@ -691,6 +697,7 @@ AdaGuard and authority checks remain downstream and independent. Satisfying a re
 | Primary + shadow agree | proceed | proceed |
 | Primary valid; shadow result is incompatible with expected semantic kind | proceed, record shadow failure | do not count as corroboration; clarify unless value itself was explicit |
 | Primary valid; healthy shadow unresolved | proceed only if typed/validation checks pass and no explicit ambiguity policy applies | clarify |
+| Primary healthy but unresolved; shadow valid | **clarify; do not treat non-resolution as degradation or fallback authority** | **clarify** |
 | Comparable primary/shadow values conflict | **clarify / no automatic proposal value** | **clarify / no automatic proposal value** |
 | Primary operationally unavailable; shadow valid | degraded operation allowed after typed/deterministic checks | clarify unless value was explicit |
 | Primary healthy but errors/timeouts on this input | **fail closed; do not silently fallback** | **fail closed** |
@@ -761,7 +768,26 @@ Reason: adding these would turn `InterpretationContext` into a cross-domain God-
 
 Calendar/default-calendar resolution should later have its own domain context/type. Memory-selected preferences should enter through an explicit, provenance-carrying input rather than being copied wholesale into this object.
 
-### 2. `TemporalExpression`
+### 2. `SourceLocator`
+
+Purpose: identify the exact user/source material from which an expression or explicit value was derived, including multi-turn conversations.
+
+Minimal conceptual fields:
+
+~~~text
+SourceLocator
+  source_ref: opaque Ada-owned source/turn identifier
+  start: integer
+  end: integer
+~~~
+
+The locator references source content owned by the surrounding interaction/archive layer; it does not copy the full conversation into the temporal model.
+
+A model-provided span or source identifier is advisory until Ada verifies it against the actual source record.
+
+This is required because a bare character span is ambiguous once a draft is completed across multiple turns.
+
+### 3. `TemporalExpression`
 
 Purpose: Ada-owned normalized semantic request presented to temporal resolvers.
 
@@ -772,12 +798,12 @@ TemporalExpression
   raw_text: str
   expected_kind: date | time | datetime | interval | duration | recurrence
   semantic_form: absolute | partial | relative | weekday | qualified_weekday | other
-  source_span: verified text span
+  source: verified SourceLocator
 ~~~
 
 `raw_text` is still untrusted user/model-derived content. `expected_kind` and `semantic_form` are semantic claims, not facts or authority.
 
-`source_span` is accepted into the Ada-owned type only after deterministic verification against the original source text. A model-provided offset is advisory until verified.
+`source` is accepted into the Ada-owned type only after deterministic verification against the referenced source record. A model-provided source reference or offset is advisory until verified.
 
 Explicitly excluded:
 
@@ -790,7 +816,30 @@ Explicitly excluded:
 
 Reason: this type says *what needs interpretation*, not *what the answer is*.
 
-### 3. `ResolverEvidence`
+### 4. `TemporalResolutionPolicy`
+
+Purpose: version the deterministic interpretation defaults that are neither environment facts nor user authority.
+
+Conceptually:
+
+~~~text
+TemporalResolutionPolicy
+  policy_id: str
+  version: str
+  date_order: DMY | MDY | YMD
+  incomplete_date_direction: future | past | nearest
+  qualified_weekday_policy: clarify | configured_semantics
+~~~
+
+Adapters map this Ada-owned policy to parser-specific settings such as dateparser's `PREFER_DATES_FROM` or Quickadd's date format.
+
+The policy is not part of `InterpretationContext` because changing a parsing rule is a product-policy/configuration change, not a change in the current environment.
+
+The policy is recorded in `ValueDerivation` so a context-derived value can be reconstructed later.
+
+It contains no permissions, identity, or learned Memory preferences.
+
+### 5. `ResolverEvidence`
 
 Purpose: canonical Ada-owned representation of one resolver's observation.
 
@@ -821,7 +870,7 @@ Explicitly excluded:
 
 Reason: evidence must remain comparable across Quickadd, dateparser, or future resolvers.
 
-### 4. `ValueDerivation`
+### 6. `ValueDerivation`
 
 Purpose: explain how a material resolved value came to exist.
 
@@ -842,7 +891,7 @@ For a context-derived temporal value the derivation records only the minimum rec
 ~~~text
 ValueDerivation
   kind
-  source_span
+  source: SourceLocator
   reference_time
   timezone
   locale
@@ -861,9 +910,11 @@ Explicitly excluded:
 - secret/provider credentials;
 - a numerical confidence score.
 
+`explicit` may be assigned only when Ada deterministically corroborates the material temporal components against the verified source record; a model cannot make a value explicit merely by labeling it so.
+
 Rule: **derivation can explain a value but can never authorize an action**.
 
-### 5. `TemporalResolution`
+### 7. `TemporalResolution`
 
 Purpose: Ada-owned validated interpretation result after resolver comparison and deterministic temporal validation.
 
@@ -890,7 +941,7 @@ Resolver evidence may be attached to an ephemeral resolution trace for diagnosti
 
 Reason: action identity should describe *what Ada intends to do*, not which parser happened to produce the date.
 
-### 6. `ResolutionRequirement`
+### 8. `ResolutionRequirement`
 
 Purpose: caller-requested interpretation strictness.
 
@@ -977,7 +1028,7 @@ Initial executable candidates:
 
 Each candidate is installed into an isolated temporary virtual environment and is not added to Ada's product dependencies.
 
-The harness records normalized results plus the redundancy states `agreement`, `interpretation_conflict`, `degraded_single_resolver`, and `unresolved`.
+The harness records normalized results plus the redundancy states `agreement`, `interpretation_conflict`, `single_resolver_result`, `input_error`, and `unresolved`.
 
 Duckling and Microsoft Recognizers-Text remain secondary benchmarks where the additional setup cost is justified by unresolved questions from the first comparison.
 
