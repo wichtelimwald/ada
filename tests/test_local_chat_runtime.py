@@ -2,12 +2,18 @@ from __future__ import annotations
 
 import unittest
 from typing import Any, Sequence
+from unittest.mock import patch
+
+import pydantic_ai
 
 from ada.adapters.local_ollama import (
     LocalModelConfigurationError,
+    LocalOllamaConfig,
+    build_local_ollama_runtime,
     validate_local_ollama_base_url,
 )
 from ada.adapters.pydantic_ai import PydanticAIRuntime
+from ada.core.actions import CreateCalendarEventProposal
 from ada.ports.agent_runtime import AgentRequest
 
 
@@ -59,6 +65,58 @@ class LocalChatRuntimeTests(unittest.TestCase):
         runtime.reset_session()
         runtime.run(AgentRequest(text="after reset"))
         self.assertIsNone(agent.calls[2][1])
+
+    def test_local_runtime_configures_typed_calendar_proposal_output(self) -> None:
+        captured: dict[str, Any] = {}
+
+        class FakeProvider:
+            def __init__(self, *, base_url: str) -> None:
+                captured["base_url"] = base_url
+
+        class FakeModel:
+            def __init__(self, name: str, *, provider: Any, settings: Any) -> None:
+                captured["model_name"] = name
+                captured["provider"] = provider
+                captured["settings"] = settings
+
+        class FakeAgent:
+            def __init__(
+                self,
+                model: Any,
+                *,
+                instructions: str,
+                output_type: list[type[Any]],
+            ) -> None:
+                captured["agent_model"] = model
+                captured["instructions"] = instructions
+                captured["output_type"] = output_type
+
+            def run_sync(
+                self,
+                prompt: str,
+                *,
+                message_history: Sequence[Any] | None = None,
+            ) -> FakeRunResult:
+                del message_history
+                return FakeRunResult(prompt, ())
+
+        previous_banner = pydantic_ai.BANNER_ENABLED
+        try:
+            with (
+                patch("ada.adapters.local_ollama.OllamaProvider", FakeProvider),
+                patch("ada.adapters.local_ollama.OllamaModel", FakeModel),
+                patch("ada.adapters.local_ollama.Agent", FakeAgent),
+            ):
+                runtime = build_local_ollama_runtime(LocalOllamaConfig())
+        finally:
+            pydantic_ai.BANNER_ENABLED = previous_banner
+
+        self.assertIsInstance(runtime, PydanticAIRuntime)
+        self.assertEqual(
+            captured["output_type"],
+            [str, CreateCalendarEventProposal],
+        )
+        self.assertIn("do not claim it happened", captured["instructions"])
 
     def test_local_ollama_profile_rejects_non_loopback_endpoints(self) -> None:
         for url in (
