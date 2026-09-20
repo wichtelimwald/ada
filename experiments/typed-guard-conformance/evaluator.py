@@ -67,6 +67,7 @@ class GuardDecision:
     effect: Effect
     reason_code: str
     matched_rule_ids: tuple[str, ...]
+    policy_version: str
 
 
 def _matches(value: object, allowed: FrozenSet[object] | None) -> bool:
@@ -112,13 +113,12 @@ def evaluate(
     *,
     policy_version: str = "prototype-v1",
 ) -> GuardDecision:
-    del policy_version  # kept in the call shape for the future Ada-owned result type
-
     if not request.actor or not request.action or not request.resource or not request.channel:
         return GuardDecision(
             effect=Effect.DENY,
             reason_code="invalid_request",
             matched_rule_ids=(),
+            policy_version=policy_version,
         )
 
     matched = [rule for rule in rules if _rule_matches(rule, request)]
@@ -131,6 +131,7 @@ def evaluate(
             effect=Effect.DENY,
             reason_code="explicit_deny",
             matched_rule_ids=deny_ids,
+            policy_version=policy_version,
         )
 
     allow_ids = tuple(
@@ -141,10 +142,12 @@ def evaluate(
             effect=Effect.ALLOW,
             reason_code="matching_grant",
             matched_rule_ids=allow_ids,
+            policy_version=policy_version,
         )
 
     return GuardDecision(
         effect=Effect.DENY,
         reason_code="no_matching_grant",
         matched_rule_ids=(),
+        policy_version=policy_version,
     )
