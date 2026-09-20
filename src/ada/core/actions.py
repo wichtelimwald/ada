@@ -31,14 +31,14 @@ class ActionProposal(Protocol):
 class CreateCalendarEventDraft:
     """Non-executable calendar intent that may contain unresolved details."""
 
-    title: str | None = None
-    date: str | None = None
-    start_time: str | None = None
-    end_time: str | None = None
-    calendar_id: str | None = None
-    location: str | None = None
-    language: Literal["de", "en"] = "en"
-    unresolved: tuple[str, ...] = ()
+    title: str | None
+    date: str | None
+    start_time: str | None
+    end_time: str | None
+    calendar_id: str | None
+    location: str | None
+    language: Literal["de", "en"]
+    unresolved: tuple[str, ...]
 
     @property
     def kind(self) -> Literal["calendar.create.draft"]:
