@@ -143,10 +143,39 @@ or edits the authoritative external memory accordingly.
 - changing the calendar merely because memory changed, without the required authority;
 - claiming an external calendar update occurred when only memory was edited.
 
+## S6 — Hold a coherent local conversation
+
+### Input
+
+A user starts a local text session and asks:
+
+> Who are you?
+
+After Ada answers, the user asks a follow-up that depends on the immediately preceding turn.
+
+### Expected behavior
+
+1. Ada answers as a modern personal assistant inspired by Ada Lovelace, not as the historical person.
+2. Ada's tone reflects the personality baseline: analytical, imaginative, calm, concise, and practical.
+3. Ada can use prior turns from the current process-local session to answer the follow-up coherently.
+4. Ada does not imply that the session history is persistent authoritative Memory.
+5. The first local profile sends model requests only to the configured loopback model service.
+6. No consequential action is executed merely because the conversation model proposes or mentions one.
+
+### Unacceptable behavior
+
+- claiming to be Ada Lovelace or inventing nineteenth-century memories;
+- presenting temporary conversation history as durable Memory;
+- sending the "local" chat to a non-loopback model endpoint;
+- treating model confidence, personality, or conversation history as authority;
+- directly executing privileged tools from the chat model.
+
+---
+
 ## How these scenarios are used
 
 These scenarios are the initial architecture/test anchors.
 
 A component or framework is useful only if it helps implement these behaviors without weakening Ada's boundaries.
 
-The first implementation slice should cover **S1 + the conflict-detection part of S2** before expanding to email, private-family views, contradiction handling, or long-term memory.
+The first implementation slice covered **S1 + the conflict-detection part of S2**. The next interaction slice targets **S6** before connecting local chat to real providers, email, private-family views, contradiction handling, or long-term memory.
