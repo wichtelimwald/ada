@@ -30,6 +30,7 @@
 - policy/tool layer ↔ operating system,
 - local components ↔ explicit remote-egress boundary,
 - trusted project code ↔ third-party dependencies/plugins/models,
+- AdaGuard ↔ pinned `cedarpy` / embedded Cedar native policy engine,
 - external content ↔ model context.
 
 ## Threats to evaluate
@@ -42,6 +43,9 @@
 - sensitive-data leakage to cloud/sync/telemetry providers,
 - secrets in prompts/logs/memory,
 - supply-chain compromise,
+- authorization-engine/binding compromise or semantic drift,
+- malicious or invalid grant/policy configuration,
+- attacker-controlled time/provenance/assurance context attempting to expand authority,
 - malicious plugins/skills/MCP servers/model artifacts,
 - sandbox escape or local privilege escalation,
 - unauthorized microphone/camera/screen capture,
@@ -60,6 +64,11 @@
 - reversible actions where practical,
 - auditable behavior without sensitive logs,
 - dependency provenance and pinning strategy,
-- fail-closed behavior for sensitive authorization boundaries.
+- fail-closed behavior for sensitive authorization boundaries,
+- Ada-owned authorization request/decision types with Cedar isolated behind AdaGuard,
+- pinned Cedar binding/engine plus permanent conformance tests on upgrades,
+- policy/schema validation before activation,
+- trusted Guard-owned clock for expiry evaluation rather than caller/model-provided time,
+- privileged grant/policy mutation separate from policy evaluation.
 
 Update this document whenever a new trust boundary, threat actor, data flow, or privileged capability is introduced.
