@@ -1,6 +1,6 @@
 # ADR-0004: Use Cedar behind the Ada-owned Guard boundary
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-20
 
 ## Context
