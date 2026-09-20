@@ -988,7 +988,7 @@ model output / draft
         ↓
 verified TemporalExpression(s)
         ↓
-InterpretationContext + ResolutionRequirement
+InterpretationContext + TemporalResolutionPolicy + ResolutionRequirement
         ↓
 TemporalResolverPort(s) -> ResolverEvidence
         ↓
@@ -1005,39 +1005,45 @@ AdaGuard
 
 This keeps framework choice, parser choice, derivation evidence, action identity, and authorization independently replaceable.
 
-## Acceptance criteria for the implementation choice
+## Acceptance criteria for ADR-0007
 
-The candidate can be accepted only if:
+The proposed resolver strategy can move from Proposed to Accepted only when:
 
-1. the characterization suite passes with explicit documented policies;
-2. no Ada-owned natural-language dictionary is required for ordinary date interpretation;
-3. ambiguous or invalid values can fail safely without forcing verbose user input for obvious context;
-4. the dependency runs locally and cleanly on Python 3.14 / target Mac;
-5. license and NOTICE requirements are compatible with Ada;
-6. parser output can be mapped into Ada-owned provenance without leaking framework-specific types into core;
-7. replacement remains practical.
+1. the representative characterization corpus and explicit ambiguity policies are documented;
+2. no Ada-owned natural-language dictionary is required for ordinary temporal interpretation;
+3. ambiguous, invalid, or conflicting values fail safely without forcing verbose input for obvious context;
+4. the selected primary and shadow adapters map into Ada-owned evidence/derivation types without leaking framework-specific types into core;
+5. license and NOTICE obligations are compatible with Ada's project/distribution strategy;
+6. the complete production dependency graph is pinned/auditable rather than only top-level packages;
+7. the Quickadd primary path has a reproducible, versioned, integrity-checked JSON scorer artifact and does not deserialize pickle in Ada's normal build/runtime path;
+8. the selected production adapters are validated in Ada's supported Python/container deployment path, including the future Linux path before that path is claimed supported;
+9. resolver operational health is established independently from per-expression parse outcomes;
+10. replacement through the Ada-owned temporal resolver port remains practical.
+
+The current research closes the semantic-feasibility question but **does not yet close items 6-8**. Therefore ADR-0007 remains Proposed.
 
 ## Characterization harness
 
-A disposable research harness lives under `research/context_awareness/`.
+The disposable research harness lives under `research/context_awareness/`.
 
-Initial executable candidates:
+Current research variants include:
 
 1. dateparser 1.4.3;
-2. Acreom quickadd pinned to a concrete commit.
+2. Acreom Quickadd pinned to commit `0b3bfc26a7347a80821e86eb3838556a7adc2a30`;
+3. Quickadd with its scorer disabled, used only to characterize scorer importance;
+4. Quickadd with the trained scorer reconstructed from primitive JSON;
+5. an optional pinned-source Duckling container benchmark, which currently fails in the upstream Buster-based build before semantic execution.
 
-Each candidate is installed into an isolated temporary virtual environment and is not added to Ada's product dependencies.
+The Python candidates are installed into isolated temporary virtual environments and are not Ada product dependencies.
 
-The harness records normalized results plus the redundancy states `agreement`, `interpretation_conflict`, `single_resolver_result`, `input_error`, and `unresolved`.
+The comparison records `agreement`, `interpretation_conflict`, `single_resolver_result`, `input_error`, and `unresolved`. These are research-result states, not runtime health states.
 
-Duckling and Microsoft Recognizers-Text remain secondary benchmarks where the additional setup cost is justified by unresolved questions from the first comparison.
+## Remaining follow-ups before acceptance
 
-After the characterization results, update this ADR with:
+1. define the production-safe Quickadd JSON artifact generation/provenance/integrity process;
+2. capture a fully resolved production dependency lock rather than relying on top-level pins;
+3. characterize the selected adapters in the intended Ada container/runtime profile and retain Linux validation as a prerequisite before claiming Linux support;
+4. convert the proposed conceptual types/port into an implementation plan without changing the existing Draft -> Proposal -> AdaGuard authority boundary;
+5. independently review the corrected ADR/research evidence.
 
-- hard-gate outcomes;
-- the completed weighted matrix;
-- the selected temporal resolver strategy;
-- whether runtime redundancy is single-primary, primary+shadow, selective dual-consensus, or another explicitly justified policy;
-- dependency/version and ambiguity policies.
-
-Only then should ADR-0007 move from Proposed to Accepted.
+Only after these follow-ups should ADR-0007 move from Proposed to Accepted.
