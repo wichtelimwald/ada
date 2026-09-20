@@ -1,6 +1,33 @@
 # Results — Cedar Guard conformance probe
 
-**Status:** Prepared; execution pending.
+**Status:** First target-Mac run exposed adapter/API issues before Cedar policy evaluation; fixes applied, rerun pending.
+
+## Target-Mac run 1
+
+Environment successfully installed `cedarpy==4.12.0`, but all ten tests failed during `CedarGuard` construction before authorization.
+
+Root cause:
+
+- the experiment passed a reusable `PolicySet` handle to `validate_policies()`;
+- in cedarpy 4.12.0, `validate_policies(policies, schema)` still requires policy **text** for `policies`;
+- `PolicySet` reuse is supported by `is_authorized*`, while the reusable `Schema` handle is supported by `validate_policies()`.
+
+Observed error:
+
+```text
+TypeError: 'PolicySet' object is not an instance of 'str'
+while processing 'policies'
+```
+
+This was an experiment-adapter bug, not a Cedar authorization failure.
+
+Fix applied:
+
+1. validate original policy text against the reusable Schema;
+2. only after successful validation, parse it into a reusable PolicySet for authorization;
+3. declare the four Cedar schema actions individually using the shared RequestContext.
+
+No conformance result is claimed from run 1 because no policy evaluation was reached.
 
 ## Dependency
 
