@@ -1021,7 +1021,7 @@ The proposed resolver strategy can move from Proposed to Accepted only when:
 9. resolver operational health is established independently from per-expression parse outcomes;
 10. replacement through the Ada-owned temporal resolver port remains practical.
 
-The current research closes the semantic-feasibility question but **does not yet close items 6-8**. Therefore ADR-0007 remains Proposed.
+The current research closes the semantic-feasibility question but **does not yet close items 5-8**. Therefore ADR-0007 remains Proposed.
 
 ## Characterization harness
 
@@ -1035,7 +1035,7 @@ Current research variants include:
 4. Quickadd with the trained scorer reconstructed from primitive JSON;
 5. an optional pinned-source Duckling container benchmark, which currently fails in the upstream Buster-based build before semantic execution.
 
-The Python candidates are installed into isolated temporary virtual environments and are not Ada product dependencies.
+The Python candidates are installed into isolated temporary virtual environments inside a disposable Docker research sandbox and are not Ada product dependencies. Direct host execution of `run.sh` is intentionally blocked while the dependency graph and scorer artifact remain conditional.
 
 The comparison records `agreement`, `interpretation_conflict`, `single_resolver_result`, `input_error`, and `unresolved`. These are research-result states, not runtime health states.
 
