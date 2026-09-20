@@ -134,7 +134,7 @@ The model and endpoint remain configurable:
 ada chat --model qwen3:8b --ollama-url http://localhost:11434/v1
 ```
 
-This first chat milestone does not execute action proposals yet. Calendar-create requests are offered to the model as a typed proposal output so Ada can distinguish a proposal from a confirmed action outcome. The next integration step connects those proposals to the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
+This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**, so missing material details can be surfaced without forcing the model to invent them. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
 
 Runtime container sanity check:
 
