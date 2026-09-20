@@ -167,7 +167,7 @@ The run also exposed issues that block acceptance:
 2. The self-referential prompt "What did I just ask you?" did not reliably demonstrate prior-turn recall on qwen3:8b.
 3. Most importantly, the model falsely answered "I've added..." to a calendar-create request even though this slice executed no action.
 
-PR #22 now suppresses the framework banner and configures calendar-create requests as a typed `CreateCalendarEventProposal` output path, with explicit model instructions never to claim execution. The application still does not execute proposals.
+PR #22 now suppresses the framework banner and routes calendar-create requests through a typed, **non-executable `CreateCalendarEventDraft`** output path. Materially missing details stay unresolved instead of being invented to satisfy the executable proposal schema. Ada renders clarification deterministically and still executes nothing. Only a later application step may convert a complete draft into a `CreateCalendarEventProposal`.
 
 ADR-0006 remains **Proposed** until the corrected path is re-tested.
 
@@ -179,3 +179,14 @@ For session-history validation, use an unambiguous semantic test rather than a s
 4. "What word did I ask you to remember before the reset?"
 
 The second answer should be "cobalt"; after reset Ada should state that the previous session context is unavailable rather than inventing an answer.
+
+
+A second target-hardware run confirmed 41/41 automated tests and clean banner-free local chat. It also showed:
+
+- explicit session recall worked before reset ("cobalt");
+- after reset, qwen3:8b still hallucinated a word instead of admitting the prior context was unavailable;
+- a partial German calendar request hit PydanticAI's output retry limit because the model was being asked to satisfy the strict executable proposal schema despite missing material details.
+
+The branch now strengthens the standing personality instruction against invented session recall and separates `CreateCalendarEventDraft` from executable proposals. The draft schema permits missing fields, while Ada-owned deterministic code identifies required clarifications such as missing year or end time/duration.
+
+ADR-0006 remains Proposed pending one more real-model re-test of those two corrected behaviors.
