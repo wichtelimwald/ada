@@ -58,6 +58,7 @@ Current examples:
 | Permissions / authorization | Cedar behind AdaGuard | Apache-2.0; accepted |
 | Python Cedar integration | `cedarpy` around the Cedar Rust engine | Apache-2.0; implemented behind AdaGuard |
 | Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, synthetic calendar slice implemented |
+| Local model serving | Self-hosted Ollama with configurable model profile; qwen3.5:9b target-Mac baseline | MIT runtime; model artifact Apache-2.0; accepted by ADR-0006 |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
 
@@ -85,7 +86,7 @@ Repository language is English. Project discussions with the maintainer are norm
 
 The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter, Cedar/cedarpy pinned behind AdaGuard, and DBOS pinned behind Ada's durable-action port. Development can run through the Dev Container or a local Python environment.
 
-The first local-chat profile uses a separately installed, self-hosted Ollama service. This is currently a **proposed** baseline in [ADR-0006](docs/decisions/ADR-0006-local-model-runtime.md), pending target-Mac validation.
+The first local-chat profile uses a separately installed, self-hosted Ollama service. This baseline is **accepted** by [ADR-0006](docs/decisions/ADR-0006-local-model-runtime.md) after target-Mac validation with qwen3.5:9b.
 
 Local validation from the repository root:
 
