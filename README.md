@@ -12,9 +12,11 @@ Ada should feel like a capable personal companion rather than a developer consol
 
 Ada is a modern assistant inspired by Ada Lovelace, especially the combination of analytical rigor and imagination associated with her idea of "poetical science". The inspiration is character, not impersonation: Ada does not claim to be the historical person or invent nineteenth-century memories.
 
-The baseline is analytical, imaginative, curious, precise, practical, calm, and lightly witty. Personality never changes permissions, privacy rules, or action truth.
+The **distribution seed** is a real package asset at `src/ada/bootstrap/default_personality.toml`, so it can be replaced by a fork/distribution without changing Ada's trust architecture.
 
-See [Ada personality baseline](docs/product/personality.md).
+The intended lifecycle is: **empty Memory -> seed once -> active personality lives in user-controlled Memory**. From then on, personality may gradually learn and evolve while remaining inspectable, editable, reversible, and separate from permissions/privacy/action truth.
+
+See [personality model and lifecycle](docs/product/personality.md).
 
 ## Project principles
 
@@ -119,6 +121,8 @@ ada chat
 
 The first local-chat profile only accepts a loopback Ollama endpoint. Conversation history is kept in memory for the current process only and is **not** Ada Memory.
 
+Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
+
 Inside the chat:
 
 - `/reset` clears the current ephemeral session context;
@@ -130,7 +134,7 @@ The model and endpoint remain configurable:
 ada chat --model qwen3:8b --ollama-url http://localhost:11434/v1
 ```
 
-This first chat milestone does not execute action proposals yet. The next integration step is to connect typed proposals from local chat to the existing AdaGuard + durable-action path rather than giving the model direct tools.
+This first chat milestone does not execute action proposals yet. Calendar-create requests are offered to the model as a typed proposal output so Ada can distinguish a proposal from a confirmed action outcome. The next integration step connects those proposals to the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
 
 Runtime container sanity check:
 
