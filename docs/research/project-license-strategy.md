@@ -1,6 +1,6 @@
 # Technology / governance evaluation — Ada project license
 
-**Status:** Research scored with maintainer-agreed weights; no license change made  
+**Status:** Decision accepted — retain MIT; no relicensing required  
 **Date checked:** 2026-09-20
 
 ## 1. Question
@@ -198,7 +198,24 @@ OSC-1.0 is not included in the finalist score because it currently misses Ada's 
 
 The MIT/Apache difference is small enough that the score should not be treated as mathematical certainty. The practical tie-break is whether Ada deliberately wants Apache-2.0's explicit patent/contribution framework enough to accept its additional compliance surface.
 
-## 9. Migration timing
+## 9. Decision
+
+The maintainer accepted the result on 2026-09-20:
+
+> **Retain the MIT License for Ada's project-owned code.**
+
+Rationale:
+
+- MIT best matches Ada's current priority on simple private and commercial use;
+- its obligations are short, familiar, and low-overhead for a small-maintainer OSS project;
+- Apache-2.0 remains a credible alternative, but its explicit patent/contribution advantages do not currently outweigh its additional compliance surface under the agreed weighting;
+- BSD-3-Clause and OSC-1.0 do not provide a stronger overall fit for Ada at this time.
+
+This decision does not relicense third-party dependencies. Each dependency retains its own license and notice obligations.
+
+Re-open if Ada's contributor/governance model changes materially, corporate adoption creates a concrete need for explicit patent grants, or applicable legal/licensing practice changes.
+
+## 10. Migration timing
 
 If Ada changes its project-owned license, doing so **before** a substantial external contributor base exists is operationally much simpler.
 
@@ -206,7 +223,7 @@ A future migration after many contributors may require consent or provenance ana
 
 No license change should be made until this evaluation is accepted explicitly.
 
-## 10. Primary references
+## 11. Primary references
 
 - Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
 - Apache license application guidance: https://www.apache.org/legal/apply-license
