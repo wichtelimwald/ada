@@ -8,6 +8,7 @@ from ada.core.actions import CreateCalendarEventDraft
 
 _FULL_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+_EXPLICIT_YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,8 @@ class CalendarDraftAssessment:
 
 def assess_calendar_create_draft(
     draft: CreateCalendarEventDraft,
+    *,
+    source_text: str | None = None,
 ) -> CalendarDraftAssessment:
     """Identify material information still required before proposal creation."""
 
@@ -32,6 +35,9 @@ def assess_calendar_create_draft(
         missing.append("title")
 
     if not draft.date or not _FULL_DATE_RE.fullmatch(draft.date.strip()):
+        missing.append("date_with_year")
+    elif source_text is not None and not _EXPLICIT_YEAR_RE.search(source_text):
+        # The model must not silently invent a year that the user never supplied.
         missing.append("date_with_year")
 
     if (
@@ -49,14 +55,25 @@ def assess_calendar_create_draft(
     if not draft.calendar_id or not draft.calendar_id.strip():
         missing.append("calendar")
 
+    # Model-generated unresolved metadata is advisory only. Ada owns the
+    # required-field policy and accepts only the small canonical set below.
     unresolved_aliases = {
         "year": "date_with_year",
+        "date": "date_with_year",
+        "duration": "end_time",
         "calendar_id": "calendar",
+    }
+    allowed_unresolved = {
+        "title",
+        "date_with_year",
+        "start_time",
+        "end_time",
+        "calendar",
     }
     for item in draft.unresolved:
         normalized = item.strip().lower()
         normalized = unresolved_aliases.get(normalized, normalized)
-        if normalized and normalized not in missing:
+        if normalized in allowed_unresolved and normalized not in missing:
             missing.append(normalized)
 
     return CalendarDraftAssessment(missing=tuple(missing))
@@ -87,10 +104,15 @@ _EN_LABELS = {
 
 def render_calendar_draft_response(
     draft: CreateCalendarEventDraft,
+    *,
+    source_text: str | None = None,
 ) -> str:
     """Render a safe user-facing result without implying external execution."""
 
-    assessment = assess_calendar_create_draft(draft)
+    assessment = assess_calendar_create_draft(
+        draft,
+        source_text=source_text,
+    )
     german = draft.language == "de"
 
     if assessment.complete:
