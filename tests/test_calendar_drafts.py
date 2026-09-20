@@ -43,8 +43,18 @@ class CalendarDraftTests(unittest.TestCase):
             unresolved=("year", "end_time"),
         )
 
-        assessment = assess_calendar_create_draft(draft)
-        response = render_calendar_draft_response(draft)
+        source = (
+            "Kannst du einen Zahnarzttermin am 21.09. für 16:00 Uhr "
+            "in den Familienkalender eintragen?"
+        )
+        assessment = assess_calendar_create_draft(
+            draft,
+            source_text=source,
+        )
+        response = render_calendar_draft_response(
+            draft,
+            source_text=source,
+        )
 
         self.assertFalse(assessment.complete)
         self.assertIn("date_with_year", assessment.missing)
@@ -147,6 +157,36 @@ class CalendarDraftTests(unittest.TestCase):
             draft,
             source_text=(
                 "Add the dentist appointment on 2026-09-21 from 16:00 to 16:30."
+            ),
+        )
+
+        self.assertEqual(assessment.missing, ("calendar",))
+
+    def test_model_cannot_invent_nonempty_calendar_target(self) -> None:
+        draft = _draft(
+            calendar_id="family",
+        )
+
+        assessment = assess_calendar_create_draft(
+            draft,
+            source_text=(
+                "Please add the dentist appointment on 2026-09-21 "
+                "from 16:00 to 16:30."
+            ),
+        )
+
+        self.assertEqual(assessment.missing, ("calendar",))
+
+    def test_unknown_calendar_id_is_not_accepted_even_if_nonempty(self) -> None:
+        draft = _draft(
+            calendar_id="work",
+        )
+
+        assessment = assess_calendar_create_draft(
+            draft,
+            source_text=(
+                "Please add the dentist appointment on 2026-09-21 "
+                "from 16:00 to 16:30 to the work calendar."
             ),
         )
 
