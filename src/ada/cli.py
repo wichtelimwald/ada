@@ -8,6 +8,8 @@ import sys
 from collections.abc import Callable
 
 from ada import __version__
+from ada.application.calendar_drafts import render_calendar_draft_response
+from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest, AgentRuntimePort
 
 
@@ -50,9 +52,27 @@ def _chat_loop(
                 write("Ada: This runtime has no session context to clear.")
             continue
 
-        response = runtime.run(AgentRequest(text=text))
+        try:
+            response = runtime.run(AgentRequest(text=text))
+        except Exception as exc:
+            write(
+                "Ada: I could not reliably process that request. "
+                "No action was executed."
+            )
+            if os.getenv("ADA_DEBUG"):
+                print(f"debug: {exc}", file=sys.stderr)
+            continue
+
         if response.text:
             write(f"Ada: {response.text}")
+        for draft in response.drafts:
+            if isinstance(draft, CreateCalendarEventDraft):
+                write(f"Ada: {render_calendar_draft_response(draft)}")
+            else:
+                write(
+                    "Ada: I formed an incomplete action draft, but nothing "
+                    "was executed."
+                )
         if response.proposals:
             write(
                 "Ada: I formed an action proposal, but this local-chat slice "
