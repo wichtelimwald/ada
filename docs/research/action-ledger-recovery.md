@@ -1,6 +1,6 @@
 # Technology evaluation — Action Ledger / recovery semantics
 
-**Status:** Research active — weights agreed; custom control passed; mature durable-execution candidates added  
+**Status:** Decision accepted — DBOS 3.0.0 behind Ada-owned action/outcome semantics  
 **Date checked:** 2026-09-20  
 **Depends on:** ADR-0002, ADR-0003, ADR-0004, representative scenarios S1/S2
 
