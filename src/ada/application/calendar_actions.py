@@ -11,7 +11,10 @@ from ada.core.action_outcomes import (
     BusinessOutcomeStatus,
     OperationId,
 )
-from ada.core.actions import CreateCalendarEventProposal
+from ada.core.actions import (
+    CreateCalendarEventProposal,
+    validate_calendar_create_proposal,
+)
 from ada.core.authorization import AuthorizationRequest, GuardDecision
 from ada.ports.calendar import CalendarEvent
 from ada.ports.durable_action import DurableActionPort, DurableCalendarCreate
@@ -39,6 +42,11 @@ class CalendarActionService:
         operation_id: OperationId,
         authorization: AuthorizationRequest,
     ) -> CalendarActionResponse:
+        # Reject incomplete/contradictory action data before authorization or
+        # durable/provider execution. Authority checks must not double as data
+        # validation.
+        validate_calendar_create_proposal(proposal)
+
         # Privileged action/resource are derived from the typed proposal, not
         # trusted from model/tool-supplied authorization fields.
         request = replace(
