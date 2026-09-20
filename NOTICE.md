@@ -47,4 +47,14 @@ For Ada development:
 
 Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; third-party code is not relicensed as Ada MIT code. Required license and NOTICE material must be preserved when distribution obligations apply.
 
+## External local-model baseline
+
+The first local-chat profile is designed to interoperate with separately installed software/model artifacts that are **not vendored or redistributed by Ada**:
+
+- **Ollama** — MIT-licensed local model runtime/service. ADR-0006 proposes it as the initial self-hosted model-serving baseline.
+- **Qwen3.5 9B / Ollama tag `qwen3.5:9b`** — externally downloaded Q4_K_M model artifact used as the current target-hardware baseline after a direct A/B test on Ada's MacBook Air M1 / 16 GB target. Ollama currently reports a 6.6 GB artifact and Apache License 2.0. Ada does not redistribute the weights.
+- **Qwen3 8B / Ollama tag `qwen3:8b`** — earlier 5.2 GB target-hardware baseline retained as a tested fallback; Apache License 2.0. Ada does not redistribute the weights.
+
+Model tags and artifacts can change independently from Ada. Reproducible model artifact pinning/distribution remains an explicit open constraint before Ada distributes or automatically provisions model weights.
+
 When a third-party component is adopted or upgraded, add or update the required attribution/notices and exact reviewed version here before merge.

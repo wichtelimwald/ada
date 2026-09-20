@@ -55,9 +55,15 @@ It must preserve the distinction:
 
 Exact identity representation remains open.
 
+### Action draft
+
+A typed but **non-executable** representation of model-derived intent that may still contain missing or unresolved material details.
+
+A draft is not an action proposal. It cannot be authorized or executed as-is. Ada-owned application logic must resolve required information and create a valid proposal explicitly.
+
 ### Action proposal
 
-A typed description of a consequential operation the model or deterministic application logic proposes.
+A typed, complete description of a consequential operation proposed for authorization/execution.
 
 A proposal is not permission and is not evidence of execution.
 
@@ -151,6 +157,17 @@ Responsibility:
 
 This may initially be implemented together with the Action Ledger if that remains simpler. It is a semantic boundary, not necessarily a separate subsystem.
 
+### PersonalityMemoryPort
+
+Responsibility:
+
+- load the active user-controlled personality profile;
+- persist the initial distribution seed only when personality Memory is empty;
+- preserve existing personality across Ada upgrades/reinstalls;
+- support attributable personality changes without granting authority.
+
+This is deliberately a **narrow semantic slice of Memory**, introduced because local chat now needs a concrete personality lifecycle. It does not select the general Memory backend or retrieval/index architecture.
+
 ## 5. Boundaries intentionally deferred
 
 Do not define broad abstractions before the relevant slice needs them.
@@ -159,7 +176,7 @@ Deferred ports include:
 
 - MessageChannelPort for email and later channels;
 - SchedulerPort for requested/background work;
-- authoritative MemoryPort and retrieval/index contracts;
+- general authoritative MemoryPort and retrieval/index contracts;
 - UI/application transport;
 - remote/cloud model broker;
 - speech/perception;

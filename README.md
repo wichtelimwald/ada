@@ -8,6 +8,16 @@ Ada is a local-first, privacy-first personal AI assistant project named after Ad
 
 Ada should feel like a capable personal companion rather than a developer console: natural voice interaction, persistent user-controlled memory, contextual awareness, and useful computer control — while keeping privacy, transparency, and human control as first-class requirements.
 
+## Personality
+
+Ada is a modern assistant inspired by Ada Lovelace, especially the combination of analytical rigor and imagination associated with her idea of "poetical science". The inspiration is character, not impersonation: Ada does not claim to be the historical person or invent nineteenth-century memories.
+
+The **distribution seed** is a real package asset at `src/ada/bootstrap/default_personality.toml`, so it can be replaced by a fork/distribution without changing Ada's trust architecture.
+
+The intended lifecycle is: **empty Memory -> seed once -> active personality lives in user-controlled Memory**. From then on, personality may gradually learn and evolve while remaining inspectable, editable, reversible, and separate from permissions/privacy/action truth.
+
+See [personality model and lifecycle](docs/product/personality.md).
+
 ## Project principles
 
 - **Local first.** Prefer on-device processing where practical.
@@ -48,6 +58,7 @@ Current examples:
 | Permissions / authorization | Cedar behind AdaGuard | Apache-2.0; accepted |
 | Python Cedar integration | `cedarpy` around the Cedar Rust engine | Apache-2.0; implemented behind AdaGuard |
 | Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, synthetic calendar slice implemented |
+| Local model serving | Self-hosted Ollama with configurable model profile; qwen3.5:9b target-Mac baseline | MIT runtime; model artifact Apache-2.0; accepted by ADR-0006 |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
 
@@ -75,6 +86,8 @@ Repository language is English. Project discussions with the maintainer are norm
 
 The initial runtime is Python 3.14 with PydanticAI pinned behind an Ada-owned adapter, Cedar/cedarpy pinned behind AdaGuard, and DBOS pinned behind Ada's durable-action port. Development can run through the Dev Container or a local Python environment.
 
+The first local-chat profile uses a separately installed, self-hosted Ollama service. This baseline is **accepted** by [ADR-0006](docs/decisions/ADR-0006-local-model-runtime.md) after target-Mac validation with qwen3.5:9b.
+
 Local validation from the repository root:
 
 ```bash
@@ -92,6 +105,37 @@ ADA_TEST_VERBOSE=1 sh scripts/validate.sh
 ```
 
 A project-local virtual environment is intentional. Do not bypass a Homebrew/PEP 668 externally-managed Python with `--break-system-packages`.
+
+### First local chat
+
+Install Ollama separately, then fetch the current target-Mac baseline model:
+
+```bash
+ollama pull qwen3.5:9b
+```
+
+With the local Ollama service running:
+
+```bash
+ada chat
+```
+
+The first local-chat profile only accepts a loopback Ollama endpoint. Conversation history is kept in memory for the current process only and is **not** Ada Memory.
+
+Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
+
+Inside the chat:
+
+- `/reset` clears the current ephemeral session context;
+- `/quit` exits.
+
+The model and endpoint remain configurable:
+
+```bash
+ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
+```
+
+This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**. Ada-owned deterministic logic — not the model — decides which material fields are actually required and checks them against the original user request, so model-invented requirements or silently invented dates cannot become action requirements. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
 
 Runtime container sanity check:
 

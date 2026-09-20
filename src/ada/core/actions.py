@@ -11,12 +11,38 @@ class CalendarProposalValidationError(ValueError):
     """Calendar proposal is incomplete or internally inconsistent."""
 
 
+class ActionDraft(Protocol):
+    """Incomplete model-derived action intent; never executable as-is."""
+
+    @property
+    def kind(self) -> str:
+        """Stable Ada draft kind."""
+
+
 class ActionProposal(Protocol):
     """Marker contract for typed proposals returned by an agent runtime."""
 
     @property
     def kind(self) -> str:
         """Stable Ada action kind."""
+
+
+@dataclass(frozen=True, slots=True)
+class CreateCalendarEventDraft:
+    """Non-executable calendar intent that may contain unresolved details."""
+
+    title: str | None
+    date: str | None
+    start_time: str | None
+    end_time: str | None
+    calendar_id: str | None
+    location: str | None
+    language: Literal["de", "en"]
+    unresolved: tuple[str, ...]
+
+    @property
+    def kind(self) -> Literal["calendar.create.draft"]:
+        return "calendar.create.draft"
 
 
 @dataclass(frozen=True, slots=True)
