@@ -23,11 +23,19 @@ def _semantic_view(value: dict[str, Any] | None) -> dict[str, Any] | None:
     return value
 
 
-def _state(left: Any, right: Any) -> str:
+def _state(
+    left: Any,
+    right: Any,
+    *,
+    left_error: str | None,
+    right_error: str | None,
+) -> str:
+    if left_error is not None or right_error is not None:
+        return "input_error"
     if left is None and right is None:
         return "unresolved"
     if left is None or right is None:
-        return "degraded_single_resolver"
+        return "single_resolver_result"
     if _semantic_view(left) == _semantic_view(right):
         return "agreement"
     return "interpretation_conflict"
@@ -50,6 +58,8 @@ def main() -> int:
         right_item = right_by_id.get(case_id, {})
         left_actual = left_item.get("actual")
         right_actual = right_item.get("actual")
+        left_error = left_item.get("error")
+        right_error = right_item.get("error")
         rows.append(
             {
                 "id": case_id,
@@ -58,9 +68,16 @@ def main() -> int:
                     left_item.get("expression")
                     or right_item.get("expression")
                 ),
-                "state": _state(left_actual, right_actual),
+                "state": _state(
+                    left_actual,
+                    right_actual,
+                    left_error=left_error,
+                    right_error=right_error,
+                ),
                 left["backend"]: left_actual,
                 right["backend"]: right_actual,
+                f"{left['backend']}_error": left_error,
+                f"{right['backend']}_error": right_error,
                 "expected": (
                     left_item.get("expected")
                     or right_item.get("expected")
@@ -75,10 +92,11 @@ def main() -> int:
         )
 
     order = {
-        "interpretation_conflict": 0,
-        "degraded_single_resolver": 1,
-        "unresolved": 2,
-        "agreement": 3,
+        "input_error": 0,
+        "interpretation_conflict": 1,
+        "single_resolver_result": 2,
+        "unresolved": 3,
+        "agreement": 4,
     }
     rows.sort(key=lambda row: (order[row["state"]], row["id"]))
 
