@@ -32,6 +32,42 @@ class CalendarDraftTests(unittest.TestCase):
         self.assertIn("vollständiges Datum mit Jahr", response)
         self.assertIn("Endzeit oder Dauer", response)
 
+    def test_model_cannot_invent_missing_year_from_partial_source(self) -> None:
+        draft = CreateCalendarEventDraft(
+            title="Zahnarzt",
+            date="2026-09-21",
+            start_time="16:00",
+            end_time=None,
+            calendar_id="family",
+            location=None,
+            language="de",
+            unresolved=("end_time", "location", "dentist_name"),
+        )
+
+        assessment = assess_calendar_create_draft(
+            draft,
+            source_text=(
+                "Kannst du einen Zahnarzttermin am 21.09. für 16:00 Uhr "
+                "in den Familienkalender eintragen?"
+            ),
+        )
+        response = render_calendar_draft_response(
+            draft,
+            source_text=(
+                "Kannst du einen Zahnarzttermin am 21.09. für 16:00 Uhr "
+                "in den Familienkalender eintragen?"
+            ),
+        )
+
+        self.assertEqual(
+            assessment.missing,
+            ("date_with_year", "end_time"),
+        )
+        self.assertIn("vollständiges Datum mit Jahr", response)
+        self.assertIn("Endzeit oder Dauer", response)
+        self.assertNotIn("location", response)
+        self.assertNotIn("Zahnarztname", response)
+
     def test_complete_draft_still_does_not_claim_execution(self) -> None:
         draft = CreateCalendarEventDraft(
             title="Dentist appointment",
@@ -51,7 +87,7 @@ class CalendarDraftTests(unittest.TestCase):
         self.assertIn("draft", response)
         self.assertIn("have not changed the calendar", response)
 
-    def test_unresolved_model_fields_are_preserved(self) -> None:
+    def test_arbitrary_model_unresolved_fields_do_not_become_requirements(self) -> None:
         draft = CreateCalendarEventDraft(
             title="Dentist appointment",
             date="2026-09-21",
@@ -60,12 +96,18 @@ class CalendarDraftTests(unittest.TestCase):
             calendar_id="family",
             location=None,
             language="en",
-            unresolved=("participant",),
+            unresolved=("participant", "location", "dentist_name", "specialty"),
         )
 
-        assessment = assess_calendar_create_draft(draft)
+        assessment = assess_calendar_create_draft(
+            draft,
+            source_text=(
+                "Please add a dentist appointment on 2026-09-21 "
+                "from 16:00 to 16:30 to the family calendar."
+            ),
+        )
 
-        self.assertEqual(assessment.missing, ("participant",))
+        self.assertEqual(assessment.missing, ())
 
 
 if __name__ == "__main__":
