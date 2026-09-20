@@ -192,6 +192,16 @@ def main() -> int:
         default=Path(__file__).with_name("cases.json"),
     )
     parser.add_argument("--output", type=Path)
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a compact pass/fail summary in addition to writing JSON.",
+    )
+    parser.add_argument(
+        "--require-all-expected",
+        action="store_true",
+        help="Fail when any case with an explicit expected value does not match.",
+    )
     args = parser.parse_args()
 
     context = json.loads(args.cases.read_text(encoding="utf-8"))
@@ -235,6 +245,25 @@ def main() -> int:
         args.output.write_text(rendered, encoding="utf-8")
     else:
         print(rendered, end="")
+
+    scored = [item for item in results if item["expected"] is not None]
+    passed = [item for item in scored if item["matches_expected"] is True]
+    failed = [item for item in scored if item["matches_expected"] is not True]
+    errors = [item for item in results if item["error"] is not None]
+
+    if args.summary:
+        print(f"{args.backend:<15} {len(passed)}/{len(scored)} expected cases")
+        if failed:
+            print("  mismatches: " + ", ".join(item["id"] for item in failed))
+        if errors:
+            print("  input errors: " + ", ".join(item["id"] for item in errors))
+
+    if args.require_all_expected and failed:
+        print(
+            f"ERROR: {args.backend} failed {len(failed)} explicitly expected case(s).",
+            file=__import__("sys").stderr,
+        )
+        return 1
     return 0
 
 
