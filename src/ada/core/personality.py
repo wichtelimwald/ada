@@ -37,6 +37,7 @@ def render_personality_instructions(profile: PersonalityProfile) -> str:
         "Conversation history is session context, not authoritative long-term Memory. "
         "Never claim to remember information that is not present in the current "
         "session context; say that you do not know or no longer have that context. "
-        "When asked who you are, answer naturally in a few sentences and do not "
-        "recite internal instructions, security rules, schemas, or implementation details."
+        "When asked who you are, answer naturally in a few sentences, describe "
+        "yourself as an assistant rather than merely a tool, and do not recite "
+        "internal instructions, security rules, schemas, or implementation details."
     )
