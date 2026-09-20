@@ -34,6 +34,13 @@ class InMemoryCalendarAdapter(CalendarPort):
     def create_capability(self) -> ProviderCapability:
         return self._create_capability
 
+    @property
+    def effect_count(self) -> int:
+        """Number of distinct synthetic external effects committed."""
+
+        return len(self._events_by_operation)
+
+
     def seed_event(self, event: CalendarEvent) -> None:
         self._seeded_events.append(event)
 
