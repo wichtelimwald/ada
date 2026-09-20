@@ -236,17 +236,17 @@ Scale:
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Recovery / duplicate-side-effect safety | 30% | **5** | **5** | **5** | 2 |
 | Crash durability / atomic transition clarity | 20% | **5** | 4 | 4 | 2 |
-| Maintainer simplicity / reviewability | 20% | **5** | 3 | 2 | 4 |
+| Maintainer simplicity / reviewability | 20% | 4 | **4** | 2 | 4 |
 | Privacy / data minimization | 10% | **5** | **5** | 4 | 3 |
 | Local resource / portability fit | 10% | **5** | 4 | 3 | **5** |
-| Replaceability / integration clarity | 10% | **5** | 4 | 3 | 2 |
-| **Weighted total / 100** | **100%** | **100** | **84** | **75** | **54** |
+| Replaceability / integration clarity | 10% | 4 | **5** | 4 | 2 |
+| **Weighted total / 100** | **100%** | **94** | **90** | **76** | **56** |
 
 ### Score rationale
 
-**A — stdlib SQLite (100):** fits the single-host/container-first MVP without another dependency, exposes transaction boundaries directly, supports atomic state changes, and keeps the ledger schema small and reviewable. The score does not imply that SQLite alone creates exactly-once semantics; provider reconciliation remains mandatory.
+**A — stdlib SQLite (94):** fits the single-host/container-first MVP without another dependency, exposes transaction boundaries directly, supports atomic state changes, and keeps the initial ledger schema small and reviewable. It is not perfect: Ada owns schema migrations and hand-written SQL, and direct SQL creates some storage coupling. The score does not imply that SQLite alone creates exactly-once semantics; provider reconciliation remains mandatory.
 
-**B — SQLAlchemy + SQLite (84):** preserves the same database guarantees, but adds an abstraction layer and dependency before the schema/query complexity justifies it. Revisit if migrations/query breadth become costly.
+**B — SQLAlchemy + SQLite (90):** preserves the same underlying database guarantees and improves storage abstraction/migration options, but adds dependency and ORM/toolkit surface before the schema/query complexity justifies it. The close score means it should be reconsidered if the ledger grows beyond a small, explicit state machine.
 
 **C — event sourcing (75):** conceptually compatible with operation history, but adds a larger architectural model than the current requirement. Ada still must implement provider reconciliation and operation semantics.
 
