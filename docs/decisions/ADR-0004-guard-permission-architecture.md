@@ -1,4 +1,4 @@
-# ADR-0004: Use an Ada-owned typed Guard evaluator
+# ADR-0004: Use Cedar behind the Ada-owned Guard boundary
 
 - **Status:** Proposed
 - **Date:** 2026-09-20
@@ -15,11 +15,11 @@ The model may propose actions and explain them, but it must not:
 - decide that a provider effect succeeded;
 - disclose private data merely because it can read it.
 
-Ada also keeps these concepts separate:
+Ada keeps these concepts separate:
 
 `Person != Data Subject != Audience != Authority`
 
-Authentication is separate from authorization. Channels/integrations establish identity and assurance claims; Ada Guard evaluates those claims against explicit grants and prohibitions.
+Authentication is also separate from authorization. Channels/integrations establish identity, assurance and instruction-provenance claims; Ada Guard evaluates those claims against explicit grants and prohibitions.
 
 The evaluated options were:
 
@@ -40,90 +40,126 @@ Agreed decision weights:
 | Policy administration / human readability | 5% |
 | License / dependency / integration fit | 5% |
 
-Final research scores:
+After targeted prototypes, the final research scores are:
 
 | Candidate | Score |
 | --- | ---: |
-| **Ada-owned typed evaluator** | **94** |
-| Cedar | 91 |
+| **Cedar** | **95** |
+| Ada-owned typed evaluator | 94 |
 | OPA / Rego | 83 |
 | PyCasbin / Casbin | 76 |
 
 ## Prototype evidence
 
-A targeted typed-evaluator prototype exercised the MVP permission semantics without third-party dependencies or a general expression language.
+### Ada-evaluator control
 
-The evaluator supported:
+A small standard-library-only evaluator passed the confirmed MVP permission cases without needing a general expression language.
 
-- actor;
-- action;
-- resource;
-- data subjects;
-- audience;
-- purpose;
-- instruction provenance;
-- channel;
-- authentication assurance;
-- representation / acting-for;
-- validity window;
-- revocation;
-- allow/deny;
-- default deny;
-- explicit deny override;
-- deterministic reason codes;
-- matched rule IDs;
-- policy version.
+This proved that Ada's MVP semantics are understandable and that Ada does not require a large IAM platform merely to express current permissions.
 
-All tested conformance cases passed:
+It also clarified the long-term risk: a custom evaluator would make Ada responsible for security-critical policy semantics, schema/tooling evolution and future relationship complexity.
 
-1. an explicitly granted calendar create is allowed;
-2. the same action without a grant is denied;
-3. an explicit deny overrides a broader allow;
-4. a direct authenticated one-off approval can authorize the matching operation;
+### Cedar prototype
+
+Cedar was then tested against the same authority model using:
+
+```text
+Ada AuthorizationRequest
+        |
+thin CedarGuard adapter
+        |
+cedarpy 4.12.0
+        |
+cedar-policy 4.12.0 Rust engine
+        |
+Ada GuardDecision
+```
+
+The tested `cedarpy` release is community-maintained and wraps the real Cedar Rust engine using PyO3/maturin.
+
+On the target Python 3.14 / ARM64 environment, the final conformance run produced:
+
+```text
+Ran 10 tests in 0.031s
+
+OK
+```
+
+The tested cases covered:
+
+1. explicit calendar-create grant;
+2. default deny;
+3. explicit forbid overrides permit;
+4. direct authenticated one-off approval;
 5. forwarded content cannot approve;
 6. model-originated "permission" cannot approve;
-7. revoked/expired grants stop authorizing;
-8. private busy-time may be visible to a family audience while detailed private content remains denied;
-9. malformed authorization requests fail closed.
+7. expired/revoked grants stop authorizing;
+8. private busy-time may be disclosed while detailed private content remains denied;
+9. malformed authorization request fails closed;
+10. invalid Cedar policy/schema configuration is rejected before privileged use.
 
-The prototype did not need:
-
-- arbitrary expressions;
-- Python callbacks or predicates in policy data;
-- role inheritance;
-- relationship graph traversal;
-- general boolean policy syntax;
-- framework-native policy objects.
-
-The predefined escalation condition to prototype Cedar was therefore not triggered.
+No Ada-owned Rust bridge and no policy sidecar were required.
 
 ## Decision
 
-Use an **Ada-owned typed policy evaluator behind the stable AdaGuard boundary** for the initial MVP.
+Use **Cedar as Ada's initial policy engine behind an Ada-owned Guard boundary**.
 
-The evaluator is intentionally not a general-purpose policy engine.
+Ada owns:
 
-The stable boundary is:
+- `AuthorizationRequest`;
+- `GuardDecision`;
+- authentication/assurance claims;
+- instruction provenance;
+- grant lifecycle and storage semantics;
+- policy version/deployment;
+- Action Ledger;
+- provider outcome truth;
+- application/domain authority semantics.
+
+Cedar owns the policy evaluation semantics.
+
+The initial private integration uses pinned `cedarpy`, which embeds the Cedar Rust engine into Python.
+
+The architectural boundary remains:
 
 ```text
-application / provider path
+application / privileged provider path
         |
-AuthorizationRequest
+Ada AuthorizationRequest
         |
 AdaGuard
         |
-private typed PolicyEvaluator
+private Cedar adapter
         |
-GuardDecision
+Cedar engine
+        |
+Ada GuardDecision
+        |
+Action Ledger / disclosure boundary
 ```
 
-Provider adapters and application use cases depend on Ada-owned authorization types, not evaluator-internal rule structures.
+Provider adapters and application use cases must not depend directly on Cedar-native types.
+
+## Why Cedar
+
+Cedar aligns closely with Ada's authorization model:
+
+- `principal`;
+- `action`;
+- `resource`;
+- structured `context`;
+- default deny;
+- explicit `forbid` overriding permits;
+- human-readable policies;
+- schema validation;
+- entity/relationship modeling;
+- policy diagnostics and analysis tooling.
+
+This lets Ada reuse a dedicated authorization engine rather than gradually growing an Ada-specific policy language.
 
 ## Authorization request
 
-Ada owns the authorization request semantics.
-
-The initial request model may include:
+Ada's request semantics may include:
 
 ```text
 actor
@@ -138,33 +174,39 @@ representation / acting-for
 deterministic context
 ```
 
+The private Cedar adapter maps these concepts to Cedar principal/action/resource/context and, where useful later, Cedar entities/relationships.
+
 Not every field is required for every action.
 
-Missing required security context causes denial.
+Missing mandatory security context results in denial.
 
 ## Guard decision
 
-Every security-relevant decision must provide at least:
+Every security-relevant decision must expose at least:
 
 - effect: allow or deny;
-- deterministic reason code;
-- matched grant/prohibition identifiers where applicable;
+- deterministic Ada reason code;
+- matched Ada grant/prohibition identifiers where applicable;
 - policy/configuration version.
 
-The audit layer may record additional non-sensitive context, but raw prompts or private content are not required for authorization explainability.
+Cedar's engine-local policy IDs are not Ada's stable identifiers.
 
-## Evaluation semantics
+Ada-generated policies/grants should use unique, stable `@id` annotations derived from Ada-owned rule/grant IDs. The adapter maps Cedar determining-policy IDs through cedarpy's annotation diagnostics for audit/UI use.
 
-The initial evaluator must satisfy:
+## Fail-closed wrapper semantics
 
-1. **default deny:** no matching grant means deny;
-2. **deny overrides allow:** any matching explicit prohibition wins;
-3. **fail closed:** malformed requests, policy failures or missing mandatory context deny consequential operations;
-4. **no executable policies:** grants/rules are structured data, never arbitrary Python, shell, templates or model-generated code;
-5. **revocation/expiry:** inactive grants cease authorizing without model cooperation;
-6. **no learning-based authority:** memory, confidence and previous success cannot expand authority;
-7. **provenance-aware approval:** direct authenticated instructions may satisfy a grant where forwarded/quoted/model content cannot;
-8. **audience-aware disclosure:** permission to read/store data is distinct from permission to reveal it to an audience.
+Ada is stricter than Cedar's generic engine behavior at the application boundary.
+
+The adapter must deny when:
+
+- the request is malformed;
+- required Ada security context is missing;
+- policy/schema loading or validation fails;
+- Cedar returns no final decision;
+- Cedar reports policy-evaluation errors in diagnostics;
+- the adapter itself fails.
+
+No provider/disclosure path may interpret an authorization error as permission.
 
 ## Authentication boundary
 
@@ -183,7 +225,7 @@ The visible email `From` field alone is not an authorization grant and is not su
 
 ## Grant creation and mutation
 
-The evaluator only evaluates policy/grant data. It does not define who may create or modify that data.
+Cedar evaluates active policies; it does not define Ada's grant-governance workflow.
 
 Grant mutation is itself privileged.
 
@@ -191,100 +233,131 @@ For the MVP:
 
 - broad/general/risky grants require direct local Ada interaction;
 - simple one-off approvals may be bound to a concrete operation and accepted through an appropriately authenticated authorized channel;
-- forwarded/quoted/model/tool/web/file content cannot create grants;
-- revocation must be immediately effective for subsequent evaluations.
+- forwarded/quoted/model/tool/web/file content cannot create authority;
+- revocation must affect subsequent evaluations without model cooperation.
 
-The production grant store and mutation workflow remain implementation work.
+The production grant store and policy-generation workflow remain Ada responsibilities.
 
 ## Disclosure authority
 
-Action authorization and disclosure authorization use the same Ada authority concepts but may expose different actions/resources.
+Action authority and disclosure authority use the same Guard boundary but different actions/resources as appropriate.
 
 For example:
 
 - `calendar.disclose.busy` may be permitted for a family audience;
-- `calendar.disclose.detail` for the same private event may be explicitly denied.
+- `calendar.disclose.detail` for the same private event may be forbidden.
 
-This prevents "the assistant could read it" from becoming "the assistant may reveal it."
+This prevents "Ada can read it" from becoming "Ada may reveal it."
 
-## Cedar escalation strategy
+## Community Python integration
 
-Cedar is the preferred escalation engine if the small evaluator stops being small.
+The initial integration uses `cedarpy` rather than an Ada-owned Rust bridge or a Cedar sidecar.
 
-Re-open this ADR before adding:
+Reasons:
 
-- arbitrary boolean/expression syntax;
-- complex policy inheritance;
-- substantial group/relationship traversal;
-- capability-specific evaluator special cases;
-- policy analysis/schema requirements that would duplicate a mature policy engine.
+- direct Python integration;
+- no extra local network/process failure mode;
+- current Python 3.14 / ARM64 support;
+- wraps the actual Cedar Rust engine;
+- exposes diagnostics, schema validation and reusable policy/schema handles;
+- conformance prototype passed on the target environment.
 
-A future Cedar backend must remain behind the same AdaGuard / AuthorizationRequest / GuardDecision boundary.
+However, `cedarpy` is community-maintained rather than officially supported by the Cedar team.
 
-The Guard conformance suite becomes mandatory for any replacement evaluator.
+Therefore Ada must:
+
+- pin the exact tested version;
+- review dependency/supply-chain changes during upgrades;
+- run the full Guard conformance suite for every upgrade;
+- avoid leaking cedarpy-native types into Ada application/domain code;
+- keep a documented fallback integration path.
+
+## Integration fallback order
+
+If `cedarpy` becomes unsuitable while Cedar remains the desired policy model, prefer:
+
+1. a reviewed local Cedar service/sidecar around the official engine;
+2. a minimal Ada-owned PyO3 bridge to the official Rust engine;
+3. another reviewed Cedar SDK/binding if the ecosystem changes.
+
+The AdaGuard / AuthorizationRequest / GuardDecision contract must remain unchanged.
+
+## Upstream strategy
+
+Prefer contributing general-purpose improvements to `cedarpy` rather than maintaining an Ada-specific fork.
+
+If Ada identifies a binding gap:
+
+1. reproduce and characterize it;
+2. discuss it upstream;
+3. contribute a narrow implementation and tests where appropriate;
+4. do not make Ada depend on unreleased fork-only behavior;
+5. adopt only reviewed/pinned released versions.
 
 ## Consequences
 
 ### Positive
 
-- exact semantic fit to Ada's MVP authority model;
-- no additional runtime/process/FFI dependency in the root authorization path;
-- directly auditable Python implementation;
-- deterministic decisions and tests;
-- MIT project-owned implementation;
-- easy integration with the current modular monolith;
-- policy engine remains replaceable.
+- mature authorization semantics rather than Ada-owned matching logic;
+- direct fit for default deny and explicit forbids;
+- schemas and validation;
+- future relationship/entity modeling;
+- richer policy tooling/analysis path;
+- no sidecar required initially;
+- no Ada-owned Rust bridge required initially;
+- stable Ada-owned domain/security API remains independent of Cedar integration details.
 
 ### Negative
 
-- Ada owns security-critical authorization code;
-- less formal policy/schema tooling than Cedar initially;
-- discipline is required to prevent gradual growth into a custom DSL;
-- grant storage, administration, authentication and audit persistence still need separate design/implementation;
-- relationship-heavy future authorization may require migration to Cedar.
+- a community-maintained Python binding becomes a root-security dependency;
+- Cedar adds a Rust/native dependency inside the Python runtime;
+- Ada still owns authentication, grant lifecycle, policy generation, audit semantics and Action Ledger;
+- Cedar concepts must be carefully mapped so they do not replace Ada's domain model;
+- binding upgrades require explicit security/conformance review.
 
 ## Alternatives considered
 
-### Cedar
+### Small Ada-owned typed evaluator
 
-Semantically an excellent fit. Cedar's principal/action/resource/context model, default deny and forbid-overrides-permit behavior align closely with Ada.
+Passed the MVP conformance cases and remains a valid fallback/control.
 
-Not selected initially because the MVP does not yet need Cedar's broader policy machinery and the Python-first Ada runtime does not currently have an equally simple canonical first-party authorizer embedding path.
-
-Cedar remains the first escalation option.
+Not selected because Cedar now has a proven low-friction Python path while avoiding long-term growth of Ada-owned authorization semantics, schema tooling and relationship logic.
 
 ### PyCasbin
 
 Provides direct Python integration and mature RBAC/ABAC/ReBAC capabilities.
 
-Not selected because Ada's authority semantics would rely heavily on custom matcher/model configuration for provenance, audience, representation and assurance.
+Not selected because Ada's provenance, audience, representation and assurance semantics rely more heavily on custom matcher/model configuration.
 
 ### OPA / Rego
 
-Provides powerful general policy-as-code capabilities and strong integration options through REST or Wasm.
+Provides powerful general policy-as-code capabilities and sidecar/Wasm integration options.
 
-Not selected because its policy/runtime machinery is materially larger than the current household/MVP authorization need.
+Not selected because its policy/runtime machinery is materially larger than Ada's current need and has no advantage over the now-tested Cedar path for the core authorization model.
 
 ## Re-open triggers
 
 Re-open this ADR if:
 
-- the evaluator needs arbitrary expression syntax;
-- roles/groups/relationships become difficult to model with simple typed selectors;
-- authorization accumulates capability-specific branches;
-- the evaluator becomes too large for comprehensive review and conformance tests;
-- policy administration requires stronger static/schema analysis;
-- a mature supported Cedar Python path materially reduces integration cost;
-- a security incident/bypass undermines confidence in the custom evaluator.
+- cedarpy maintenance or release cadence becomes unsuitable;
+- Python/ARM64 wheel support regresses;
+- supply-chain review identifies unacceptable risk;
+- Cedar cannot express a confirmed Ada permission cleanly;
+- Ada starts adding substantial authorization semantics outside Cedar to compensate for engine limitations;
+- a first-party Cedar Python SDK or better integration mode appears;
+- process isolation becomes preferable for the Guard;
+- a security incident/bypass undermines confidence in the selected integration.
 
 ## Follow-up
 
 If accepted:
 
-1. promote Ada-owned authorization request/decision types into `src/ada/core`;
-2. implement the small evaluator under the Guard boundary;
-3. add the conformance cases to the permanent test suite;
-4. implement trusted grant storage/mutation separately;
-5. integrate Guard before the Action Ledger/provider path;
-6. add disclosure-authorization tests before family/private briefings;
-7. update the threat model with the grant store and authentication-claim boundaries.
+1. add Ada-owned authorization request/decision types to `src/ada/core`;
+2. add pinned `cedarpy` to the runtime dependency set;
+3. implement the thin Cedar adapter behind `AdaGuard`;
+4. promote the conformance cases into the permanent test suite;
+5. define initial Cedar schema and policy-generation conventions;
+6. require unique Ada rule/grant IDs mapped through Cedar `@id`;
+7. implement trusted grant storage/mutation separately;
+8. integrate Guard before Action Ledger/provider writes and before sensitive disclosures;
+9. update the threat model with the binding, grant-store and authentication-claim boundaries.
