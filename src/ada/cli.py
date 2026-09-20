@@ -9,6 +9,7 @@ from collections.abc import Callable
 
 from ada import __version__
 from ada.application.calendar_drafts import render_calendar_draft_response
+from ada.application.local_chat_safety import enforce_local_chat_action_truth
 from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest, AgentRuntimePort
 
@@ -62,6 +63,11 @@ def _chat_loop(
             if os.getenv("ADA_DEBUG"):
                 print(f"debug: {exc}", file=sys.stderr)
             continue
+
+        response = enforce_local_chat_action_truth(
+            request_text=text,
+            response=response,
+        )
 
         if response.text:
             write(f"Ada: {response.text}")
