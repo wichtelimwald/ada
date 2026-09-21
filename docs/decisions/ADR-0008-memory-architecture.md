@@ -1246,9 +1246,17 @@ The target-Mac characterization now passes the main substrate/runtime gates:
 - direct native Ollama tool calling with `qwen3.5:9b`;
 - full local Auto Memory -> Auto Dream workflow, including preference, correction, and contradiction fixtures.
 
+The semantic inspection found a material boundary condition:
+
+- explicit correction executed successfully, but the corrected Markdown body (Thursday) disagreed with generated description metadata (Wednesday);
+- Auto Dream later inverted the correction direction again in a procedure digest;
+- two explicit contradictory pickup claims were preserved separately rather than overwritten, but ReMe created no deterministic contradiction relation/state.
+
+Therefore ReMe can remain a candidate **file-native substrate**, but ReMe-generated descriptions/digests cannot be authoritative Ada truth. Ada must own canonical fact values, lifecycle, supersession, contradiction, confirmation basis, and validation of derived summaries.
+
 This moves the remaining ReMe decision work away from basic runtime feasibility and toward:
 
-- semantic inspection of correction/contradiction outputs;
+- design of the Ada-owned canonical fact/lifecycle adapter required above ReMe;
 - external document reference/lifecycle fit;
 - exact transitive license/security audit;
 - maintenance/AgentScope dependency cost;
