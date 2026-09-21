@@ -651,6 +651,146 @@ The characterization evidence shows:
 
 This is a characterization result, not a requirement that Ada's main PydanticAI runtime abandon its accepted OpenAI-compatible model boundary. ReMe remains behind an Ada-owned Memory adapter and may use its own narrow native-Ollama integration internally if adopted.
 
+## Semantic review of successful native-Ollama artifacts
+
+The successful runtime flow was followed by manual inspection of the generated daily, digest, and session artifacts.
+
+### Preference case — mostly good
+
+ReMe preserved the explicit communication preference in a human-readable daily note and later created a personal digest node with source links.
+
+Positive:
+
+- explicit statement remained inspectable;
+- evidence token survived;
+- source links were retained;
+- the preference was not mixed into authorization state.
+
+Caution:
+
+- the digest wording promoted the preference into a "binding communication guideline for the session";
+- Ada still needs to decide whether such a statement belongs in global personality, per-interlocutor interaction profile, or session-only adaptation.
+
+This reinforces the need for Ada-owned subject/scope/lifecycle metadata.
+
+### Explicit correction — semantic integrity failure
+
+Input sequence:
+
+```text
+1. music lesson = Wednesday 17:00
+2. explicit correction: not Wednesday, Thursday 17:00
+```
+
+ReMe's daily-note **body** correctly ended at:
+
+```text
+Day: Thursday
+Time: 17:00
+Status: Corrected and recorded
+```
+
+However, the same note's frontmatter/index description still said that the lesson was **Wednesday at 17:00**, while the filename had been renamed to Thursday.
+
+Auto Dream then made the error worse: it synthesized a procedure that described the correction in the **wrong direction**, e.g. "shifted from Thursday 17:00 to Wednesday 17:00" and listed "Original schedule: Thursday" / "Corrected schedule: Wednesday".
+
+This is a material Ada hard-gate issue.
+
+It demonstrates that model-generated derived metadata/digests can contradict the authoritative body even when the body itself is correct.
+
+**Ada implication:**
+
+- ReMe-generated descriptions/digests cannot be treated as authoritative truth.
+- Explicit correction lifecycle must be deterministic and Ada-owned.
+- A correction write must update canonical structured fields atomically or be rejected.
+- Derived summaries must be validated against canonical facts/provenance before they can influence recall.
+- Ada must preserve the old claim as superseded evidence rather than relying on a model-generated narrative of "what changed".
+
+This strongly supports:
+
+```text
+Authoritative Ada fact/lifecycle
+    -> deterministic structured fields
+    -> human-readable Markdown body
+    -> ReMe-derived descriptions/digests/indexes
+```
+
+rather than allowing ReMe Dream output to become the source of truth.
+
+### Unresolved contradiction — partial success, insufficient Ada semantics
+
+Input sequence:
+
+```text
+pickup = 16:00
+pickup = 17:00
+```
+
+without any correction statement.
+
+Positive:
+
+- ReMe did **not** overwrite the first claim with the second;
+- it created two separate source-backed daily notes;
+- one note explicitly described the situation as an unresolved conflict;
+- the second note explicitly said it did not assume it corrected previous source data.
+
+This is significantly better than last-write-wins.
+
+However:
+
+- there is no deterministic first-class `contradicted` relationship/state linking the two claims;
+- one generated note calls the second item a "Confirmed record", which is safe only if interpreted as "confirmed that this statement was recorded", not "confirmed true";
+- Auto Dream attempted to turn the contradictory evidence into a generic "conflict fixturing procedure" rather than a durable contradiction object;
+- that Dream integration was skipped with `ValueError`, leaving no consolidated contradiction representation.
+
+**Ada implication:** keep contradiction detection and lifecycle Ada-owned. ReMe can retain the evidence and human-readable notes, but Ada must create/maintain the explicit contradiction relation and prevent either claim from becoming authoritative through model consolidation alone.
+
+### Provenance — good substrate fit
+
+The artifacts consistently retained session references such as:
+
+```text
+source_conversation: [[session/dialog/...jsonl]]
+```
+
+and Dream nodes linked back to daily source notes.
+
+This is a useful substrate capability, subject to Ada's cross-scope provenance minimization rules.
+
+### Native Ollama tool calling — good operational result
+
+The direct `qwen3.5:9b` native Ollama tool-call probe completed successfully in about 17.6 seconds and returned the expected tool call with thinking disabled.
+
+This confirms that the earlier extreme latency was transport/configuration-related rather than evidence that Qwen3.5 cannot perform the required tool interaction locally.
+
+### Semantic conclusion
+
+The semantic review changes the ReMe assessment from:
+
+```text
+"possibly sufficient Memory semantics with a thin wrapper"
+```
+
+to:
+
+```text
+"strong file-native substrate, but Ada must own canonical fact/lifecycle semantics"
+```
+
+This is still compatible with adopting ReMe, but the adapter is no longer optional or merely a privacy façade.
+
+At minimum Ada must own:
+
+- canonical fact values;
+- subject and privacy scope;
+- confirmation basis;
+- observed/provisional/confirmed/stale state;
+- supersession;
+- explicit contradiction links;
+- deterministic correction semantics;
+- validation of derived ReMe summaries before they can influence authoritative recall.
+
 ## Current recommendation
 
 Keep **ReMe as the primary deep-dive candidate**, but downgrade the earlier assumption that it is a largely standalone runtime-independent library.
