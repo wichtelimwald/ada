@@ -316,7 +316,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
                 "Do not treat the two pickup claims as an explicit correction unless the evidence says so."
             ),
             "scan_days": 1,
-            "max_units": 10,
+            "max_units": 5,
         },
         timeout=args.dream_timeout,
     )
