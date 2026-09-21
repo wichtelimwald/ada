@@ -566,6 +566,39 @@ max dream units 5
 
 This is not a production decision. It tests whether ReMe's core Memory semantics are operationally viable when configured to Ada's expected workload rather than ReMe's general-purpose defaults.
 
+## Fourth local-LLM attempt — OpenAI-compatible path remains too slow
+
+The bounded ReMe profile still timed out on the first Auto Memory agent call before any tool invocation completed.
+
+This rules out the earlier hypothesis that only ReMe's large default `max_tokens`, ReAct iteration limit, or post-memory auto-tagging caused the initial latency.
+
+### Stronger hypothesis: OpenAI-compatible Ollama path does not disable thinking
+
+Source review shows an important difference between AgentScope's model backends:
+
+- the OpenAI-compatible backend does not send Ollama's native `think=false` parameter when `thinking_enable: false`; it only uses OpenAI-style reasoning fields when thinking is enabled;
+- AgentScope's native Ollama backend explicitly sends `think=self.parameters.thinking_enable`;
+- the native Ollama backend also maps `max_tokens` to `num_predict` and passes tool schemas directly to Ollama.
+
+Ollama documents Qwen3.5 as both tool-capable and thinking-capable, and its native chat API supports an explicit `think` flag.
+
+Therefore the next characterization changes **only the model transport/backend**, not the model:
+
+```text
+before: ReMe -> AgentScope OpenAI backend -> Ollama /v1
+after:  ReMe -> AgentScope native Ollama backend -> Ollama /api/chat
+model:  qwen3.5:9b unchanged
+think:  false explicitly
+```
+
+A direct native Ollama tool-call probe now runs before ReMe so model/tool compatibility and latency can be separated from ReMe's Memory agent workflow.
+
+References:
+
+- https://ollama.com/library/qwen3.5
+- https://ollama.com/blog/thinking
+- https://ollama.com/blog/streaming-tool
+
 ## Current recommendation
 
 Keep **ReMe as the primary deep-dive candidate**, but downgrade the earlier assumption that it is a largely standalone runtime-independent library.
