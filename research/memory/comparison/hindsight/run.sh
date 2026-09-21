@@ -30,7 +30,7 @@ else
   fi
   if [ "$STATUS" = PASS ]; then
     export HOME="$OUT/home"
-    export HINDSIGHT_API_DATABASE_URL="pg0://$OUT/data/hindsight"
+    export HINDSIGHT_API_DATABASE_URL="pg0://ada-memcmp-$PORT"
     export HINDSIGHT_API_LLM_PROVIDER=ollama
     export HINDSIGHT_API_LLM_MODEL="$MODEL"
     export HINDSIGHT_API_LLM_BASE_URL="http://127.0.0.1:11434/v1"
@@ -40,7 +40,7 @@ else
     export HINDSIGHT_API_EMBEDDINGS_ONNX_MODEL_ID="intfloat/multilingual-e5-small"
     export HINDSIGHT_API_RERANKER_PROVIDER=rrf
     export HINDSIGHT_API_ENABLE_RERANKING=false
-    export HINDSIGHT_API_PORT="$PORT"
+    export HINDSIGHT_API_HOST="127.0.0.1"\n    export HINDSIGHT_API_PORT="$PORT"
 
     "$OUT/venv/bin/hindsight-api" >"$OUT/server.log" 2>&1 &
     PID=$!
