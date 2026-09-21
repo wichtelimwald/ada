@@ -61,6 +61,10 @@ Dream units          max 5
 
 These are characterization bounds, not Ada production defaults. They isolate ReMe's core Memory behavior from optional derived tagging and from ReMe's much larger general-purpose output/ReAct limits.
 
+The current characterization uses AgentScope's **native Ollama backend**, not Ollama's OpenAI-compatible `/v1` endpoint. This is deliberate: the native backend passes `think=false` explicitly for `qwen3.5:9b`, maps output limits to Ollama's `num_predict`, and forwards tool schemas through Ollama's native chat API.
+
+Before starting ReMe, the harness now performs a direct native Ollama tool-call probe. This separates a model/tool-calling problem from a ReMe Memory-agent problem.
+
 `REME_VERSION` and `OLLAMA_MODEL` are overridable for explicit comparison runs, but the first result should use the defaults.
 
 ## Run
