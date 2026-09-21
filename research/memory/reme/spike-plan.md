@@ -20,6 +20,29 @@ It must not:
 
 Use synthetic canary data only.
 
+## Prepared executable harness
+
+The first macOS characterization is implemented under:
+
+```text
+research/memory/reme/mac/
+├── README.md
+├── run.sh
+└── driver.py
+```
+
+Run from the Ada repository root with:
+
+```bash
+sh research/memory/reme/mac/run.sh
+```
+
+The harness deliberately installs ReMe into an isolated temporary virtual environment and writes all workspaces/results outside the repository. It does not change Ada's `pyproject.toml` or production runtime.
+
+The first executable baseline pins the current published ReMe release `0.4.1.12`. Source-level research in this ADR also inspected newer upstream `main` state; do not conflate unreleased upstream behavior with the executable baseline.
+
+The harness currently automates C1-C7 plus the core local-learning part of C9 and dependency metadata capture for C11. C8 (external document reference adapter) and the ReMe-vs-Hindsight part of C10 intentionally remain unimplemented until earlier results show they are decision-changing.
+
 ## Environment under test
 
 First attempt:
