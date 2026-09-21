@@ -651,10 +651,11 @@ ResolverEvidence
   parse_state
   semantic_kind / granularity
   normalized_value
-  source_span
 ~~~
 
 Parser-native types never cross the Ada port boundary.
+
+Source attribution is not duplicated in resolver evidence. The verified `TemporalExpression.source` / `SourceLocator` remains the sole canonical source reference for the expression being resolved; resolver evidence describes only the resolver's observation of that expression.
 
 Resolver health and per-input parse outcome are separate concepts:
 
