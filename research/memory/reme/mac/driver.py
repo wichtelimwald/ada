@@ -221,6 +221,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
             "ada-spike-preference",
             [
                 {
+                    "name": "user",
                     "role": "user",
                     "content": (
                         "Synthetic characterization fixture only. "
@@ -228,7 +229,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
                         f"Evidence token: {args.preference_token}"
                     ),
                 },
-                {"role": "assistant", "content": "Understood."},
+                {"name": "assistant", "role": "assistant", "content": "Understood."},
             ],
             "Record the explicit communication preference and its synthetic evidence token.",
         ),
@@ -237,13 +238,14 @@ def cmd_llm(args: argparse.Namespace) -> None:
             "ada-spike-correction",
             [
                 {
+                    "name": "user",
                     "role": "user",
                     "content": (
                         "Synthetic fixture: the music lesson is Wednesday at 17:00. "
                         f"Evidence token: {args.correction_token}"
                     ),
                 },
-                {"role": "assistant", "content": "Recorded."},
+                {"name": "assistant", "role": "assistant", "content": "Recorded."},
             ],
             "Record the synthetic schedule fact.",
         ),
@@ -252,13 +254,14 @@ def cmd_llm(args: argparse.Namespace) -> None:
             "ada-spike-correction",
             [
                 {
+                    "name": "user",
                     "role": "user",
                     "content": (
                         "Correction to the synthetic fixture: not Wednesday. "
                         "The music lesson is Thursday at 17:00."
                     ),
                 },
-                {"role": "assistant", "content": "Recorded correction."},
+                {"name": "assistant", "role": "assistant", "content": "Recorded correction."},
             ],
             "Apply the explicit correction to the same synthetic schedule fact.",
         ),
@@ -267,13 +270,14 @@ def cmd_llm(args: argparse.Namespace) -> None:
             "ada-spike-conflict-a",
             [
                 {
+                    "name": "user",
                     "role": "user",
                     "content": (
                         "Synthetic unresolved-conflict fixture: pickup is at 16:00. "
                         f"Evidence token: {args.conflict_token}"
                     ),
                 },
-                {"role": "assistant", "content": "Recorded."},
+                {"name": "assistant", "role": "assistant", "content": "Recorded."},
             ],
             "Record this synthetic pickup-time claim without inventing clarification.",
         ),
@@ -282,10 +286,11 @@ def cmd_llm(args: argparse.Namespace) -> None:
             "ada-spike-conflict-b",
             [
                 {
+                    "name": "user",
                     "role": "user",
                     "content": "Synthetic unresolved-conflict fixture: pickup is at 17:00.",
                 },
-                {"role": "assistant", "content": "Recorded."},
+                {"name": "assistant", "role": "assistant", "content": "Recorded."},
             ],
             "Record this second synthetic pickup-time claim without assuming it corrects another source.",
         ),
