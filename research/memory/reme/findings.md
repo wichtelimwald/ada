@@ -527,6 +527,45 @@ The harness now uses:
 
 The next retry should determine whether the local Ollama/AgentScope tool path completes successfully or exposes a genuine runtime/model compatibility issue.
 
+## Third local-LLM attempt — functional success plus performance finding
+
+The corrected long-timeout retry reached real local ReMe/AgentScope/Ollama execution.
+
+Observed behavior:
+
+- explicit preference Auto Memory completed successfully and created a daily note;
+- a new "music lesson Wednesday 17:00" fact completed successfully and created a daily note;
+- the subsequent explicit correction found the existing note and successfully executed the required `read` tool;
+- the client then timed out before the next edit/update tool step completed.
+
+This proves that the local OpenAI-compatible Ollama path and ReMe tool-calling workflow are functional on the target machine. The remaining issue is performance/operational fit for the default ReMe agent configuration, not basic compatibility.
+
+### Default workflow is oversized for Ada's Memory use case
+
+ReMe's published default configuration currently allows:
+
+- `max_tokens: 65536` for the LLM component;
+- `max_iters: 30` for the AgentScope ReAct loop;
+- an additional `auto_tag_step` after every `auto_memory` call;
+- an additional `auto_tag_step` after `auto_dream`.
+
+On the target local 9B model, successful small Memory creates took minutes, and the derived auto-tag pass contributed substantial extra latency.
+
+Tagging is not an ADR-0008 hard gate and can be rebuilt/derived separately.
+
+The characterization harness now includes a bounded Ada profile:
+
+```text
+max_tokens      4096
+context_size    32768
+ReAct max_iters 8
+auto_memory     AutoMemoryStep only
+auto_dream      extract + integrate + finish, no AutoTag
+max dream units 5
+```
+
+This is not a production decision. It tests whether ReMe's core Memory semantics are operationally viable when configured to Ada's expected workload rather than ReMe's general-purpose defaults.
+
 ## Current recommendation
 
 Keep **ReMe as the primary deep-dive candidate**, but downgrade the earlier assumption that it is a largely standalone runtime-independent library.
