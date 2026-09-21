@@ -126,7 +126,11 @@ The simplest useful learning loop is:
 4. strengthen, revise, or discard the hypothesis;
 5. only persist a stable fact/preference/routine at the maturity level justified by that evidence.
 
-The system should prefer **state-based maturity** over an opaque universal numeric confidence score. Initial states to characterize are:
+The system should prefer **state-based maturity** over an opaque universal numeric confidence score.
+
+Maturity and confirmation basis are separate dimensions.
+
+Initial maturity states to characterize are:
 
 - `observed`;
 - `provisional`;
@@ -135,7 +139,28 @@ The system should prefer **state-based maturity** over an opaque universal numer
 - `superseded`;
 - `forgotten`.
 
-Exact names remain open, but the distinction must be visible in human-readable Memory.
+For a confirmed memory, Ada should also preserve **how it became confirmed**. Initial confirmation bases are:
+
+- `observed_pattern` — promoted after repeated, sufficiently consistent observed outcomes without an explicit user confirmation;
+- `explicit_user` — explicitly confirmed/stated by the relevant user.
+
+This avoids conflating maturity with provenance. For example:
+
+```yaml
+state: confirmed
+confirmation_basis: observed_pattern
+```
+
+and:
+
+```yaml
+state: confirmed
+confirmation_basis: explicit_user
+```
+
+A memory confirmed through observation remains weaker evidence than an explicit confirmation for later contradiction resolution or sensitive decisions. Exact precedence rules still need characterization.
+
+Exact field names remain open, but both maturity and confirmation basis must remain visible in human-readable Memory.
 
 #### Confirmed initial learning classes
 
@@ -144,7 +169,7 @@ The maintainer confirmed four default learning classes. More specific classes ma
 | Class | Default behavior | Examples / notes |
 | --- | --- | --- |
 | **A — explicit, low-risk facts/preferences** | **Remember automatically, private by default**, with provenance and correction/supersession semantics. | "I prefer concise answers." A later explicit correction wins. |
-| **B — inferred preferences/routines** | **Observe first, learn gradually.** Record minimized observations, form a provisional hypothesis, and promote only after repeated evidence or explicit confirmation. | Repeatedly choosing one option; recurring pickup patterns. Never implies authority. |
+| **B — inferred preferences/routines** | **Observe first, learn gradually.** Record minimized observations, form a provisional hypothesis, and promote after repeated evidence as `confirmed/observed_pattern` or after explicit confirmation as `confirmed/explicit_user`. | Repeatedly choosing one option; recurring pickup patterns. Never implies authority. |
 | **C — sensitive or consequential facts** | **Require confirmation or an explicit future rule before durable promotion.** | Health, finances, highly personal information, facts whose incorrect persistence could materially affect people. |
 | **D — secrets/credentials** | **Never learn automatically.** | Passwords, API tokens, authentication secrets, private keys, recovery codes. Explicit requested secure storage is a separate future capability, not ordinary Memory learning. |
 
@@ -160,10 +185,10 @@ Cross-cutting rules still apply:
 Learning may use multiple feedback forms with different evidentiary weight:
 
 - explicit correction or rejection — strong negative evidence;
-- explicit confirmation — strong positive evidence;
+- explicit confirmation — strong positive evidence and `explicit_user` confirmation basis;
 - user selecting/accepting a suggestion — useful but weaker positive evidence;
 - a real-world outcome explicitly reported back to Ada — useful outcome evidence;
-- repeated consistent behavior across occasions — cumulative evidence;
+- repeated consistent behavior across occasions — cumulative evidence that may eventually justify `observed_pattern` confirmation;
 - silence / absence of correction — **not sufficient on its own** to establish a durable fact.
 
 When Ada acts or proposes based on a provisional hypothesis, the relevant outcome may be referenced from existing action/application records, but the durable action ledger must not become a hidden personal Memory store. Memory should retain only the minimized learning fact/provenance needed for future behavior.
@@ -477,7 +502,7 @@ Before selecting a backend, characterize at least:
 9. **No archive rescan** — deleted/forgotten information is not silently relearned from archived messages unless an explicit archive-read task permits it.
 10. **Offline recall** — representative local chat retrieval works with network access unavailable.
 11. **Gardening** — after Memory accumulates duplicates and stale structure, Ada proposes a cleanup without silently deleting or changing material facts.
-12. **Preference learning** — repeated accepted concise replies create a provisional preference hypothesis; silence alone does not confirm it, while explicit confirmation/correction updates the state.
+12. **Preference learning** — repeated accepted concise replies create a provisional preference hypothesis; repeated consistent outcomes may promote it to `confirmed/observed_pattern`, while an explicit confirmation yields `confirmed/explicit_user`; silence alone never confirms it.
 13. **Routine learning** — repeated reported outcomes may establish a routine, but the routine never becomes permission to act.
 14. **Learning correction** — a user rejects a learned hypothesis and Ada stops using it without routine archive rescanning recreating it.
 
@@ -513,7 +538,7 @@ Weights are deliberately not assigned by this draft.
 8. Decide how concurrent/out-of-band file edits are detected and reconciled.
 9. Define explicit forget/delete semantics across authoritative files, derived indexes/graphs, source references, and action/audit records.
 10. Define the Memory-gardening proposal/approval boundary.
-11. Characterize learning promotion rules for explicit facts, preferences, routines, sensitive facts, and shared knowledge.
+11. Characterize learning promotion rules for explicit facts, preferences, routines, sensitive facts, and shared knowledge, including precedence between observed-pattern and explicit-user confirmation.
 12. Define the inspectable learning-journal representation, retention/compaction rules, and how application outcomes feed learning without duplicating the action ledger.
 13. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
