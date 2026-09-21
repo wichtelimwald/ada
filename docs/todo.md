@@ -34,7 +34,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [ ] Ears — wake word / speech input.
 - [ ] Voice — speech output.
 - [x] Brain — initial agent-runtime/orchestration foundation ([ADR-0002](decisions/ADR-0002-agent-runtime-foundation.md)).
-- [ ] Memory — **next architecture priority**. Evaluate human-readable stores, agent memory, dedicated local stores, and credible hybrid alternatives. Must support personality bootstrap/growth, correction, provenance, export/delete, and remain external to runtime persistence.
+- [ ] Memory — **next architecture priority**. Architecture evaluation in [ADR-0008](decisions/ADR-0008-memory-architecture.md): evaluate human-readable stores, agent memory, dedicated local stores, and credible hybrid alternatives. Must support personality bootstrap/growth, correction, provenance, export/delete, and remain external to runtime persistence.
 - [ ] Hands — computer control / action runtime.
 - [x] Guard — permission/policy architecture ([ADR-0004](decisions/ADR-0004-guard-permission-architecture.md)).
 - [ ] Eyes — screen/camera, only if required.
