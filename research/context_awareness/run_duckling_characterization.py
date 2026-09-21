@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -86,6 +87,14 @@ def _normalize_duckling(
     }
 
 
+def _service_ready(base_url: str) -> bool:
+    try:
+        with urlopen(base_url.rstrip("/") + "/", timeout=1):
+            return True
+    except Exception:
+        return False
+
+
 def _matches_expected(
     actual: dict[str, Any] | None,
     expected: dict[str, Any] | None,
@@ -130,9 +139,23 @@ def main() -> int:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
             method="POST",
         )
-        with urlopen(request, timeout=10) as response:
-            raw = json.loads(response.read().decode("utf-8"))
-        actual = _normalize_duckling(raw, context["timezone"])
+        raw = None
+        actual = None
+        error = None
+        try:
+            with urlopen(request, timeout=10) as response:
+                raw = json.loads(response.read().decode("utf-8"))
+            actual = _normalize_duckling(raw, context["timezone"])
+        except HTTPError as exc:
+            if exc.code == 400:
+                error = f"input_error: HTTP {exc.code}"
+            else:
+                raise
+        except TimeoutError as exc:
+            if _service_ready(args.base_url):
+                error = f"timeout: {type(exc).__name__}: {exc}"
+            else:
+                raise
 
         rows.append(
             {
@@ -145,7 +168,7 @@ def main() -> int:
                     actual,
                     case.get("expected"),
                 ),
-                "error": None,
+                "error": error,
                 "raw": raw,
             }
         )
