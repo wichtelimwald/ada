@@ -116,7 +116,14 @@ If the main run already passed installation/file/isolation tests and only `local
 sh research/memory/reme/mac/resume-llm.sh /path/to/ada-reme-spike-RESULT
 ```
 
-The retry writes into `llm-flow-retry/` inside that existing result bundle and prints the relevant driver/service log tails on failure.
+The retry reuses the existing virtual environment but creates a **fresh ReMe workspace and output directory** for each attempt. This avoids contamination from a request that timed out after writing a partial session. It also prints the relevant driver/service log tails on failure.
+
+LLM-driven HTTP calls use longer research timeouts than ordinary file/search operations:
+
+- Auto Memory: 300 seconds;
+- Auto Dream: 600 seconds.
+
+These are harness timeouts, not Ada production defaults.
 
 ## Interpreting important failures
 
