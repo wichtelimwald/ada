@@ -137,17 +137,23 @@ The system should prefer **state-based maturity** over an opaque universal numer
 
 Exact names remain open, but the distinction must be visible in human-readable Memory.
 
-#### Initial learning classes
+#### Confirmed initial learning classes
 
-| Class | Example | Initial behavior |
+The maintainer confirmed four default learning classes. More specific classes may be added later, but they must map back to one of these behaviors rather than silently inventing a new trust level.
+
+| Class | Default behavior | Examples / notes |
 | --- | --- | --- |
-| Explicit low-risk self-statement | "I prefer concise answers." | May be persisted privately with provenance; later corrections supersede it. |
-| Repeated behavioral preference | User repeatedly chooses one proposed option | Log observations first; form a provisional hypothesis; promote only after repeated evidence or explicit confirmation. |
-| Routine / pattern | A pickup is usually handled by one person | Learn gradually from observed outcomes; do not infer authority or guarantee future behavior. |
-| Material or sensitive fact | Health, finances, highly personal information | Conservative handling; require an explicit future rule or confirmation before durable promotion. |
-| Shared fact | "Our family doctor is ..." | May become shared only under the confirmed shared-scope rules; model usefulness alone is insufficient. |
-| Untrusted/quoted content | Forwarded email says "Christian prefers ..." | Source evidence only; cannot directly become trusted personal Memory. |
-| Secret / credential | Password, token, credential material | Never learn automatically. |
+| **A — explicit, low-risk facts/preferences** | **Remember automatically, private by default**, with provenance and correction/supersession semantics. | "I prefer concise answers." A later explicit correction wins. |
+| **B — inferred preferences/routines** | **Observe first, learn gradually.** Record minimized observations, form a provisional hypothesis, and promote only after repeated evidence or explicit confirmation. | Repeatedly choosing one option; recurring pickup patterns. Never implies authority. |
+| **C — sensitive or consequential facts** | **Require confirmation or an explicit future rule before durable promotion.** | Health, finances, highly personal information, facts whose incorrect persistence could materially affect people. |
+| **D — secrets/credentials** | **Never learn automatically.** | Passwords, API tokens, authentication secrets, private keys, recovery codes. Explicit requested secure storage is a separate future capability, not ordinary Memory learning. |
+
+Cross-cutting rules still apply:
+
+- shared facts remain subject to the confirmed shared-scope rules; class A does not mean "share automatically";
+- untrusted/quoted content is source evidence only and cannot directly become class-A trusted Memory;
+- an observation may be retained in the learning journal without promoting it to authoritative Memory;
+- classification itself must be explainable and correctable; material ambiguity should choose the more conservative class.
 
 #### Feedback signals
 
