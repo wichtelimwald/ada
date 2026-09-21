@@ -49,7 +49,8 @@ Structured formats such as dedicated YAML/TOML records remain possible where the
 
 The maintainer confirmed the following separation:
 
-- **directory location is the hard privacy/audience boundary**;
+- **directory/vault placement expresses the privacy/audience boundary**;
+- **the storage protection boundary must enforce that placement** through separate storage roots, OS access control, encryption keys, or another deterministic mechanism;
 - **YAML properties/front matter carry metadata inside that boundary**;
 - **Markdown is the primary human-readable content**.
 
@@ -69,7 +70,11 @@ memory/
     └── personality/
 ```
 
-The exact directory taxonomy remains open and should be scenario-driven, but access control must not depend on free-text tags or model interpretation. Moving a note across a hard-scope directory boundary is therefore a security-relevant operation and must eventually be mediated by deterministic Ada policy rather than silently inferred by the model.
+The exact directory/vault taxonomy remains open and should be scenario-driven, but access control must not depend on free-text tags or model interpretation.
+
+A directory name **alone is not a security boundary** if the same filesystem principal can read all directories. The logical scope boundary therefore needs a corresponding enforceable storage boundary.
+
+Moving a note across a scope/storage boundary is a security-relevant operation and must eventually be mediated by deterministic Ada policy rather than silently inferred by the model.
 
 YAML metadata may describe properties such as:
 
@@ -82,6 +87,32 @@ YAML metadata may describe properties such as:
 - optional structured fields such as addresses.
 
 YAML metadata must not be treated as an alternate authorization system. Authority remains owned by AdaGuard.
+
+### Storage topology to characterize
+
+The current preferred topology to evaluate is **multiple human-readable Memory vaults rather than one monolithic plaintext vault**:
+
+```text
+memory/
+├── shared-household/       # shared protection domain
+├── person-a-private/       # private protection domain / key / ACL
+├── person-b-private/       # private protection domain / key / ACL
+├── ...
+└── ada-system/             # Ada-owned non-user/private configuration such as personality seed state
+```
+
+The names and exact ownership model remain open. The important property is that gaining read access to one private Memory domain must not automatically reveal another person's private Memory.
+
+Questions still to decide:
+
+- one vault/repository per person plus separate shared vaults, versus another equivalent protected topology;
+- OS permissions versus per-vault encryption versus both;
+- how Ada receives temporary access to the minimum vaults required for a task;
+- how derived indexes/graphs are partitioned so they cannot recombine private scopes into one readable database;
+- whether indexes are one-per-vault, encrypted per scope, or held only ephemerally;
+- how shared minimized derivatives reference a private source without exposing that source.
+
+This also means a single global Obsidian vault is only acceptable where all users of that vault are authorized to read all contained material. Separate private vaults may still each be opened independently in Obsidian.
 
 ### Confirmed default placement policy: private by default
 
@@ -283,6 +314,73 @@ Requirements:
 
 The exact representation remains open; Markdown/YAML or another human-readable append-friendly form should be characterized.
 
+## Provenance model
+
+Provenance should explain **why Ada believes a memory** without retaining an unnecessary copy of the original source.
+
+For ordinary durable Memory, characterize a minimal human-readable provenance record such as:
+
+```yaml
+state: confirmed
+confirmation_basis: explicit_user
+provenance:
+  source_kind: local_chat
+  source_ref: optional-stable-reference
+  recorded_at: 2026-09-21T14:30:00+02:00
+  reason: "Explicitly stated by the subject"
+```
+
+Potential source kinds include:
+
+- explicit user statement;
+- direct manual file edit;
+- observation / learned outcome;
+- calendar or other structured local source;
+- email/message source;
+- derived from another Memory entry.
+
+Rules:
+
+- provenance is **minimized**; raw chats, emails, or documents are not copied into Memory merely to prove provenance;
+- `source_ref` may be omitted or become non-resolvable after source deletion;
+- deletion of a source does not by itself invalidate an already established derived memory;
+- provenance must never create authority or widen audience;
+- cross-scope provenance must not leak private filenames, titles, snippets, or identifiers into a broader scope;
+- explicit manual edits remain first-class provenance and must not be treated as inferior merely because Ada did not create them;
+- superseded/contradicted entries retain enough provenance to explain how the current state was reached.
+
+## Versioning, backup, and sync are separate concerns
+
+The Memory design must treat these as three different mechanisms:
+
+- **versioning** — recover accidental edits and inspect how Memory changed;
+- **backup** — recover from device loss/corruption;
+- **sync** — replicate current state across authorized devices/users.
+
+Git-like history is attractive for Markdown because it provides diffs and rollback, but it has a major privacy/forgetting consequence: deleting a file from the working tree does not remove it from repository history.
+
+Therefore **plain Git history must not be adopted automatically as the Memory backup/versioning mechanism**.
+
+Any selected mechanism must characterize:
+
+- encryption at rest and key ownership;
+- per-private-vault versus shared-vault protection;
+- deletion/forget semantics across historical versions and backups;
+- retention windows and eventual purge;
+- recovery if a key/device is lost;
+- ability to restore one person's vault without exposing another's;
+- offline operation;
+- human-inspectable recovery where practical.
+
+Possible solution families to research later include:
+
+- per-vault Git-style versioning with an encryption/retention design;
+- encrypted snapshot/version stores;
+- filesystem-native snapshots where available;
+- encrypted backup tools independent of the live Markdown representation.
+
+The authoritative Memory format should not depend on whichever versioning/backup mechanism is selected.
+
 ## Security and semantic invariants
 
 The following remain non-negotiable:
@@ -363,6 +461,8 @@ A candidate cannot win by weighted score if it fails a hard gate.
 | No hidden persistence | No second independent persistent truth store; indexes/caches are reconstructible. |
 | Local/offline baseline | Core Memory read/write/retrieval can operate without cloud access. |
 | Scope isolation | Individual/private/shared scopes can be represented and enforced without trusting the model. |
+| Storage isolation | Read access to one private Memory domain must not implicitly grant read access to other private domains; derived indexes must preserve the same boundary. |
+| History privacy | Versioning/backups must not silently defeat deliberate forgetting or expose plaintext private Memory through history. |
 | Authority separation | Learned Memory cannot create or widen permissions. |
 | Correction semantics | Corrections, supersession, contradiction, and deliberate forgetting can be represented safely. |
 | Learning explainability | Observations, hypotheses, promotion, correction, and rejection remain inspectable; no hidden behavioral model silently becomes Memory truth. |
@@ -583,6 +683,10 @@ Before selecting a backend, characterize at least:
 15. **Pattern aging** — an observationally confirmed routine that has not been observed for a category-appropriate period becomes `stale` without being deleted; an explicitly confirmed durable fact does not age merely because time passed.
 16. **Contradictory explicit statements** — two conflicting explicit-user claims remain visibly `contradicted` unless one is clearly expressed as a correction or another deterministic resolution rule applies.
 17. **Explicit correction** — "not Wednesday, Thursday" supersedes the corrected claim directly while preserving provenance for both versions.
+18. **Private vault isolation** — a person with legitimate access to one private Memory vault cannot read another person's private vault or a cross-scope derived index.
+19. **Shared derivative provenance** — a shared minimized fact can remain attributable without leaking private source content or identifiers.
+20. **Version recovery** — an accidental Markdown edit can be restored without weakening scope isolation.
+21. **Forget across history** — deliberate forgetting defines what happens to historical versions and backups rather than leaving the deleted memory silently recoverable forever.
 
 ## Evaluation criteria to weight with the maintainer
 
@@ -592,7 +696,8 @@ After hard gates, candidate scoring should consider:
 - retrieval quality and context/token efficiency;
 - correction and contradiction semantics;
 - learning quality, explainability, and false-learning resistance;
-- privacy/scope isolation;
+- privacy/scope and physical storage isolation;
+- versioning/backup privacy and recoverability;
 - local/offline behavior;
 - operational simplicity;
 - integration effort with current Python/PydanticAI architecture;
@@ -620,7 +725,12 @@ Weights are deliberately not assigned by this draft.
 12. Define the inspectable learning-journal representation, retention/compaction rules, and how application outcomes feed learning without duplicating the action ledger.
 13. Define deterministic, category-specific staleness rules for observed patterns and which memory types, if any, have explicit validity windows.
 14. Characterize explicit correction detection and contradiction-resolution rules without relying on model-only last-write-wins behavior.
-15. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+15. Define the minimal provenance schema and cross-scope provenance redaction/reference semantics.
+16. Compare protected storage topologies: per-person private vaults plus shared vaults versus equivalent designs, including OS ACL and encryption options.
+17. Define partitioning for FTS/graph/vector indexes so derived retrieval cannot collapse private protection domains.
+18. Evaluate versioning separately from backup and sync; specifically characterize Git-like history against forgetting, encryption, and recovery requirements.
+19. Define backup retention and eventual purge semantics for deliberately forgotten Memory.
+20. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
