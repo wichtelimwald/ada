@@ -683,6 +683,68 @@ A candidate cannot win by weighted score if it fails a hard gate.
 | License | Runtime/build dependencies must be compatible with Ada's MIT distribution strategy and documented in NOTICE. |
 | Maintenance | Fits the accepted Python/container architecture and the project's roughly 1–2 evenings/week maintenance budget. |
 
+## Reference systems and lessons
+
+These systems are not automatically candidates for adoption; they are useful evidence for Memory/document design.
+
+### OpenJarvis
+
+Current architecture documentation describes Memory primarily as persistent searchable document storage with ingestion, chunking, retrieval, and context injection. Available backends include SQLite/FTS5, FAISS, ColBERTv2, BM25, and hybrid retrieval.
+
+Useful lesson for Ada:
+
+- mature document retrieval can remain a replaceable backend capability;
+- document source attribution and bounded context injection are valuable;
+- Ada should avoid making the retrieval database itself the only authoritative personal Memory if that would sacrifice human-readable ownership.
+
+References:
+
+- https://github.com/open-jarvis/OpenJarvis/blob/main/docs/architecture/overview.md
+- https://github.com/open-jarvis/OpenJarvis/blob/main/docs/getting-started/quickstart.md
+
+### Mark LIV
+
+Mark LIV currently stores remembered user facts locally in `memory/long_term.json` and separates storage capacity from prompt budget by recalling additional facts on demand. It also has document-reading/summarization tooling, but its documented persistent personal Memory remains a local JSON store rather than a curated document knowledge base.
+
+Useful lesson for Ada:
+
+- prompt budget and Memory capacity should remain separate;
+- visible deletion/inspection of remembered facts is good product behavior;
+- the flat personal-fact model is too coarse for Ada's per-person scopes, provenance, lifecycle, and document requirements.
+
+Reference:
+
+- https://github.com/FatihMakes/Mark-LIV
+
+### Hermes Agent
+
+Hermes separates several persistent concerns:
+
+- `SOUL.md` for agent identity/personality;
+- `USER.md` for the user profile;
+- `MEMORY.md` for learned facts/notes;
+- SQLite/FTS5 session storage for full conversation history and search.
+
+Its built-in Markdown Memory is intentionally bounded and injected at session boundaries, while older conversations are retrieved on demand through session search. Hermes also supports optional external Memory providers in addition to the built-in Markdown files.
+
+For documents, current Hermes documentation supports file/context references and temporary document caches, while a persistent user workspace/knowledge-base design is still being discussed separately.
+
+Useful lessons for Ada:
+
+- separating global agent identity, per-user profile, learned Memory, and conversation history is a strong precedent for Ada's global/per-interlocutor model;
+- bounded always-in-context Memory plus on-demand historical retrieval validates separating storage from context budget;
+- full transcript/session storage can solve recall but is not equivalent to Ada's desired human-readable episodic summaries;
+- document storage should be a separate concern from compact personal Memory;
+- external Memory providers are useful references, but Ada should keep authoritative user-controlled Memory independent from provider-specific databases.
+
+References:
+
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/memory.md
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/which-file-does-what.md
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/sessions.md
+- https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/memory-providers.md
+- https://github.com/NousResearch/hermes-agent/issues/531
+
 ## Candidate architectures
 
 No candidate is selected by this draft.
