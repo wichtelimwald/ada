@@ -745,6 +745,148 @@ References:
 - https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/memory-providers.md
 - https://github.com/NousResearch/hermes-agent/issues/531
 
+## Broader Memory/document landscape
+
+The broader ecosystem suggests that Ada should distinguish between **complete assistant references** and **reusable Memory/context components**.
+
+### Additional assistant/reference systems worth tracking
+
+#### Khoj
+
+Khoj is an open-source "second brain" that can search and chat over Markdown, PDF, plaintext, Org-mode, Notion, and other user knowledge, with Obsidian integration and self-hosting.
+
+Useful lesson:
+
+- personal document/notes retrieval can be a first-class assistant capability rather than an upload-only RAG feature;
+- existing user knowledge stores should be reusable rather than migrated into an opaque assistant database.
+
+Reference: https://github.com/khoj-ai/khoj
+
+#### Mimir
+
+Mimir combines a local-first assistant, document RAG, persistent conversations, and explicitly human-readable Markdown personal Memory.
+
+Useful lesson:
+
+- human-readable personal Memory plus opaque/reconstructible document retrieval is a viable split;
+- this is a close small-scale reference for Ada's Markdown-source-of-truth principle.
+
+Reference: https://github.com/csornyei/mimir
+
+#### PersonalAI
+
+PersonalAI combines continuously synchronized document folders, local OCR, hybrid RAG, an entity knowledge graph, controllable Memory, and explicit security/egress controls.
+
+Useful lesson:
+
+- continuously watched external document folders can remain the source material while indexes/knowledge graphs are derived;
+- document deletion/change detection and entity-graph generation can be treated as separate pipelines.
+
+Reference: https://github.com/lucianhanga/personal-ai
+
+### Reusable Memory/context frameworks to evaluate
+
+#### Letta MemFS
+
+Letta's current MemFS is a git-backed Markdown filesystem with YAML front matter. Files under `system/` are always included in context; other files remain discoverable and are loaded on demand. It also supports shared git-backed Memory repositories and background Memory maintenance.
+
+This is one of the closest existing architectural references to Ada's current direction.
+
+Potential reuse question:
+
+- determine whether MemFS components are sufficiently separable from the Letta runtime to reuse behind an Ada-owned boundary; otherwise adopt only the patterns.
+
+References:
+
+- https://github.com/letta-ai/letta-docs-md/blob/main/concepts/memfs/index.md
+- https://github.com/letta-ai/letta-code
+
+#### Hindsight
+
+Hindsight provides isolated Memory banks with `retain`, `recall`, and `reflect`; it distinguishes facts/experiences from consolidated observations and supports living "mental models"/knowledge pages. Recall combines semantic, keyword, graph, and temporal retrieval. Current repository license is MIT.
+
+Particularly relevant Ada concepts:
+
+- per-user/per-project banks as protection/relevance boundaries;
+- evidence-backed observations instead of flat confidence;
+- compact knowledge pages derived from accumulated evidence;
+- explicit retain/recall/reflect separation;
+- token-bounded hybrid retrieval.
+
+Potential Ada role:
+
+- serious candidate for a **derived learning/retrieval engine**, provided authoritative Markdown can remain Ada-owned and Hindsight state can be rebuilt or treated as non-authoritative.
+
+Reference: https://github.com/vectorize-io/hindsight
+
+#### LangMem
+
+LangMem is an MIT-licensed memory SDK that supports memory extraction, consolidation, update, hot-path management, and background processing. Its core APIs can work with storage systems other than LangGraph's native store.
+
+Potential Ada role:
+
+- investigate reusable write-time learning/consolidation logic while keeping Ada's Markdown/vault abstraction authoritative.
+
+Reference: https://github.com/langchain-ai/langmem
+
+#### Cognee
+
+Cognee turns documents, code, and conversations into a self-hosted knowledge graph plus semantic retrieval layer. The Python package is Apache-2.0.
+
+Potential Ada role:
+
+- derived document/knowledge graph alternative to Graphify/Graphiti;
+- useful for comparing graph construction from heterogeneous personal documents and conversations.
+
+Reference: https://github.com/topoteretes/cognee
+
+#### OpenViking
+
+OpenViking unifies resources, memories, and skills behind a virtual filesystem, uses directory summaries and layered context loading, and can turn sessions into Memory through background extraction/consolidation.
+
+Its main project is currently **AGPLv3**, so it does not pass Ada's current permissive-runtime license gate.
+
+Useful concepts to study without adopting the main runtime:
+
+- resources vs Memory vs skills as separate context types;
+- hierarchical directory summaries (coarse-to-detailed context);
+- directory-scoped retrieval before vector ranking;
+- compiling source material into wiki/graph/report views;
+- session-to-memory consolidation.
+
+Reference: https://github.com/volcengine/OpenViking
+
+#### Supermemory
+
+Supermemory provides document/Memory ingestion and graph-style retrieval and is integrated as an optional Hermes Memory provider. Its current public licensing surfaces require closer review: the repository exposes an MIT LICENSE while recent self-hosted release material also describes product-specific document limits.
+
+Current status: **license/product-boundary review required before Ada runtime consideration**.
+
+Reference: https://github.com/supermemoryai/supermemory
+
+### Emerging synthesis for Ada
+
+The ecosystem increasingly converges on several patterns that align with Ada:
+
+```text
+human/source layer
+  Markdown / files / documents / sessions
+              |
+              v
+learning/consolidation layer
+  extract / reconcile / observe / summarize
+              |
+              v
+derived knowledge layer
+  FTS / vectors / graph / temporal indexes
+              |
+              v
+context assembly
+  load only the smallest relevant context
+```
+
+Ada's differentiator should remain that **the human/source layer and privacy/authority boundaries are Ada-owned**, while mature frameworks may be reused below that boundary.
+
 ## Candidate architectures
 
 No candidate is selected by this draft.
@@ -1019,7 +1161,12 @@ Weights are deliberately not assigned by this draft.
 22. Define when a conversation merits an episodic summary and the minimum summary schema for decisions, rationale, and open loops.
 23. Define a provider-independent document-reference abstraction for local files, iCloud, and future stores, including fingerprint/change detection.
 24. Decide whether Ada eventually needs a managed document store in addition to references to user-controlled external storage.
-25. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+25. Characterize Letta MemFS as the closest git-Markdown architecture reference and determine whether any implementation can be reused without adopting the Letta runtime.
+26. Characterize Hindsight as a derived learning/retrieval engine, especially banks, evidence-backed observations, knowledge pages, and rebuildability from Ada-owned Memory.
+27. Characterize LangMem for storage-agnostic extraction/consolidation logic.
+28. Compare Cognee, Graphify, Graphiti, and Hindsight for derived graph/temporal retrieval over representative Memory and document scenarios.
+29. Use OpenViking as a design reference for hierarchical context loading and resource/Memory separation; do not adopt the AGPLv3 main runtime under the current license strategy.
+30. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
