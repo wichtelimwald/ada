@@ -291,6 +291,25 @@ Therefore the preferred evaluation order is:
 3. benchmark Hindsight only on scenarios where ReMe remains weak;
 4. add Hindsight only if the improvement is substantial.
 
+## 12. PydanticAI integration fit
+
+Hindsight has a dedicated `hindsight-pydantic-ai` package.
+
+Current package metadata:
+
+- MIT license;
+- Python >=3.10;
+- depends on `pydantic-ai-slim>=1.0.0` and `hindsight-client>=0.4.0`;
+- async-native retain/recall/reflect tools;
+- can expose only selected operations;
+- can inject recalled context through PydanticAI instructions or leave recall entirely explicit.
+
+This is a strong fit with Ada's already accepted PydanticAI runtime boundary.
+
+If Hindsight is ever adopted, Ada should **not** expose its `retain` tool directly to the model as an authority-free write path. Ada should instead call Hindsight through an Ada-owned Memory adapter after learning/privacy policy has approved the write.
+
+The lightweight PydanticAI client integration reduces framework coupling, but the self-hosted Hindsight backend remains a substantial database/retrieval service and must still justify its operational cost.
+
 ## 12. Current recommendation
 
 - **Authoritative Memory:** Hindsight = NO.
