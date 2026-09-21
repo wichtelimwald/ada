@@ -466,6 +466,45 @@ Ada must explicitly supply its accepted local model boundary/configuration and t
 6. identify a minimal characterization configuration that avoids the `core` extra;
 7. prepare executable spike cases for later local macOS/Python 3.14 validation.
 
+## First macOS execution — 2026-09-21
+
+The first executable characterization ran on the target macOS/Apple-Silicon/Python-3.14 environment.
+
+Observed PASS results:
+
+- preflight;
+- isolated virtual-environment creation;
+- pinned `reme-ai[as]==0.4.1.12` installation;
+- initial ReMe service startup;
+- basic Markdown write/search;
+- preservation of nested Ada YAML metadata;
+- one-workspace status capture;
+- out-of-band Markdown edit;
+- clean startup after removing derived metadata;
+- search rebuilt from the edited current source;
+- operational forget remained forgotten after a clean metadata rebuild;
+- second ReMe workspace startup;
+- two-workspace canary isolation;
+- independent status capture for both workspaces.
+
+This is strong evidence for the file-source, rebuild, forget, Python-3.14, and workspace-isolation hypotheses.
+
+### Initial local-LLM step was a harness defect, not yet a ReMe result
+
+The first `local-llm-memory-flow` invocation failed immediately before useful model characterization.
+
+Source review identified the harness defect: ReMe converts raw messages through AgentScope's `Msg` model, whose `name` field is required. The initial synthetic messages contained only `role` and `content`.
+
+The harness has been corrected to include sender names, and a focused `resume-llm.sh` retry path was added so the successful installation/workspaces can be reused.
+
+Therefore the first LLM failure is classified as:
+
+```text
+HARNESS INVALID / RETRY REQUIRED
+```
+
+not as a ReMe gate failure.
+
 ## Current recommendation
 
 Keep **ReMe as the primary deep-dive candidate**, but downgrade the earlier assumption that it is a largely standalone runtime-independent library.
