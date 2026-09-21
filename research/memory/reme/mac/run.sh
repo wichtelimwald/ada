@@ -208,12 +208,9 @@ apply_runtime_network_guard() {
   export no_proxy="$NO_PROXY"
 
   unset OPENAI_API_KEY ANTHROPIC_API_KEY DASHSCOPE_API_KEY GEMINI_API_KEY GOOGLE_API_KEY || true
-
-  # ReMe's default AgentScope OpenAI-compatible model wrapper points at local Ollama.
-  export LLM_BACKEND="openai"
-  export LLM_MODEL_NAME="$OLLAMA_MODEL"
-  export LLM_API_KEY="ollama-local-research-only"
-  export LLM_BASE_URL="http://127.0.0.1:11434/v1"
+  unset LLM_API_KEY LLM_BASE_URL || true
+  export OLLAMA_MODEL_NAME="$OLLAMA_MODEL"
+  export OLLAMA_HOST="http://127.0.0.1:11434"
 }
 
 launch_service() {
@@ -260,6 +257,8 @@ critical preflight preflight
 critical create-venv create_venv
 critical install-reme install_reme
 apply_runtime_network_guard
+critical native-ollama-tool-probe "$VENV/bin/python" "$DRIVER" ollama-probe \
+  --host "$OLLAMA_HOST" --model "$OLLAMA_MODEL" --out "$RESULT_DIR/native-ollama-tool-probe.json"
 
 # C1/C3/C7: basic file path, retrieval, nested Ada metadata.
 PID_A="$(launch_service a "$WORKSPACE_A" "$PORT_A")"
