@@ -16,7 +16,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
-def _post(base_url: str, endpoint: str, payload: dict) -> dict:
+def _post(base_url: str, endpoint: str, payload: dict, *, timeout: float = 20.0) -> dict:
     url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
     request = Request(
         url,
@@ -24,7 +24,7 @@ def _post(base_url: str, endpoint: str, payload: dict) -> dict:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urlopen(request, timeout=20) as response:
+    with urlopen(request, timeout=timeout) as response:
         raw = response.read().decode("utf-8")
     parsed = json.loads(raw)
     if not isinstance(parsed, dict):
@@ -301,6 +301,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
             args.base_url,
             "auto_memory",
             {"session_id": session_id, "messages": messages, "memory_hint": hint, "date": day},
+            timeout=args.llm_timeout,
         )
         _expect_success(response, f"auto_memory {label}")
         _write_json(out / f"auto-memory-{label}.json", response)
@@ -317,6 +318,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
             "scan_days": 1,
             "max_units": 10,
         },
+        timeout=args.dream_timeout,
     )
     _expect_success(dream, "auto_dream")
     _write_json(out / "auto-dream.json", dream)
@@ -433,6 +435,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--preference-token", required=True)
     p.add_argument("--correction-token", required=True)
     p.add_argument("--conflict-token", required=True)
+    p.add_argument("--llm-timeout", type=float, default=300.0)
+    p.add_argument("--dream-timeout", type=float, default=600.0)
     p.add_argument("--out", type=Path, required=True)
     p.set_defaults(func=cmd_llm)
 
