@@ -14,7 +14,13 @@ def _semantic_view(value: dict[str, Any] | None) -> dict[str, Any] | None:
     if kind == "point":
         return {
             key: value.get(key)
-            for key in ("kind", "local", "wall_time_status")
+            for key in (
+                "kind",
+                "semantic_kind",
+                "granularity",
+                "local",
+                "wall_time_status",
+            )
         }
     if kind == "interval":
         return {
@@ -25,6 +31,10 @@ def _semantic_view(value: dict[str, Any] | None) -> dict[str, Any] | None:
                 "end",
                 "start_wall_time_status",
                 "end_wall_time_status",
+                "start_semantic_kind",
+                "end_semantic_kind",
+                "start_granularity",
+                "end_granularity",
             )
         }
     return value
