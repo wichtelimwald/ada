@@ -17,8 +17,8 @@ Legend:
 | ---: | --- | --- | --- |
 | 1 | Personality bootstrap | **ADAPTER** | ReMe can store/edit Markdown, but it has no Ada personality seed-once/existing-wins lifecycle. Ada owns bootstrap and writes the resulting profile into the appropriate vault/workspace. |
 | 2 | Outside edit | **NATIVE / CHARACTERIZE** | File editing while stopped is consistent with ReMe's file-source design. Startup/watchers can rebuild metadata, but full rebuild behavior must be tested; `reindex` alone is insufficient. |
-| 3 | Correction | **ADAPTER** | Auto Dream supports `CORRECT`, but Ada's explicit `superseded` state and confirmation basis are not native. |
-| 4 | Contradiction | **GAP / ADAPTER** | ReMe can annotate conflicting evidence, but its prompts may reconcile/tighten the claim. Ada requires two credible explicit claims to remain visibly unresolved unless deterministically corrected. |
+| 3 | Correction | **ADAPTER — REQUIRED** | Runtime update works, but executable review found semantic inconsistency: corrected body = Thursday while generated description remained Wednesday, and Dream later inverted the correction direction. Ada must own canonical values/supersession. |
+| 4 | Contradiction | **PARTIAL / ADAPTER REQUIRED** | Executable review showed ReMe preserved two conflicting claims separately and did not last-write-win, but it created no deterministic contradiction relation/state. Ada must own that relation. |
 | 5 | Private/shared scope | **ADA-OWNED + CHARACTERIZE** | One ReMe workspace can plausibly map to one protection domain. Ada must choose which workspaces are accessible and create permitted minimized shared derivatives. |
 | 6 | Provenance after source deletion | **ADAPTER** | Digest nodes retain source links, but source deletion/lifecycle semantics are not Ada's minimized non-resolvable provenance contract. Need source-ref degradation behavior. |
 | 7 | Forget | **NATIVE / CHARACTERIZE** | Current-file deletion is watched and derived index entries are pruned. Must prove forgotten content does not return after full metadata rebuild. |
@@ -26,12 +26,12 @@ Legend:
 | 9 | No archive rescan | **ADA-OWNED / ADAPTER** | ReMe retains session source by default. Ada must control whether/when session material may be reprocessed after a deliberate forget. |
 | 10 | Offline recall | **NATIVE / CHARACTERIZE** | BM25 and explicit-link retrieval are local and do not require a cloud LLM. End-to-end Ada local configuration still needs testing. |
 | 11 | Gardening | **ADAPTER** | Auto Dream consolidates/refines/corrects automatically. Ada requires inspectable/confirmable destructive or material restructuring, so policy and proposal mode must wrap it. |
-| 12 | Preference learning | **ADAPTER** | ReMe can corroborate/refine preferences, but lacks Ada's `provisional -> confirmed/observed_pattern|explicit_user` contract. |
+| 12 | Preference learning | **PARTIAL / ADAPTER** | Explicit preference was preserved with provenance and digested successfully, but ReMe promoted it into model-generated 'binding' wording without Ada's subject/scope/maturity contract. |
 | 13 | Routine learning | **ADAPTER** | ReMe can consolidate recurring procedures/patterns; Ada must own maturity and ensure routine never becomes authority. |
-| 14 | Learning correction | **ADAPTER** | `CORRECT` exists, but user rejection, lifecycle state, and archive no-relearn behavior require Ada semantics. |
+| 14 | Learning correction | **SEMANTIC FAIL NATIVE / ADAPTER REQUIRED** | Operational update passed, but body/frontmatter/digest disagreed and Dream inverted correction direction. ReMe-derived narratives cannot define Ada truth. |
 | 15 | Pattern aging | **GAP / ADAPTER** | No matching category-specific observed-pattern aging state was found. ReMe can use dates/search but does not expose Ada's `stale` lifecycle. |
-| 16 | Contradictory explicit statements | **GAP / ADAPTER** | ReMe's conflict reconciliation does not guarantee unresolved `contradicted` state for two credible explicit claims. |
-| 17 | Explicit correction | **ADAPTER** | ReMe can `CORRECT`; Ada must deterministically preserve old/new lifecycle and `explicit_user` confirmation basis. |
+| 16 | Contradictory explicit statements | **PARTIAL / ADAPTER REQUIRED** | Both claims survived separately and were not treated as correction, but no first-class unresolved `contradicted` state linked them; Dream conflict consolidation was skipped. |
+| 17 | Explicit correction | **OPERATIONAL PASS / SEMANTIC FAIL NATIVE** | Daily body corrected Wednesday -> Thursday, but generated description stayed Wednesday and Dream later reversed original/corrected values. Ada-owned deterministic correction is mandatory. |
 | 18 | Private vault isolation | **ADAPTER / CHARACTERIZE** | Separate workspaces are the promising topology. ReMe itself has no general-purpose user authentication/household model. Need multi-Application isolation/resource test. |
 | 19 | Shared derivative provenance | **ADA-OWNED** | Cross-protection-domain minimized derivatives and redacted provenance are an Ada privacy-policy function. |
 | 20 | Version recovery | **ADA-OWNED** | ReMe does not require Git. Ada's per-vault Git/versioning layer should provide rollback independently. |
@@ -74,6 +74,16 @@ More important is **where the gaps are**:
 - shared minimized derivatives;
 - retention classes;
 - per-interlocutor vs global personality.
+
+### Executable semantic integrity finding
+
+ReMe's generated derived text is **not internally authoritative** enough for Ada:
+
+- a corrected daily-note body and its generated description disagreed;
+- Auto Dream later inverted the correction direction in a procedure digest;
+- unresolved conflicting claims were preserved separately but not linked by a deterministic contradiction object.
+
+Therefore Ada's adapter must own canonical fact/lifecycle state and validate any ReMe-derived summary before it influences authoritative recall.
 
 ### ReMe has the largest functional gaps at
 
