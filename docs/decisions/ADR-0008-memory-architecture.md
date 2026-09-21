@@ -299,6 +299,138 @@ Learning may use multiple feedback forms with different evidentiary weight:
 
 When Ada acts or proposes based on a provisional hypothesis, the relevant outcome may be referenced from existing action/application records, but the durable action ledger must not become a hidden personal Memory store. Memory should retain only the minimized learning fact/provenance needed for future behavior.
 
+#### Episodic conversation summaries
+
+Some interactions are valuable because the **conversation itself** provides useful future context even when individual facts have already been extracted.
+
+Ada should therefore support selective episodic summaries for longer or materially useful conversations.
+
+Examples:
+
+- architecture/design interviews;
+- planning discussions;
+- decisions with rationale and unresolved questions;
+- emotionally or operationally important conversations where later continuity matters;
+- multi-step problem-solving sessions likely to be referenced later as "we discussed this recently".
+
+A conversation episode should be a compact human-readable Memory artifact, not a raw transcript by default.
+
+Illustrative representation:
+
+```markdown
+---
+type: conversation_summary
+participants:
+  - christian
+started_at: 2026-09-19T07:57:00+02:00
+scope: private
+source_ref: optional-conversation-reference
+topics:
+  - ada
+  - permissions
+  - learning
+---
+
+# Ada architecture interview
+
+## Summary
+
+We clarified that ...
+
+## Decisions
+
+- ...
+- ...
+
+## Open questions
+
+- ...
+```
+
+Rules:
+
+- not every conversation receives a durable summary;
+- summaries should capture decisions, useful context, conclusions, and open loops rather than reproduce the transcript;
+- extracted facts/preferences may still live as separate ordinary Memory entries;
+- the episode may reference the original conversation where that reference remains available;
+- if the original transcript is deleted, the summary may remain according to normal Memory rules;
+- later retrieval may use episodic summaries to answer references such as "we talked about this the other day" without loading full historical conversations.
+
+#### Referenced documents and external source material
+
+Ada also needs to remember information **from documents** without requiring every source document to live inside the Git-versioned Markdown Memory.
+
+Examples include:
+
+- school letters;
+- contracts;
+- invoices;
+- forms;
+- PDFs and scans;
+- notes or records stored in iCloud or another user-controlled file store.
+
+The preferred model to characterize is:
+
+```text
+external/user-controlled document
+        │
+        ├── stable document reference
+        └── optional content fingerprint
+                 │
+                 ▼
+         Memory summary / metadata
+         (Markdown + YAML)
+```
+
+A Memory entry may contain:
+
+- title/document type;
+- relevant people/subjects;
+- received/document date;
+- concise summary;
+- extracted deadlines or facts;
+- source location/reference;
+- optional content hash/fingerprint for change detection;
+- privacy scope;
+- provenance and lifecycle state.
+
+Illustrative representation:
+
+```markdown
+---
+type: document_summary
+document_type: school_letter
+scope: family
+document_date: 2026-09-18
+source:
+  kind: external_file
+  uri: <provider-independent reference>
+  fingerprint: <optional>
+---
+
+# School letter — class trip
+
+## Summary
+
+...
+
+## Relevant dates
+
+- ...
+```
+
+The URI/reference format must remain provider-independent at the Memory layer. iCloud may be one concrete storage provider, but Ada should not encode iCloud-specific semantics into the canonical Memory model.
+
+Document handling rules:
+
+- the original document may remain outside Git and outside the Memory vault;
+- Ada may retain only a summary/reference when that is sufficient;
+- if a task requires the original document, Ada must resolve/access it through the applicable file/provider boundary and permissions;
+- a missing/unavailable source must be distinguishable from a deleted/forgotten memory;
+- Memory deletion does not automatically delete an externally stored document unless an explicit document-management action is separately authorized;
+- document summaries inherit the same privacy/scope rules as other Memory;
+- raw document content must not be copied into a broader scope merely for retrieval convenience.
+
 #### Memory selectivity and retention
 
 Ada must not treat every utterance, event, or successful action as durable Memory.
@@ -308,6 +440,8 @@ The amount retained should be governed by **usefulness, stability, privacy cost,
 Initial principles:
 
 - prefer compact durable facts/preferences/routines over raw interaction history;
+- retain selective episodic summaries when the conversation as a whole is likely to provide useful future continuity;
+- retain document summaries/references when future tasks need the source context without copying the source document into Memory;
 - observations used for learning may be temporary and should be compacted, expired, or discarded when no longer useful;
 - repeated equivalent memories should converge rather than accumulate indefinitely;
 - low-value incidental details should normally remain session context only;
@@ -485,6 +619,22 @@ Required properties:
 - supports deletion/export;
 - preserves existing Memory across Ada upgrades;
 - allows deterministic validation before content becomes trusted Memory.
+
+### Source/document layer
+
+Authoritative Memory may reference source documents that remain outside the Memory vault.
+
+This source/document layer is **not itself Memory** and is not automatically Git-versioned with Memory. It may live in a user-controlled local filesystem, iCloud, another configured file provider, or a future Ada-managed document store.
+
+Ada's Memory model owns the reference, summary, provenance, and extracted durable knowledge; the source store owns the original bytes and its storage lifecycle.
+
+A future document-storage abstraction should provide at least:
+
+- stable reference/identity where possible;
+- read access under explicit scope/authority;
+- source availability status;
+- optional fingerprint/version observation;
+- no assumption that the source is always local or always online.
 
 ### 2. Derived retrieval/index layer
 
@@ -751,6 +901,10 @@ Before selecting a backend, characterize at least:
 21. **Operational forget with history** — deleting/forgetting a memory removes it from Ada's current retrieval and rebuilt indexes even if a Git/version history still contains an older copy; permanent historical erasure is a separate operational concern.
 22. **Selective retention** — incidental low-value details remain session-only while stable useful preferences/routines are compacted into durable Memory.
 23. **Per-interlocutor adaptation** — Ada can learn a communication preference for one person without changing global Ada personality or another person's profile.
+24. **Conversation continuity** — after a long architecture interview, Ada stores a compact episodic summary and can later retrieve "what we decided two days ago" without loading the original transcript.
+25. **Referenced school letter** — Ada stores a summary, deadlines, and a protected reference to a school letter while the original PDF remains in an external user-controlled document store.
+26. **Unavailable source document** — a remembered document summary remains usable while Ada clearly reports that the referenced original is currently unavailable.
+27. **Source/memory lifecycle separation** — forgetting a document summary removes it from Memory retrieval without silently deleting the original external file.
 
 ## Evaluation criteria to weight with the maintainer
 
@@ -761,6 +915,8 @@ After hard gates, candidate scoring should consider:
 - correction and contradiction semantics;
 - learning quality, explainability, and false-learning resistance;
 - selectivity/retention quality and resistance to unbounded Memory growth;
+- episodic-summary quality and continuity value;
+- document-reference portability and source-lifecycle separation;
 - global-versus-per-interlocutor adaptation isolation;
 - privacy/scope and physical storage isolation;
 - versioning/backup privacy and recoverability;
@@ -798,7 +954,10 @@ Weights are deliberately not assigned by this draft.
 19. Define optional historical purge/backup-retention semantics separately from Ada's operational forgetting.
 20. Define retention/compaction policy by memory class and maturity state so durable Memory stays useful rather than exhaustive.
 21. Define the boundary between global Ada personality evolution and per-interlocutor interaction-profile learning.
-22. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+22. Define when a conversation merits an episodic summary and the minimum summary schema for decisions, rationale, and open loops.
+23. Define a provider-independent document-reference abstraction for local files, iCloud, and future stores, including fingerprint/change detection.
+24. Decide whether Ada eventually needs a managed document store in addition to references to user-controlled external storage.
+25. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
