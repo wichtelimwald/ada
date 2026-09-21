@@ -108,7 +108,7 @@ critical() {
 
 collect_environment() {
   {
-    echo "timestamp=$(date -Iseconds)"
+    echo "timestamp=$(date '+%Y-%m-%dT%H:%M:%S%z')"
     echo "repository=$ROOT"
     echo "branch=$(git -C "$ROOT" branch --show-current 2>/dev/null || true)"
     echo "head=$(git -C "$ROOT" rev-parse HEAD 2>/dev/null || true)"
