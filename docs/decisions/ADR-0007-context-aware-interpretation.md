@@ -700,7 +700,7 @@ AdaGuard and authority checks remain downstream and independent. Satisfying a re
 | Primary valid; healthy shadow unresolved | proceed only if typed/validation checks pass and no explicit ambiguity policy applies | clarify |
 | Primary healthy but unresolved; shadow valid | **clarify; do not treat non-resolution as degradation or fallback authority** | **clarify** |
 | Comparable primary/shadow values conflict | **clarify / no automatic proposal value** | **clarify / no automatic proposal value** |
-| Primary operationally unavailable; shadow valid | degraded operation allowed after typed/deterministic checks | clarify unless value was explicit |
+| Primary operationally unavailable; shadow valid | degraded operation allowed **only for an explicitly characterized low-risk/unambiguous fallback class**, after typed/deterministic checks | clarify unless value was explicit and deterministically validated |
 | Primary healthy but errors/timeouts on this input | **fail closed; do not silently fallback** | **fail closed** |
 | DST nonexistent/ambiguous wall time | clarify | clarify |
 | Explicit semantic ambiguity policy applies | clarify or use an explicit user preference if one exists | clarify |
@@ -719,7 +719,7 @@ AdaGuard and authority checks remain downstream and independent. Satisfying a re
 Redundancy is also an availability mechanism, but degraded mode is deliberately bounded:
 
 - resolver availability is established independently of the current user expression;
-- if the primary is operationally unavailable, dateparser may serve as fallback under `standard` only when its result matches the typed expected kind/granularity and deterministic validation succeeds;
+- if the primary is operationally unavailable, dateparser may serve as fallback under `standard` only for a versioned, explicitly characterized low-risk/unambiguous fallback class **and** when its result matches the typed expected kind/granularity and deterministic validation succeeds;
 - a current input that causes primary failure, timeout, or exception does not qualify as operational degradation;
 - every degraded resolution records resolver/version/provenance so later audit can distinguish it from the normal primary path.
 
@@ -781,6 +781,13 @@ SourceLocator
   start: integer
   end: integer
 ~~~
+
+Offset convention:
+
+- `start` and `end` are **zero-based Unicode code-point offsets** into the referenced source text;
+- the range is **half-open**: `[start, end)`;
+- offsets are not UTF-8 byte positions and not UTF-16 code-unit positions;
+- Ada verifies that the referenced slice equals the claimed `raw_text` before accepting the locator as source evidence.
 
 The locator references source content owned by the surrounding interaction/archive layer; it does not copy the full conversation into the temporal model.
 
