@@ -135,9 +135,12 @@ Initial maturity states to characterize are:
 - `observed`;
 - `provisional`;
 - `confirmed`;
+- `stale`;
 - `contradicted`;
 - `superseded`;
 - `forgotten`.
+
+`stale` is primarily for learned/observed patterns whose supporting evidence has become too old or too sparse to treat as current. It does not delete the memory and does not imply that the earlier observation was wrong.
 
 For a confirmed memory, Ada should also preserve **how it became confirmed**. Initial confirmation bases are:
 
@@ -159,6 +162,33 @@ confirmation_basis: explicit_user
 ```
 
 A memory confirmed through observation remains weaker evidence than an explicit confirmation for later contradiction resolution or sensitive decisions. Exact precedence rules still need characterization.
+
+#### Aging and staleness
+
+Ada may automatically move a **pattern-based** memory from `confirmed` to `stale` when its supporting observations have not been refreshed for a sufficiently long time.
+
+This is allowed only when:
+
+- the confirmation basis is observational (for example `observed_pattern`);
+- the transition is non-destructive and inspectable;
+- the original observations/provenance remain available according to retention policy;
+- the rule for staleness is deterministic and category-specific rather than an LLM guess.
+
+Explicitly confirmed durable facts must not become stale merely because time passed. A future memory type may still define an explicit validity window where time is semantically relevant.
+
+Useful metadata to characterize includes:
+
+- `last_observed`;
+- `observation_count`;
+- optional `valid_from` / `valid_until`;
+- optional category-specific staleness policy.
+
+A stale pattern may later be:
+
+- reconfirmed by new consistent observations;
+- explicitly confirmed by the user;
+- superseded by a newer pattern;
+- contradicted and left unresolved until clarified.
 
 Exact field names remain open, but both maturity and confirmation basis must remain visible in human-readable Memory.
 
@@ -505,6 +535,7 @@ Before selecting a backend, characterize at least:
 12. **Preference learning** — repeated accepted concise replies create a provisional preference hypothesis; repeated consistent outcomes may promote it to `confirmed/observed_pattern`, while an explicit confirmation yields `confirmed/explicit_user`; silence alone never confirms it.
 13. **Routine learning** — repeated reported outcomes may establish a routine, but the routine never becomes permission to act.
 14. **Learning correction** — a user rejects a learned hypothesis and Ada stops using it without routine archive rescanning recreating it.
+15. **Pattern aging** — an observationally confirmed routine that has not been observed for a category-appropriate period becomes `stale` without being deleted; an explicitly confirmed durable fact does not age merely because time passed.
 
 ## Evaluation criteria to weight with the maintainer
 
@@ -540,7 +571,8 @@ Weights are deliberately not assigned by this draft.
 10. Define the Memory-gardening proposal/approval boundary.
 11. Characterize learning promotion rules for explicit facts, preferences, routines, sensitive facts, and shared knowledge, including precedence between observed-pattern and explicit-user confirmation.
 12. Define the inspectable learning-journal representation, retention/compaction rules, and how application outcomes feed learning without duplicating the action ledger.
-13. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+13. Define deterministic, category-specific staleness rules for observed patterns and which memory types, if any, have explicit validity windows.
+14. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
