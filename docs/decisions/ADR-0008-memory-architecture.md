@@ -190,6 +190,51 @@ A stale pattern may later be:
 - superseded by a newer pattern;
 - contradicted and left unresolved until clarified.
 
+#### Contradiction and explicit correction
+
+Ada must distinguish between a **new contradictory statement** and an **explicit correction**.
+
+A new contradictory statement does not automatically supersede existing confirmed Memory merely because it is newer.
+
+Example:
+
+```text
+earlier: "Music lesson is Wednesday."
+later:   "Music lesson is Thursday."
+```
+
+Absent explicit correction semantics or another deterministic resolution rule, Ada should preserve both claims as a visible contradiction and mark the affected memory as `contradicted`.
+
+By contrast, explicit correction language such as:
+
+```text
+"No, not Wednesday — Thursday."
+```
+
+may deterministically supersede the corrected claim:
+
+```text
+Wednesday -> superseded
+Thursday  -> confirmed / explicit_user
+```
+
+Initial evidence precedence for conflict handling is:
+
+```text
+explicit_user > observed_pattern > provisional > observed
+```
+
+This precedence is **not** a blanket last-write-wins rule.
+
+Rules:
+
+- two plausible explicit-user claims that conflict remain unresolved unless one clearly corrects the other;
+- an explicit correction may supersede an observational pattern;
+- an observational pattern must not overwrite an explicit-user claim merely through repetition;
+- contradictions remain inspectable and should be surfaced when relevant;
+- resolution should preserve provenance for both the superseded and surviving claims;
+- model inference alone must not decide that one ambiguous explicit claim "probably" wins.
+
 Exact field names remain open, but both maturity and confirmation basis must remain visible in human-readable Memory.
 
 #### Confirmed initial learning classes
@@ -536,6 +581,8 @@ Before selecting a backend, characterize at least:
 13. **Routine learning** — repeated reported outcomes may establish a routine, but the routine never becomes permission to act.
 14. **Learning correction** — a user rejects a learned hypothesis and Ada stops using it without routine archive rescanning recreating it.
 15. **Pattern aging** — an observationally confirmed routine that has not been observed for a category-appropriate period becomes `stale` without being deleted; an explicitly confirmed durable fact does not age merely because time passed.
+16. **Contradictory explicit statements** — two conflicting explicit-user claims remain visibly `contradicted` unless one is clearly expressed as a correction or another deterministic resolution rule applies.
+17. **Explicit correction** — "not Wednesday, Thursday" supersedes the corrected claim directly while preserving provenance for both versions.
 
 ## Evaluation criteria to weight with the maintainer
 
@@ -572,7 +619,8 @@ Weights are deliberately not assigned by this draft.
 11. Characterize learning promotion rules for explicit facts, preferences, routines, sensitive facts, and shared knowledge, including precedence between observed-pattern and explicit-user confirmation.
 12. Define the inspectable learning-journal representation, retention/compaction rules, and how application outcomes feed learning without duplicating the action ledger.
 13. Define deterministic, category-specific staleness rules for observed patterns and which memory types, if any, have explicit validity windows.
-14. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+14. Characterize explicit correction detection and contradiction-resolution rules without relying on model-only last-write-wins behavior.
+15. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
