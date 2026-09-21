@@ -62,6 +62,9 @@ run_step() {
     end="$(now_seconds)"
     record "$name" FAIL "$((end - start))"
     say "    FAIL (exit $rc; see $log)"
+    say "    --- tail of log ---"
+    tail -n 40 "$log" 2>/dev/null || true
+    say "    --- end log tail ---"
     return "$rc"
   fi
 }
