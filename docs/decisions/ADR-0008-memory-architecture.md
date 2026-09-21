@@ -45,6 +45,44 @@ Current direction:
 
 Structured formats such as dedicated YAML/TOML records remain possible where they materially improve a narrow data type, but they should not replace readable Markdown as the default human surface.
 
+### Confirmed scope/layout convention
+
+The maintainer confirmed the following separation:
+
+- **directory location is the hard privacy/audience boundary**;
+- **YAML properties/front matter carry metadata inside that boundary**;
+- **Markdown is the primary human-readable content**.
+
+Illustrative layout:
+
+```text
+memory/
+├── shared/
+│   ├── family/
+│   └── ...
+├── people/
+│   ├── <person-id>/
+│   │   ├── private/
+│   │   └── ...
+│   └── ...
+└── ada/
+    └── personality/
+```
+
+The exact directory taxonomy remains open and should be scenario-driven, but access control must not depend on free-text tags or model interpretation. Moving a note across a hard-scope directory boundary is therefore a security-relevant operation and must eventually be mediated by deterministic Ada policy rather than silently inferred by the model.
+
+YAML metadata may describe properties such as:
+
+- subject/person;
+- type;
+- tags;
+- dates;
+- lifecycle/correction state;
+- provenance/source reference;
+- optional structured fields such as addresses.
+
+YAML metadata must not be treated as an alternate authorization system. Authority remains owned by AdaGuard.
+
 ## Security and semantic invariants
 
 The following remain non-negotiable:
