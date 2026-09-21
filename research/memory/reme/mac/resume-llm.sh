@@ -60,12 +60,24 @@ export NO_PROXY="127.0.0.1,localhost,::1"
 export no_proxy="$NO_PROXY"
 
 unset OPENAI_API_KEY ANTHROPIC_API_KEY DASHSCOPE_API_KEY GEMINI_API_KEY GOOGLE_API_KEY || true
-export LLM_BACKEND="openai"
-export LLM_MODEL_NAME="$OLLAMA_MODEL"
-export LLM_API_KEY="ollama-local-research-only"
-export LLM_BASE_URL="http://127.0.0.1:11434/v1"
+unset LLM_API_KEY LLM_BASE_URL || true
+export OLLAMA_MODEL_NAME="$OLLAMA_MODEL"
+export OLLAMA_HOST="http://127.0.0.1:11434"
 
 mkdir -p "$OUT" "$RESULT_DIR/logs"
+
+PROBE_LOG="$RESULT_DIR/logs/native-ollama-tool-probe-$RETRY_STAMP.log"
+if ! "$VENV/bin/python" "$DRIVER" ollama-probe \
+  --host "$OLLAMA_HOST" \
+  --model "$OLLAMA_MODEL" \
+  --out "$OUT/native-ollama-tool-probe.json" \
+  >"$PROBE_LOG" 2>&1
+then
+  echo "FAIL: native Ollama tool-call probe failed." >&2
+  tail -n 60 "$PROBE_LOG" >&2 || true
+  exit 1
+fi
+echo "PASS: native Ollama tool-call probe."
 
 "$VENV/bin/reme" start \
     "config=$SPIKE_CONFIG" \
