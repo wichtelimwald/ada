@@ -71,7 +71,10 @@ def _run_dateparser(
         result["semantic_kind"] = "date"
         result["granularity"] = data.period
     elif data.period == "time":
-        result["semantic_kind"] = "datetime"
+        # dateparser fills absent date components from RELATIVE_BASE.
+        # Preserve "time" as the source semantic kind instead of promoting
+        # those synthesized date components to an Ada datetime claim.
+        result["semantic_kind"] = "time"
         result["granularity"] = "minute"
     result["parser_period"] = data.period
     result["parser_locale"] = data.locale
