@@ -887,6 +887,65 @@ context assembly
 
 Ada's differentiator should remain that **the human/source layer and privacy/authority boundaries are Ada-owned**, while mature frameworks may be reused below that boundary.
 
+## Provisional decision matrix
+
+This matrix is intentionally **role-aware**. Ada may use one component for authoritative file-native Memory and another for derived learning/retrieval. A candidate that is poor as the source of truth may still be strong behind an Ada-owned boundary.
+
+Legend: ✅ strong fit / 🟡 partial or adapter required / ❓ not yet verified / ❌ structural mismatch.
+
+| Criterion | ReMe | Hindsight | Letta MemFS | LangMem |
+| --- | --- | --- | --- | --- |
+| Top-level license compatible with Ada MIT strategy | ✅ Apache-2.0 | ✅ MIT | ✅ Apache-2.0 | ✅ MIT |
+| Human-readable authoritative files | ✅ Markdown/YAML is source of truth | ❌ bank/database is primary state; Markdown knowledge pages are projections | ✅ git-backed Markdown files | 🟡 storage-agnostic toolkit, not a file-native store itself |
+| Human direct edit/correction | ✅ first-class | 🟡 via APIs/export rather than canonical files | ✅ first-class file editing | 🟡 depends on chosen backing store |
+| Derived indexes rebuildable from files | ✅ explicit design goal | 🟡 observations can be regenerated from retained facts, but Ada-owned-file rebuild path is not established | 🟡 MemFS syncs files and agent state; full rebuild semantics need verification | 🟡 depends on backing store |
+| Learning / consolidation | ✅ auto-memory / auto-dream / digest refinement | ✅ particularly strong: evidence-backed observations and mental models | ✅ reflection/background memory patterns | ✅ extraction, consolidation, update, hot/background paths |
+| Evidence / provenance model | ✅ source links from digest to sessions/resources | ✅ particularly strong supporting-evidence model | 🟡 needs characterization | 🟡 application-defined |
+| Per-person/private isolation | ❓ workspace separation exists conceptually; enforceable Ada-style protection domains not yet verified | ✅ strict bank isolation | ❓ agent/repository separation exists; household privacy model not verified | ❌ no isolation model supplied by the library |
+| Shared household Memory | ❓ requires Ada-specific design | 🟡 multi-bank composition is client-side; shared bank possible but Ada semantics required | 🟡 shared repositories exist, household semantics still Ada-owned | ❌ must be supplied by Ada |
+| Git-native history | 🟡 files are versionable but Git is not the core contract | ❌ | ✅ built in | ❌ |
+| Conversation/resource ingestion | ✅ sessions + resources are first-class source layers | ✅ conversations/documents can be retained | 🟡 external memory files/context repos; broader ingestion is runtime-dependent | ✅ conversation-oriented extraction |
+| Runtime independence from another agent framework | 🟡 Python package exists, but current self-evolving workflows depend on AgentScope components | ✅ standalone server/client/embedded options | ❌ tightly coupled to Letta runtime/SDK | 🟡 core primitives are storage-agnostic, but ecosystem is LangGraph-oriented |
+| Fit as Ada authoritative Memory substrate | **✅ strongest current candidate** | ❌ | 🟡 architecture reference / possible component | ❌ |
+| Fit as Ada derived learning/recall layer | ✅ | **✅ strongest current candidate** | 🟡 | ✅ lightweight candidate |
+
+### Current working conclusion
+
+**Primary deep-dive candidate: ReMe** for the authoritative, human-readable Memory substrate.
+
+Why it currently leads:
+
+- Markdown/YAML files are explicitly the source of truth;
+- source/session/resource and long-term-memory layers are already separated;
+- keyword/link/vector indexes are derived;
+- users can inspect and edit Memory directly;
+- it already implements consolidation/refinement rather than only retrieval;
+- Apache-2.0 passes the top-level license gate.
+
+Important unresolved gates before adoption:
+
+1. verify the full runtime/dependency license path, not only ReMe's top-level Apache-2.0 license;
+2. determine how much of ReMe can run without adopting AgentScope as Ada runtime infrastructure;
+3. verify out-of-band edit/reindex behavior under Ada's scenarios;
+4. determine whether separate Ada protection domains can map cleanly to separate ReMe workspaces without cross-scope indexes/state;
+5. test correction, contradiction, deletion, episodic summaries, and external document references against Ada's semantics;
+6. characterize local-model/Ollama and Python 3.14 behavior on the accepted target platforms.
+
+**Secondary deep-dive candidate: Hindsight** for learning/consolidation and recall, not as Ada's authoritative store.
+
+Its evidence-backed observations, strict banks, temporal/graph/lexical/semantic recall, and mental models are particularly relevant to Ada's learning design. The key question is whether it adds enough value as a rebuildable derived layer to justify operating both ReMe and Hindsight.
+
+**Letta MemFS** remains the strongest architecture/reference for Git-backed Markdown context repositories, but current runtime coupling makes it a weaker adoption candidate.
+
+**LangMem** remains the lightweight fallback for reusable extraction/consolidation logic if ReMe's or Hindsight's larger runtimes prove too invasive.
+
+### Candidates currently outside the primary shortlist
+
+- **Basic Memory / OpenViking** — useful design references, but current AGPL licensing conflicts with Ada's runtime license strategy.
+- **sqlite-memory** — source-of-truth concept is relevant, but the current Elastic License 2.0 plus additional grant remains a licensing hard-gate concern.
+- **Graphify / Graphiti / Cognee** — evaluate as derived graph/retrieval components, not authoritative Memory.
+- **Docling** — evaluate separately for document parsing/normalization; it does not compete for the Memory role.
+
 ## Candidate architectures
 
 No candidate is selected by this draft.
