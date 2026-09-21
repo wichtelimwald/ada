@@ -31,6 +31,20 @@ empty authoritative Memory
 
 This ADR evaluates the general authoritative Memory and retrieval architecture. It does not allow Memory to create authority.
 
+### Confirmed maintainer direction
+
+The authoritative Memory should feel closer to a durable personal knowledge base than to an opaque agent database.
+
+Current direction:
+
+- **Markdown-first** for ordinary memories, relationships, routines, explanations, and notes;
+- optional **YAML properties/front matter** for small machine-readable fields such as scope, subject, dates, addresses, lifecycle state, or provenance;
+- schema-light rather than ontology-first: useful structure may emerge over time instead of being fixed up front;
+- compatible with ordinary editors and tools such as Obsidian, but **not dependent on Obsidian** for correctness or runtime operation;
+- periodic "Memory gardening" may reorganize, deduplicate, summarize, or suggest cleanup, but destructive merges/deletions must remain visible and deliberate.
+
+Structured formats such as dedicated YAML/TOML records remain possible where they materially improve a narrow data type, but they should not replace readable Markdown as the default human surface.
+
 ## Security and semantic invariants
 
 The following remain non-negotiable:
@@ -57,14 +71,15 @@ In particular:
 
 Ada should evaluate Memory as two distinct layers.
 
-### 1. Authoritative Memory
+### 1. Authoritative human-controlled Memory
 
-This is the user/operator-controlled source of truth.
+This is the user/operator-controlled source of truth. The default representation should be a directory/vault of Markdown notes that remains understandable without Ada.
 
 Required properties:
 
-- human-readable;
-- directly editable with ordinary tools;
+- human-readable, with Markdown as the default representation;
+- directly editable with ordinary tools, including plain text editors and optionally Obsidian;
+- may use constrained YAML properties/front matter for small structured fields without turning the note body into a rigid schema;
 - stable on disk independently of Ada process state;
 - supports private/shared scopes;
 - supports provenance/reason/source references where materially useful;
@@ -83,6 +98,8 @@ It may contain:
 - embeddings;
 - semantic chunks;
 - normalized lookup keys;
+- explicit link graphs derived from Markdown links;
+- semantic or inferred knowledge graphs;
 - derived search metadata.
 
 Rules:
@@ -92,7 +109,8 @@ Rules:
 - deleting/rebuilding it must not lose authoritative Memory;
 - stale index state must be detectable and repairable;
 - it must preserve enough scope metadata that retrieval cannot widen audience/access boundaries;
-- remote embedding/index services are not part of the default local path.
+- remote embedding/index services are not part of the default local path;
+- inferred graph edges remain derived evidence and never become authoritative Memory merely because an indexer generated them.
 
 This split allows Ada to reuse mature retrieval technology without giving an opaque agent-memory database ownership of user truth.
 
@@ -103,6 +121,7 @@ A candidate cannot win by weighted score if it fails a hard gate.
 | Gate | Requirement |
 | --- | --- |
 | Human control | Authoritative Memory is human-readable and directly editable without Ada. |
+| Open format | The authoritative representation remains usable without a proprietary editor or database runtime. |
 | No hidden persistence | No second independent persistent truth store; indexes/caches are reconstructible. |
 | Local/offline baseline | Core Memory read/write/retrieval can operate without cloud access. |
 | Scope isolation | Individual/private/shared scopes can be represented and enforced without trusting the model. |
@@ -121,15 +140,18 @@ No candidate is selected by this draft.
 
 Concept:
 
-- authoritative Markdown/TOML/YAML files in a user-controlled Memory directory;
-- Ada-owned minimal schema for identity/scope, subject, provenance, lifecycle, and correction state;
-- standard SQLite/FTS5 as a derived local search index;
-- optional vector retrieval added only if characterization proves it materially improves recall;
+- authoritative Markdown notes in a user-controlled Memory directory/vault;
+- optional YAML properties/front matter for compact structured fields such as scope, subject, provenance, lifecycle state, dates, or addresses;
+- dedicated YAML/TOML records only where a narrow data type genuinely benefits from them;
+- no mandatory fixed ontology beyond the minimum metadata required for safety and scope isolation;
+- standard SQLite/FTS5 as one possible derived local search index;
+- optional explicit-link, knowledge-graph, or vector retrieval layers added only when characterization proves they materially improve recall/context efficiency;
 - embeddings, if used, generated through the already accepted local model boundary or a separately reviewed local embedder.
 
 Potential strengths:
 
 - directly satisfies the human-readable/editable source-of-truth requirement;
+- naturally compatible with Obsidian-style personal knowledge workflows without making Obsidian a dependency;
 - simple deletion/export/backup semantics;
 - no mandatory service;
 - aligns with the accepted modular Python monolith;
@@ -186,7 +208,33 @@ Possible role: evaluate whether reusable extraction/conflict/retrieval logic can
 
 Current status: **candidate for adaptation/derived capability, not yet demonstrated as authoritative Memory**.
 
-### D. Graphiti
+### D. Graphify — derived knowledge-graph candidate
+
+Repository: https://github.com/Graphify-Labs/graphify
+
+Relevant fit:
+
+- Apache-2.0;
+- builds a queryable graph from code/docs/media rather than a vector index;
+- records whether edges are `EXTRACTED` from source or `INFERRED`;
+- produces a persistent `graph.json` that can be queried without rereading all source files;
+- local-first for deterministic code parsing; documentation/media semantic passes may use a configured model/backend.
+
+Potential Ada role:
+
+- derive relationships and scoped subgraphs from the Markdown Memory vault;
+- reduce the amount of raw Memory that must be placed into model context;
+- complement lexical/vector retrieval rather than replace authoritative Memory.
+
+Important boundary:
+
+- Graphify output is a **derived index**, especially for `INFERRED` edges;
+- inferred relationships must not silently rewrite Markdown Memory or become permission/action truth;
+- any semantic pass over personal Memory must use Ada's approved local/egress boundary.
+
+Current status: **promising derived knowledge-graph candidate; not an authoritative Memory store**.
+
+### E. Graphiti
 
 Repository: https://github.com/getzep/graphiti
 
@@ -206,7 +254,7 @@ Mismatch / cost:
 
 Current status: **specialist reference / possible derived graph layer, not yet demonstrated as authoritative Memory**.
 
-### E. Letta memory / MemFS
+### F. Letta memory / MemFS
 
 Repository: https://github.com/letta-ai/letta-code
 
@@ -225,7 +273,7 @@ Mismatch:
 
 Current status: **reference / component-reuse investigation, not a default runtime replacement**.
 
-### F. Dedicated vector database as authoritative Memory
+### G. Dedicated vector database as authoritative Memory
 
 Examples include Qdrant, Chroma, or similar stores.
 
@@ -244,9 +292,12 @@ The first MVP should not assume semantic vectors are required.
 
 Characterize progressively:
 
-1. deterministic structured lookup for known memory types;
-2. SQLite FTS5 keyword/full-text retrieval;
-3. hybrid lexical + vector retrieval only if it materially improves representative scenario recall.
+1. deterministic structured lookup for known memory types and YAML properties;
+2. Markdown links/backlinks and SQLite FTS5 keyword/full-text retrieval;
+3. derived knowledge-graph retrieval such as Graphify for relationship/path/subgraph queries;
+4. vector or hybrid lexical + vector retrieval only if it materially improves representative scenario recall or reduces context cost.
+
+Obsidian's own graph is useful as a human visualization of explicit note links. Ada should not assume that this is equivalent to semantic graph extraction: richer inferred relationships belong in a separate derived layer.
 
 Potential optional vector components must be reviewed independently for:
 
@@ -256,6 +307,21 @@ Potential optional vector components must be reviewed independently for:
 - maintenance and release maturity;
 - deletion/rebuild correctness;
 - local embedding model cost on the M1/16 GB target.
+
+## Memory gardening
+
+A schema-light Markdown Memory will accumulate duplicates, stale notes, fragmented facts, and inconsistent structure over time. That is expected.
+
+Ada should support occasional gardening passes that can:
+
+- detect duplicate or near-duplicate notes;
+- surface contradictions and stale facts;
+- suggest clearer links, titles, tags, or properties;
+- propose merging fragmented notes;
+- identify orphaned or low-value derived structure;
+- rebuild indexes after outside edits.
+
+Gardening must not silently perform destructive cleanup. Proposed merges, deletions, or material semantic rewrites should remain inspectable and reversible/confirmable according to the eventual Memory authority policy.
 
 ## Required representative Memory scenarios
 
@@ -271,13 +337,14 @@ Before selecting a backend, characterize at least:
 8. **No authority from learning** — a remembered preference or repeated past action cannot satisfy AdaGuard.
 9. **No archive rescan** — deleted/forgotten information is not silently relearned from archived messages unless an explicit archive-read task permits it.
 10. **Offline recall** — representative local chat retrieval works with network access unavailable.
+11. **Gardening** — after Memory accumulates duplicates and stale structure, Ada proposes a cleanup without silently deleting or changing material facts.
 
 ## Evaluation criteria to weight with the maintainer
 
 After hard gates, candidate scoring should consider:
 
 - human editability / explainability;
-- retrieval quality;
+- retrieval quality and context/token efficiency;
 - correction and contradiction semantics;
 - privacy/scope isolation;
 - local/offline behavior;
@@ -293,15 +360,17 @@ Weights are deliberately not assigned by this draft.
 
 ## Open research before a decision
 
-1. Define the smallest Ada-owned general Memory semantic model from the scenarios above.
-2. Decide the canonical file representation to characterize first (for example Markdown + constrained front matter versus TOML/YAML records).
-3. Characterize plain structured lookup + FTS5 before adding vector infrastructure.
-4. Verify candidate license/dependency chains from source, not search summaries.
-5. Evaluate whether Mem0 contributes enough reusable extraction/update logic without becoming the authoritative store.
-6. Determine whether temporal graph behavior from Graphiti solves an MVP problem that simpler correction/supersession records do not.
-7. Decide how concurrent/out-of-band file edits are detected and reconciled.
-8. Define explicit forget/delete semantics across authoritative files, derived indexes, source references, and action/audit records.
-9. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+1. Define the smallest Ada-owned general Memory semantic model from the scenarios above without turning the vault into a rigid ontology.
+2. Characterize **Markdown + constrained YAML properties/front matter** as the canonical default representation; use separate structured files only where justified by a concrete data type.
+3. Characterize structured/property lookup + Markdown links + FTS5 before adding more expensive retrieval infrastructure.
+4. Compare Graphify-style graph retrieval with vector/hybrid retrieval on representative family-memory questions, including context/token reduction.
+5. Verify candidate license/dependency chains from source, not search summaries.
+6. Evaluate whether Mem0 contributes enough reusable extraction/update logic without becoming the authoritative store.
+7. Determine whether temporal graph behavior from Graphiti solves an MVP problem that simpler correction/supersession records plus a derived graph do not.
+8. Decide how concurrent/out-of-band file edits are detected and reconciled.
+9. Define explicit forget/delete semantics across authoritative files, derived indexes/graphs, source references, and action/audit records.
+10. Define the Memory-gardening proposal/approval boundary.
+11. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
