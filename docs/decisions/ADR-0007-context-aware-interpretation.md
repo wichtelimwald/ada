@@ -702,7 +702,7 @@ AdaGuard and authority checks remain downstream and independent. Satisfying a re
 | Primary healthy but unresolved; shadow valid | **clarify; do not treat non-resolution as degradation or fallback authority** | **clarify** |
 | Comparable primary/shadow values conflict | **clarify / no automatic proposal value** | **clarify / no automatic proposal value** |
 | Primary operationally unavailable; shadow valid | degraded operation allowed **only for an explicitly characterized low-risk/unambiguous fallback class**, after typed/deterministic checks | clarify unless value was explicit and deterministically validated |
-| Primary healthy but errors/timeouts on this input | **fail closed; do not silently fallback** | **fail closed** |
+| Either healthy resolver errors/timeouts on this input | **fail closed; do not treat the other resolver's result as sufficient or silently fallback** | **fail closed** |
 | DST nonexistent/ambiguous wall time | clarify | clarify |
 | Explicit semantic ambiguity policy applies | clarify or use an explicit user preference if one exists | clarify |
 | Both unresolved/invalid | clarify | clarify |
@@ -1052,7 +1052,8 @@ The comparison records `agreement`, `interpretation_conflict`, `single_resolver_
 1. define the production-safe Quickadd JSON artifact generation/provenance/integrity process, including separate scorer-model licensing/redistribution evidence;
 2. capture a fully resolved production dependency lock rather than relying on top-level pins;
 3. characterize the selected adapters in the intended Ada container/runtime profile and retain Linux validation as a prerequisite before claiming Linux support;
-4. convert the proposed conceptual types/port into an implementation plan without changing the existing Draft -> Proposal -> AdaGuard authority boundary;
-5. independently review the corrected ADR/research evidence.
+4. complete the still-open characterization required above: verified input-span/source attribution, determinism across repeated runs, thread safety, and measured dependency footprint;
+5. convert the proposed conceptual types/port into an implementation plan without changing the existing Draft -> Proposal -> AdaGuard authority boundary;
+6. independently review the corrected ADR/research evidence.
 
 Only after these follow-ups should ADR-0007 move from Proposed to Accepted.
