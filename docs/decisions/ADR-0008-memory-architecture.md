@@ -905,7 +905,7 @@ Legend: ✅ strong fit / 🟡 partial or adapter required / ❓ not yet verified
 | Shared household Memory | ❓ requires Ada-specific design | 🟡 multi-bank composition is client-side; shared bank possible but Ada semantics required | 🟡 shared repositories exist, household semantics still Ada-owned | ❌ must be supplied by Ada |
 | Git-native history | 🟡 files are versionable but Git is not the core contract | ❌ | ✅ built in | ❌ |
 | Conversation/resource ingestion | ✅ sessions + resources are first-class source layers | ✅ conversations/documents can be retained | 🟡 external memory files/context repos; broader ingestion is runtime-dependent | ✅ conversation-oriented extraction |
-| Runtime independence from another agent framework | ❌ current package import/runtime path contains unconditional AgentScope imports; upstream package smoke installs the AgentScope extra | ✅ standalone server/client/embedded options | ❌ tightly coupled to Letta runtime/SDK | 🟡 core primitives are storage-agnostic, but ecosystem is LangGraph-oriented |
+| Runtime independence from another agent framework | ❌ current package import/runtime path requires AgentScope in the characterized path; target-Mac spike confirmed this path works with native Ollama | ✅ standalone server/client/embedded options | ❌ tightly coupled to Letta runtime/SDK | 🟡 core primitives are storage-agnostic, but ecosystem is LangGraph-oriented |
 | Fit as Ada authoritative Memory substrate | **✅ strongest current candidate** | ❌ | 🟡 architecture reference / possible component | ❌ |
 | Fit as Ada derived learning/recall layer | ✅ | **✅ strongest current candidate** | 🟡 | ✅ lightweight candidate |
 
@@ -1232,6 +1232,27 @@ Weights are deliberately not assigned by this draft.
 28. Compare Cognee, Graphify, Graphiti, and Hindsight for derived graph/temporal retrieval over representative Memory and document scenarios.
 29. Use OpenViking as a design reference for hierarchical context loading and resource/Memory separation; do not adopt the AGPLv3 main runtime under the current license strategy.
 30. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+
+## Executable ReMe evidence
+
+The target-Mac characterization now passes the main substrate/runtime gates:
+
+- Python 3.14 / Apple Silicon install and startup;
+- human-readable Markdown/YAML write/read;
+- preservation of Ada-owned nested YAML metadata;
+- out-of-band edit followed by clean derived-state rebuild;
+- operational forget followed by clean rebuild;
+- two independent ReMe workspaces with canary isolation;
+- direct native Ollama tool calling with `qwen3.5:9b`;
+- full local Auto Memory -> Auto Dream workflow, including preference, correction, and contradiction fixtures.
+
+This moves the remaining ReMe decision work away from basic runtime feasibility and toward:
+
+- semantic inspection of correction/contradiction outputs;
+- external document reference/lifecycle fit;
+- exact transitive license/security audit;
+- maintenance/AgentScope dependency cost;
+- whether Hindsight adds enough derived-learning value to justify a second subsystem.
 
 ## Decision status
 
