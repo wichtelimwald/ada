@@ -320,7 +320,7 @@ Unknowns remain TBD until characterized; TBD is not a pass.
 | --- | --- | --- | --- | --- | --- | --- |
 | dateparser 1.4.3 | PASS — BSD-3-Clause | PASS | PASS | PASS — Python 3.14 target Mac | **CONDITIONAL** — top-level release pinned, transitive graph not yet locked | **CONDITIONAL** |
 | Quickadd 0.6.5 + safe JSON scorer | **CONDITIONAL** — code repository is MIT, but scorer-model provenance/redistribution terms have not yet been recorded separately | PASS | **CONDITIONAL PASS** — no runtime pickle; production artifact path still to formalize | PASS — Python 3.14 target Mac; Linux validation remains | **CONDITIONAL** — source commit pinned, transitive graph + JSON artifact provenance not yet fully locked | **CONDITIONAL** |
-| Duckling 59a13ff8 | PASS — BSD-3-Clause | PASS | PASS in reviewed design | **NOT DEMONSTRATED for Ada container path** — pinned upstream Dockerfile fails without modernization; native Haskell path exists upstream | PASS — pinned commit | **DEFERRED / NOT SELECTED** |
+| Duckling 59a13ff8 | PASS — BSD-3-Clause | PASS | PASS in reviewed design | **NOT DEMONSTRATED for Ada container path** — pinned upstream Dockerfile fails without modernization; native Haskell path exists upstream | **NOT DEMONSTRATED** — source commit is pinned, but the evaluated container path uses mutable base-image tags and dynamically resolved OS/build dependencies | **DEFERRED / NOT SELECTED** |
 | Microsoft Recognizers-Text | PASS — MIT | PASS | PASS in reviewed design | TBD — stale Python distribution path | TBD | **DEFERRED** |
 | HeidelTime | **FAIL for Ada's MIT distribution strategy** — GPL-3.0 | PASS | PASS in reviewed design | Java/UIMA burden | PASS | **EXCLUDED before scoring** |
 
