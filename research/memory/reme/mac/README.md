@@ -108,6 +108,16 @@ workspace-b/
 
 Do not commit the result directory.
 
+## Retry only the local LLM step
+
+If the main run already passed installation/file/isolation tests and only `local-llm-memory-flow` failed, reuse the existing virtual environment and workspace instead of reinstalling ReMe:
+
+```bash
+sh research/memory/reme/mac/resume-llm.sh /path/to/ada-reme-spike-RESULT
+```
+
+The retry writes into `llm-flow-retry/` inside that existing result bundle and prints the relevant driver/service log tails on failure.
+
 ## Interpreting important failures
 
 ### `install-reme` fails on Python 3.14
