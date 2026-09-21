@@ -93,6 +93,22 @@ run_backend() {
   fi
 }
 
+filter_known_invalid_escape_warning() {
+  awk '
+    /SyntaxWarning:.*invalid escape sequence/ {
+      skipping_known_warning = 1
+      next
+    }
+    skipping_known_warning && /^[[:space:]]/ {
+      next
+    }
+    {
+      skipping_known_warning = 0
+      print
+    }
+  ' "$1"
+}
+
 report_warnings() {
   invalid_escape=0
   other_warning=0
@@ -107,12 +123,11 @@ report_warnings() {
       invalid_escape=1
     fi
 
-    if grep 'Warning:' "$log" | grep -qv 'SyntaxWarning:.*invalid escape sequence'; then
+    residual="$TMP/$backend-residual-stderr.log"
+    filter_known_invalid_escape_warning "$log" >"$residual"
+    if [ -s "$residual" ]; then
       other_warning=1
-      echo "WARN: $backend emitted additional warnings; use VERBOSE=1 for details." >&2
-    elif ! grep -q 'Warning:' "$log"; then
-      other_warning=1
-      echo "WARN: $backend emitted stderr output; use VERBOSE=1 for details." >&2
+      echo "WARN: $backend emitted additional stderr output; use VERBOSE=1 for details." >&2
     fi
 
     if [ "$VERBOSE" = "1" ]; then
