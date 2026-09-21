@@ -83,6 +83,26 @@ YAML metadata may describe properties such as:
 
 YAML metadata must not be treated as an alternate authorization system. Authority remains owned by AdaGuard.
 
+### Confirmed default placement policy: private by default
+
+Newly learned personal knowledge is stored **private by default**.
+
+A memory may enter a shared scope only when at least one of the following is true:
+
+- the user explicitly states that the information is shared/common household knowledge;
+- the source itself has a deterministically established shared audience and the memory semantics are safe to preserve at that same scope;
+- a later explicit Ada-owned rule classifies a narrowly defined memory type as shared.
+
+The model must not widen scope merely because information appears useful for coordination.
+
+Examples:
+
+- a person's preference -> private by default;
+- a household fact explicitly stated as common information -> may be shared;
+- a person's medical appointment -> remains private unless an explicit rule/grant establishes a permitted shared abstraction.
+
+Where coordination requires broader visibility, Ada should prefer a deliberately minimized shared derivative (for example, `busy` or `needs transport`) over copying private details into shared Memory. Such derivatives still require an explicit future policy and must preserve provenance to the private source without exposing the source content.
+
 ## Security and semantic invariants
 
 The following remain non-negotiable:
