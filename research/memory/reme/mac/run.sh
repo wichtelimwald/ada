@@ -4,6 +4,7 @@ set -u
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 HARNESS_DIR="$ROOT/research/memory/reme/mac"
 DRIVER="$HARNESS_DIR/driver.py"
+SPIKE_CONFIG="$HARNESS_DIR/spike-config.yaml"
 PYTHON_BIN="${PYTHON_BIN:-python3.14}"
 REME_VERSION="${REME_VERSION:-0.4.1.12}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3.5:9b}"
@@ -221,6 +222,7 @@ launch_service() {
   port="$3"
   log="$RESULT_DIR/logs/service-$label.log"
   "$VENV/bin/reme" start \
+    "config=$SPIKE_CONFIG" \
     "workspace_dir=$workspace" \
     "service.host=127.0.0.1" \
     "service.port=$port" \
