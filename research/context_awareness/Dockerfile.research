@@ -1,0 +1,18 @@
+FROM python:3.14-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home --uid 10001 researcher
+
+WORKDIR /work
+
+COPY --chown=researcher:researcher . /work/
+
+USER researcher
+
+ARG VERBOSE=0
+ENV VERBOSE=${VERBOSE}
+ENV ADA_RESEARCH_SANDBOX=1
+
+RUN sh ./run.sh

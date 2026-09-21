@@ -1,0 +1,1 @@
+quickadd @ git+https://github.com/Acreom/quickadd.git@0b3bfc26a7347a80821e86eb3838556a7adc2a30
