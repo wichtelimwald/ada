@@ -599,6 +599,58 @@ References:
 - https://ollama.com/blog/thinking
 - https://ollama.com/blog/streaming-tool
 
+## Fifth local-LLM attempt — native Ollama path passes end to end
+
+The focused retry using AgentScope's native Ollama backend completed successfully on the target Mac:
+
+```text
+PASS: native Ollama tool-call probe.
+PASS: local LLM Memory flow completed.
+```
+
+This run used:
+
+- ReMe `0.4.1.12`;
+- AgentScope `2.0.7.post1`;
+- Python 3.14 on Apple Silicon;
+- local `qwen3.5:9b`;
+- native Ollama chat/tool transport;
+- `think=false`;
+- bounded characterization settings;
+- a fresh ReMe workspace;
+- no cloud model credentials.
+
+The successful `local LLM Memory flow` means the prepared sequence completed operationally:
+
+1. explicit preference -> Auto Memory;
+2. initial schedule fact -> Auto Memory;
+3. explicit correction -> existing-note Auto Memory update;
+4. first unresolved-conflict claim -> Auto Memory;
+5. second unresolved-conflict claim -> Auto Memory;
+6. Auto Dream consolidation.
+
+This resolves the **local model/runtime compatibility gate** positively.
+
+It does **not** yet resolve Ada's semantic gates for contradiction/correction. Successful execution proves that ReMe can perform the workflow, not that the resulting Markdown/digest represents:
+
+- explicit correction as Ada's desired `superseded -> confirmed/explicit_user` lifecycle;
+- two non-corrective contradictory explicit statements as an unresolved `contradicted` state;
+- provenance with the exact minimization/scope semantics Ada requires.
+
+Those require inspection of the generated `daily/`, `digest/`, and session artifacts from the successful result bundle.
+
+### Transport conclusion
+
+For Ada's local ReMe characterization, the native Ollama backend is materially preferable to the OpenAI-compatible Ollama path.
+
+The characterization evidence shows:
+
+- the OpenAI-compatible route could work, but was operationally very slow;
+- the bounded settings alone did not solve that;
+- switching to native Ollama plus an explicit `think=false` path allowed the complete Memory/Dream flow to finish.
+
+This is a characterization result, not a requirement that Ada's main PydanticAI runtime abandon its accepted OpenAI-compatible model boundary. ReMe remains behind an Ada-owned Memory adapter and may use its own narrow native-Ollama integration internally if adopted.
+
 ## Current recommendation
 
 Keep **ReMe as the primary deep-dive candidate**, but downgrade the earlier assumption that it is a largely standalone runtime-independent library.
