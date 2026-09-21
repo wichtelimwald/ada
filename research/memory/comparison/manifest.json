@@ -1,0 +1,10 @@
+{
+  "as_of": "2026-09-21",
+  "model": "qwen3.5:9b",
+  "candidates": {
+    "reme": {"version": "0.4.1.12", "role": "file-native substrate + consolidation"},
+    "langmem": {"version": "0.0.30", "role": "storage-agnostic structured extraction/update"},
+    "hindsight": {"version": "0.10.1", "role": "evidence/observation learning + retrieval"},
+    "letta": {"version": "0.32.15", "role": "Git-backed MemFS + stateful agent memory"}
+  }
+}
