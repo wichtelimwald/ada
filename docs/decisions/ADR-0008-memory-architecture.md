@@ -103,6 +103,80 @@ Examples:
 
 Where coordination requires broader visibility, Ada should prefer a deliberately minimized shared derivative (for example, `busy` or `needs transport`) over copying private details into shared Memory. Such derivatives still require an explicit future policy and must preserve provenance to the private source without exposing the source content.
 
+### Confirmed learning direction: evidence-based and class-dependent
+
+Memory ingestion should not use one universal rule. Different classes of knowledge need different learning paths.
+
+Ada should support a small learning lifecycle:
+
+```text
+observation
+  -> hypothesis
+  -> confirmed / established Memory
+  -> later superseded, corrected, or forgotten
+```
+
+An **observation is not yet an authoritative fact**. It records that something happened, was stated, or appeared useful. A hypothesis may be formed from one or more observations, but it remains visibly provisional until the applicable learning rule promotes it.
+
+The simplest useful learning loop is:
+
+1. record a privacy-conscious observation with source/reason and scope;
+2. use the current hypothesis when appropriate, without treating it as permission or guaranteed truth;
+3. observe whether the resulting suggestion/behavior was accepted, corrected, rejected, or contradicted;
+4. strengthen, revise, or discard the hypothesis;
+5. only persist a stable fact/preference/routine at the maturity level justified by that evidence.
+
+The system should prefer **state-based maturity** over an opaque universal numeric confidence score. Initial states to characterize are:
+
+- `observed`;
+- `provisional`;
+- `confirmed`;
+- `contradicted`;
+- `superseded`;
+- `forgotten`.
+
+Exact names remain open, but the distinction must be visible in human-readable Memory.
+
+#### Initial learning classes
+
+| Class | Example | Initial behavior |
+| --- | --- | --- |
+| Explicit low-risk self-statement | "I prefer concise answers." | May be persisted privately with provenance; later corrections supersede it. |
+| Repeated behavioral preference | User repeatedly chooses one proposed option | Log observations first; form a provisional hypothesis; promote only after repeated evidence or explicit confirmation. |
+| Routine / pattern | A pickup is usually handled by one person | Learn gradually from observed outcomes; do not infer authority or guarantee future behavior. |
+| Material or sensitive fact | Health, finances, highly personal information | Conservative handling; require an explicit future rule or confirmation before durable promotion. |
+| Shared fact | "Our family doctor is ..." | May become shared only under the confirmed shared-scope rules; model usefulness alone is insufficient. |
+| Untrusted/quoted content | Forwarded email says "Christian prefers ..." | Source evidence only; cannot directly become trusted personal Memory. |
+| Secret / credential | Password, token, credential material | Never learn automatically. |
+
+#### Feedback signals
+
+Learning may use multiple feedback forms with different evidentiary weight:
+
+- explicit correction or rejection — strong negative evidence;
+- explicit confirmation — strong positive evidence;
+- user selecting/accepting a suggestion — useful but weaker positive evidence;
+- a real-world outcome explicitly reported back to Ada — useful outcome evidence;
+- repeated consistent behavior across occasions — cumulative evidence;
+- silence / absence of correction — **not sufficient on its own** to establish a durable fact.
+
+When Ada acts or proposes based on a provisional hypothesis, the relevant outcome may be referenced from existing action/application records, but the durable action ledger must not become a hidden personal Memory store. Memory should retain only the minimized learning fact/provenance needed for future behavior.
+
+#### Learning journal / observation record
+
+Ada may maintain an inspectable, privacy-scoped learning journal for observations that are not yet mature enough to become ordinary Memory notes.
+
+Requirements:
+
+- it belongs to the same human-controlled Memory domain, not a hidden runtime database;
+- it follows the same hard directory privacy boundaries;
+- it stores minimized observations rather than raw conversations by default;
+- entries may expire or be compacted once promoted, rejected, superseded, or no longer useful;
+- rebuilding retrieval indexes must not change learning maturity;
+- users can inspect/correct/remove learning observations.
+
+The exact representation remains open; Markdown/YAML or another human-readable append-friendly form should be characterized.
+
 ## Security and semantic invariants
 
 The following remain non-negotiable:
@@ -185,6 +259,7 @@ A candidate cannot win by weighted score if it fails a hard gate.
 | Scope isolation | Individual/private/shared scopes can be represented and enforced without trusting the model. |
 | Authority separation | Learned Memory cannot create or widen permissions. |
 | Correction semantics | Corrections, supersession, contradiction, and deliberate forgetting can be represented safely. |
+| Learning explainability | Observations, hypotheses, promotion, correction, and rejection remain inspectable; no hidden behavioral model silently becomes Memory truth. |
 | Deletion/export | Users can inspect, export, edit, and delete authoritative memories; derived state can be rebuilt. |
 | Provenance | Material facts can retain useful source/reason attribution without requiring raw source retention. |
 | License | Runtime/build dependencies must be compatible with Ada's MIT distribution strategy and documented in NOTICE. |
@@ -396,6 +471,9 @@ Before selecting a backend, characterize at least:
 9. **No archive rescan** — deleted/forgotten information is not silently relearned from archived messages unless an explicit archive-read task permits it.
 10. **Offline recall** — representative local chat retrieval works with network access unavailable.
 11. **Gardening** — after Memory accumulates duplicates and stale structure, Ada proposes a cleanup without silently deleting or changing material facts.
+12. **Preference learning** — repeated accepted concise replies create a provisional preference hypothesis; silence alone does not confirm it, while explicit confirmation/correction updates the state.
+13. **Routine learning** — repeated reported outcomes may establish a routine, but the routine never becomes permission to act.
+14. **Learning correction** — a user rejects a learned hypothesis and Ada stops using it without routine archive rescanning recreating it.
 
 ## Evaluation criteria to weight with the maintainer
 
@@ -404,6 +482,7 @@ After hard gates, candidate scoring should consider:
 - human editability / explainability;
 - retrieval quality and context/token efficiency;
 - correction and contradiction semantics;
+- learning quality, explainability, and false-learning resistance;
 - privacy/scope isolation;
 - local/offline behavior;
 - operational simplicity;
@@ -428,7 +507,9 @@ Weights are deliberately not assigned by this draft.
 8. Decide how concurrent/out-of-band file edits are detected and reconciled.
 9. Define explicit forget/delete semantics across authoritative files, derived indexes/graphs, source references, and action/audit records.
 10. Define the Memory-gardening proposal/approval boundary.
-11. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+11. Characterize learning promotion rules for explicit facts, preferences, routines, sensitive facts, and shared knowledge.
+12. Define the inspectable learning-journal representation, retention/compaction rules, and how application outcomes feed learning without duplicating the action ledger.
+13. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
