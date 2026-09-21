@@ -16,10 +16,11 @@ if [ -z "$RESULT_DIR" ]; then
 fi
 
 VENV="$RESULT_DIR/venv"
-WORKSPACE="$RESULT_DIR/workspace-a"
-OUT="$RESULT_DIR/llm-flow-retry"
-LOG="$RESULT_DIR/logs/local-llm-memory-flow-retry.log"
-SERVICE_LOG="$RESULT_DIR/logs/service-a-retry.log"
+RETRY_STAMP="$(date '+%Y%m%d-%H%M%S')"
+WORKSPACE="$RESULT_DIR/workspace-llm-retry-$RETRY_STAMP"
+OUT="$RESULT_DIR/llm-flow-retry-$RETRY_STAMP"
+LOG="$RESULT_DIR/logs/local-llm-memory-flow-retry-$RETRY_STAMP.log"
+SERVICE_LOG="$RESULT_DIR/logs/service-llm-retry-$RETRY_STAMP.log"
 
 PREFERENCE_TOKEN="REME_PREF_RETRY_5E39C2"
 CORRECTION_TOKEN="REME_CORRECTION_RETRY_A1D884"
@@ -37,10 +38,7 @@ trap stop_service EXIT INT TERM
   echo "Existing ReMe venv not found: $VENV" >&2
   exit 1
 }
-[ -d "$WORKSPACE" ] || {
-  echo "Existing workspace not found: $WORKSPACE" >&2
-  exit 1
-}
+mkdir -p "$WORKSPACE"
 command -v ollama >/dev/null 2>&1 || {
   echo "Ollama CLI not found" >&2
   exit 1
