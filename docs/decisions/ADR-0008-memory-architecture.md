@@ -299,6 +299,61 @@ Learning may use multiple feedback forms with different evidentiary weight:
 
 When Ada acts or proposes based on a provisional hypothesis, the relevant outcome may be referenced from existing action/application records, but the durable action ledger must not become a hidden personal Memory store. Memory should retain only the minimized learning fact/provenance needed for future behavior.
 
+#### Memory selectivity and retention
+
+Ada must not treat every utterance, event, or successful action as durable Memory.
+
+The amount retained should be governed by **usefulness, stability, privacy cost, and evidence**, not by a goal of maximum recall.
+
+Initial principles:
+
+- prefer compact durable facts/preferences/routines over raw interaction history;
+- observations used for learning may be temporary and should be compacted, expired, or discarded when no longer useful;
+- repeated equivalent memories should converge rather than accumulate indefinitely;
+- low-value incidental details should normally remain session context only;
+- sensitive information has a higher bar for durable retention than ordinary low-risk preferences;
+- durable Memory should be periodically gardened so the human-readable corpus remains understandable rather than becoming an append-only transcript;
+- retention policy may differ by memory class, maturity state, and privacy sensitivity.
+
+The target is **useful continuity, not exhaustive surveillance**.
+
+Exact retention windows and compaction thresholds remain open and should be characterized from representative usage rather than fixed prematurely.
+
+#### Global and per-interlocutor adaptation
+
+Ada may evolve at more than one level, and those levels must remain separable.
+
+At minimum, characterize:
+
+1. **Global Ada personality** — stable traits and interaction principles that apply generally across users;
+2. **Per-interlocutor interaction profile** — preferences learned for a specific person, such as desired brevity, terminology, explanation depth, or interaction style;
+3. **Domain/routine Memory about that person** — facts, routines, relationships, and preferences that are about the person rather than about Ada's own behavior.
+
+Per-interlocutor adaptation must not silently mutate the global Ada personality.
+
+Example:
+
+```text
+Global Ada:
+  concise, transparent, privacy-first
+
+Christian interaction profile:
+  prefers concise technical answers
+  tolerates architecture terminology
+
+Another person:
+  prefers simpler explanations
+  wants more explicit confirmation
+```
+
+Ada may learn and refine both the global personality and per-interlocutor profiles, but:
+
+- global changes require stronger evidence because they affect everyone;
+- per-interlocutor adaptations stay inside that person's privacy scope;
+- one person's interaction preferences must not leak into another person's profile;
+- relationship-specific adaptation remains subordinate to privacy and authority boundaries;
+- untrusted content cannot directly rewrite either layer.
+
 #### Learning journal / observation record
 
 Ada may maintain an inspectable, privacy-scoped learning journal for observations that are not yet mature enough to become ordinary Memory notes.
@@ -357,16 +412,23 @@ The Memory design must treat these as three different mechanisms:
 - **backup** — recover from device loss/corruption;
 - **sync** — replicate current state across authorized devices/users.
 
-Git-like history is attractive for Markdown because it provides diffs and rollback, but it has a major privacy/forgetting consequence: deleting a file from the working tree does not remove it from repository history.
+Git-like history is attractive for Markdown because it provides diffs and rollback.
 
-Therefore **plain Git history must not be adopted automatically as the Memory backup/versioning mechanism**.
+The maintainer explicitly accepts the following semantic split:
 
-Any selected mechanism must characterize:
+- **Ada forgetting** means Ada no longer reads or retrieves the forgotten content from the current authoritative Memory state or any derived index;
+- historical versions may still retain earlier content for recovery/versioning;
+- permanent erasure from history/backups is a separate lifecycle/operations concern and may be handled outside Ada.
+
+Therefore Git-style history is **compatible with Ada's runtime forgetting semantics**, provided Ada only reads the current authoritative state during normal Memory retrieval and derived indexes are rebuilt from that state.
+
+Any selected mechanism must still characterize:
 
 - encryption at rest and key ownership;
 - per-private-vault versus shared-vault protection;
-- deletion/forget semantics across historical versions and backups;
-- retention windows and eventual purge;
+- operational forgetting from Ada's current readable state and indexes;
+- optional historical purge/retention outside normal Ada retrieval;
+- retention windows and eventual purge where required;
 - recovery if a key/device is lost;
 - ability to restore one person's vault without exposing another's;
 - offline operation;
@@ -374,7 +436,7 @@ Any selected mechanism must characterize:
 
 Possible solution families to research later include:
 
-- per-vault Git-style versioning with an encryption/retention design;
+- per-vault Git-style versioning, potentially the simplest baseline for inspectable Markdown history;
 - encrypted snapshot/version stores;
 - filesystem-native snapshots where available;
 - encrypted backup tools independent of the live Markdown representation.
@@ -462,7 +524,7 @@ A candidate cannot win by weighted score if it fails a hard gate.
 | Local/offline baseline | Core Memory read/write/retrieval can operate without cloud access. |
 | Scope isolation | Individual/private/shared scopes can be represented and enforced without trusting the model. |
 | Storage isolation | Read access to one private Memory domain must not implicitly grant read access to other private domains; derived indexes must preserve the same boundary. |
-| History privacy | Versioning/backups must not silently defeat deliberate forgetting or expose plaintext private Memory through history. |
+| History privacy | Normal Ada retrieval must not read forgotten historical content; versioning/backups must preserve vault privacy even if older versions remain recoverable outside normal Ada use. |
 | Authority separation | Learned Memory cannot create or widen permissions. |
 | Correction semantics | Corrections, supersession, contradiction, and deliberate forgetting can be represented safely. |
 | Learning explainability | Observations, hypotheses, promotion, correction, and rejection remain inspectable; no hidden behavioral model silently becomes Memory truth. |
@@ -686,7 +748,9 @@ Before selecting a backend, characterize at least:
 18. **Private vault isolation** — a person with legitimate access to one private Memory vault cannot read another person's private vault or a cross-scope derived index.
 19. **Shared derivative provenance** — a shared minimized fact can remain attributable without leaking private source content or identifiers.
 20. **Version recovery** — an accidental Markdown edit can be restored without weakening scope isolation.
-21. **Forget across history** — deliberate forgetting defines what happens to historical versions and backups rather than leaving the deleted memory silently recoverable forever.
+21. **Operational forget with history** — deleting/forgetting a memory removes it from Ada's current retrieval and rebuilt indexes even if a Git/version history still contains an older copy; permanent historical erasure is a separate operational concern.
+22. **Selective retention** — incidental low-value details remain session-only while stable useful preferences/routines are compacted into durable Memory.
+23. **Per-interlocutor adaptation** — Ada can learn a communication preference for one person without changing global Ada personality or another person's profile.
 
 ## Evaluation criteria to weight with the maintainer
 
@@ -696,6 +760,8 @@ After hard gates, candidate scoring should consider:
 - retrieval quality and context/token efficiency;
 - correction and contradiction semantics;
 - learning quality, explainability, and false-learning resistance;
+- selectivity/retention quality and resistance to unbounded Memory growth;
+- global-versus-per-interlocutor adaptation isolation;
 - privacy/scope and physical storage isolation;
 - versioning/backup privacy and recoverability;
 - local/offline behavior;
@@ -728,9 +794,11 @@ Weights are deliberately not assigned by this draft.
 15. Define the minimal provenance schema and cross-scope provenance redaction/reference semantics.
 16. Compare protected storage topologies: per-person private vaults plus shared vaults versus equivalent designs, including OS ACL and encryption options.
 17. Define partitioning for FTS/graph/vector indexes so derived retrieval cannot collapse private protection domains.
-18. Evaluate versioning separately from backup and sync; specifically characterize Git-like history against forgetting, encryption, and recovery requirements.
-19. Define backup retention and eventual purge semantics for deliberately forgotten Memory.
-20. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
+18. Characterize per-vault Git-style versioning as a baseline, including encryption/privacy, recovery, and the rule that normal Ada retrieval reads current state only.
+19. Define optional historical purge/backup-retention semantics separately from Ada's operational forgetting.
+20. Define retention/compaction policy by memory class and maturity state so durable Memory stays useful rather than exhaustive.
+21. Define the boundary between global Ada personality evolution and per-interlocutor interaction-profile learning.
+22. Keep Memory-derived values distinct from explicit/context-derived values until this ADR defines trustworthy provenance; ADR-0007 intentionally deferred `memory_derived`.
 
 ## Decision status
 
