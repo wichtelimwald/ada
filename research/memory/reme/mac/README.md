@@ -48,6 +48,19 @@ Model           qwen3.5:9b
 Ollama endpoint http://127.0.0.1:11434/v1
 ```
 
+The harness overlays `spike-config.yaml` on ReMe's published defaults:
+
+```text
+LLM max tokens       4096
+LLM context size     32768
+ReAct max iterations 8
+Auto Memory          no derived auto-tag step
+Auto Dream           no derived auto-tag step
+Dream units          max 5
+```
+
+These are characterization bounds, not Ada production defaults. They isolate ReMe's core Memory behavior from optional derived tagging and from ReMe's much larger general-purpose output/ReAct limits.
+
 `REME_VERSION` and `OLLAMA_MODEL` are overridable for explicit comparison runs, but the first result should use the defaults.
 
 ## Run
