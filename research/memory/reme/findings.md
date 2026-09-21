@@ -778,18 +778,20 @@ to:
 "strong file-native substrate, but Ada must own canonical fact/lifecycle semantics"
 ```
 
-This is still compatible with adopting ReMe, but the adapter is no longer optional or merely a privacy façade.
+This is still compatible with adopting ReMe, but ReMe alone is not sufficient for the semantic layer.
 
-At minimum Ada must own:
+The comparison must now determine whether the missing responsibilities can be reused from LangMem, Hindsight, or Letta/MemFS before Ada implements them itself. The required capabilities, regardless of implementation source, are:
 
 - canonical fact values;
 - subject and privacy scope;
 - confirmation basis;
-- observed/provisional/confirmed/stale state;
+- observed/provisional/confirmed/stale state where needed;
 - supersession;
 - explicit contradiction links;
 - deterministic correction semantics;
-- validation of derived ReMe summaries before they can influence authoritative recall.
+- validation of derived summaries before they can influence authoritative recall.
+
+A custom Ada implementation is the control/fallback, not the default conclusion.
 
 ## Current recommendation
 
