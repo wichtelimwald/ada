@@ -128,6 +128,26 @@ When local execution becomes available, the minimal ReMe spike should prove:
    - measure baseline process memory and CPU for one workspace;
    - repeat for multiple concurrent protection-domain workspaces.
 
+## Executable characterization status
+
+The macOS/Python-3.14 spike has now provided direct evidence for several scenarios:
+
+| Scenario | Executable result | Remaining question |
+| --- | --- | --- |
+| #2 Outside edit | **PASS** | none for basic file -> clean metadata rebuild path |
+| #7 Forget | **PASS** | Git/history purge remains deliberately separate |
+| #10 Offline recall/local operation | **PASS** | tested with local BM25/file retrieval and local Ollama Memory flow |
+| #12 Preference learning | **OPERATIONAL PASS** | inspect resulting maturity/provenance semantics |
+| #14 Learning correction | **OPERATIONAL PASS** | inspect resulting supersession/confirmation semantics |
+| #16 Contradictory explicit statements | **OPERATIONAL PASS** | inspect whether conflict remains unresolved vs model reconciliation |
+| #17 Explicit correction | **OPERATIONAL PASS** | inspect exact old/new lifecycle representation |
+| #18 Private vault isolation | **PASS for two-workspace canary isolation** | Ada still owns authorization, encryption, and federated retrieval |
+| #24 Conversation continuity pipeline | **OPERATIONAL PASS** | inspect summary/digest quality and transcript-retention fit |
+
+The complete native-Ollama characterization also passed a direct Qwen3.5 tool-call probe and the full Auto Memory -> Auto Dream sequence.
+
+"Operational PASS" intentionally means the mechanism completed without runtime failure. It does not promote ReMe's model-generated semantics to Ada authority.
+
 ## Current interpretation
 
 The scenario matrix **does not overturn ReMe's lead**.
