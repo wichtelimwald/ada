@@ -342,6 +342,70 @@ def cmd_llm(args: argparse.Namespace) -> None:
                 )
 
 
+def cmd_ollama_probe(args: argparse.Namespace) -> None:
+    """Verify native Ollama tool calling independently from ReMe/AgentScope."""
+    try:
+        import ollama
+    except ImportError as exc:
+        raise RuntimeError("ollama Python package is not installed in this environment") from exc
+
+    tool = {
+        "type": "function",
+        "function": {
+            "name": "record_memory_probe",
+            "description": "Record one synthetic memory fact for a characterization probe.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "fact": {"type": "string"},
+                },
+                "required": ["fact"],
+            },
+        },
+    }
+
+    started = time.monotonic()
+    client = ollama.Client(host=args.host)
+    response = client.chat(
+        model=args.model,
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    "Synthetic characterization only. Call record_memory_probe exactly once "
+                    "with fact='native-ollama-tool-call-ok'. Do not answer in prose."
+                ),
+            }
+        ],
+        tools=[tool],
+        think=False,
+        stream=False,
+        options={"num_predict": 512},
+    )
+    elapsed = time.monotonic() - started
+
+    payload = response.model_dump() if hasattr(response, "model_dump") else dict(response)
+    message = getattr(response, "message", None)
+    tool_calls = getattr(message, "tool_calls", None) or []
+    names = [getattr(getattr(call, "function", None), "name", None) for call in tool_calls]
+    if "record_memory_probe" not in names:
+        raise RuntimeError(
+            f"native Ollama probe returned no expected tool call after {elapsed:.1f}s: "
+            f"{json.dumps(payload, ensure_ascii=False, default=str)}"
+        )
+
+    _write_json(
+        args.out,
+        {
+            "elapsed_seconds": round(elapsed, 3),
+            "model": args.model,
+            "host": args.host,
+            "tool_call_names": names,
+            "response": payload,
+        },
+    )
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     response = _post(args.base_url, "status", {})
     _expect_success(response, "status")
@@ -439,6 +503,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--dream-timeout", type=float, default=600.0)
     p.add_argument("--out", type=Path, required=True)
     p.set_defaults(func=cmd_llm)
+
+    p = sub.add_parser("ollama-probe")
+    p.add_argument("--host", default="http://127.0.0.1:11434")
+    p.add_argument("--model", required=True)
+    p.add_argument("--out", type=Path, required=True)
+    p.set_defaults(func=cmd_ollama_probe)
 
     p = sub.add_parser("status")
     p.add_argument("--base-url", required=True)
