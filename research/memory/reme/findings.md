@@ -505,6 +505,28 @@ HARNESS INVALID / RETRY REQUIRED
 
 not as a ReMe gate failure.
 
+### Second local-LLM attempt reached the agent but hit the harness HTTP timeout
+
+After fixing the missing AgentScope message `name`, the focused retry progressed through:
+
+- ReMe startup;
+- Auto Memory message validation;
+- session JSONL persistence;
+- daily-note lookup;
+- entry into the AgentScope `user_message_create` agent call.
+
+The client then timed out while the service log still showed the agent call in progress and no ReMe/model exception.
+
+This is currently classified as a second **harness limitation**, not a ReMe failure: ordinary HTTP calls used a fixed 20-second timeout, which is too short for a local 9B model plus tool-calling Memory workflow.
+
+The harness now uses:
+
+- 300 seconds for each Auto Memory call;
+- 600 seconds for Auto Dream;
+- a fresh ReMe workspace for each focused retry, while reusing the already-installed virtual environment.
+
+The next retry should determine whether the local Ollama/AgentScope tool path completes successfully or exposes a genuine runtime/model compatibility issue.
+
 ## Current recommendation
 
 Keep **ReMe as the primary deep-dive candidate**, but downgrade the earlier assumption that it is a largely standalone runtime-independent library.
