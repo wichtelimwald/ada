@@ -67,6 +67,12 @@ def _run_dateparser(
     if parsed is None:
         return None
     result = _normalize_point(parsed, context["timezone"])
+    if data.period in {"year", "month", "week", "day"}:
+        result["semantic_kind"] = "date"
+        result["granularity"] = data.period
+    elif data.period == "time":
+        result["semantic_kind"] = "datetime"
+        result["granularity"] = "minute"
     result["parser_period"] = data.period
     result["parser_locale"] = data.locale
     return result
@@ -84,6 +90,24 @@ def _time_to_local(value: Any) -> str | None:
         value.hour or 0,
         value.minute or 0,
     ).isoformat(timespec="minutes")
+
+
+def _time_semantics(value: Any) -> tuple[str | None, str | None]:
+    if value is None:
+        return None, None
+    has_date = (
+        value.year is not None
+        and value.month is not None
+        and value.day is not None
+    )
+    has_time = value.hour is not None
+    if has_date and not has_time:
+        return "date", "day"
+    if has_date and has_time:
+        return "datetime", "minute" if value.minute is not None else "hour"
+    if has_time:
+        return "time", "minute" if value.minute is not None else "hour"
+    return None, None
 
 
 def _run_quickadd(
@@ -108,14 +132,19 @@ def _run_quickadd(
 
     if kind == "Time":
         local = _time_to_local(resolution)
+        semantic_kind, granularity = _time_semantics(resolution)
         if local is None:
             return {
                 "kind": "partial",
+                "semantic_kind": semantic_kind,
+                "granularity": granularity,
                 "raw_type": kind,
                 "raw": str(resolution),
             }
         return {
             "kind": "point",
+            "semantic_kind": semantic_kind,
+            "granularity": granularity,
             "local": local,
             "wall_time_status": _wall_time_status(local, context["timezone"]),
         }
@@ -123,10 +152,16 @@ def _run_quickadd(
     if kind == "Interval":
         start = _time_to_local(resolution.start)
         end = _time_to_local(resolution.end)
+        start_kind, start_granularity = _time_semantics(resolution.start)
+        end_kind, end_granularity = _time_semantics(resolution.end)
         result: dict[str, Any] = {
             "kind": "interval",
             "start": start,
             "end": end,
+            "start_semantic_kind": start_kind,
+            "end_semantic_kind": end_kind,
+            "start_granularity": start_granularity,
+            "end_granularity": end_granularity,
         }
         if start is not None:
             result["start_wall_time_status"] = _wall_time_status(
@@ -145,6 +180,8 @@ def _run_quickadd(
             return {"kind": "duration", "raw": str(resolution)}
         return {
             "kind": "point",
+            "semantic_kind": "datetime",
+            "granularity": "minute",
             "local": local,
             "wall_time_status": _wall_time_status(local, context["timezone"]),
             "source_kind": "duration",
