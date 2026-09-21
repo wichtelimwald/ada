@@ -1252,11 +1252,13 @@ The semantic inspection found a material boundary condition:
 - Auto Dream later inverted the correction direction again in a procedure digest;
 - two explicit contradictory pickup claims were preserved separately rather than overwritten, but ReMe created no deterministic contradiction relation/state.
 
-Therefore ReMe can remain a candidate **file-native substrate**, but ReMe-generated descriptions/digests cannot be authoritative Ada truth. Ada must own canonical fact values, lifecycle, supersession, contradiction, confirmation basis, and validation of derived summaries.
+Therefore ReMe can remain a candidate **file-native substrate**, but ReMe-generated descriptions/digests cannot by themselves be authoritative Ada truth. The missing canonical fact/lifecycle semantics must be supplied outside ReMe.
+
+That does **not** imply a custom Ada implementation. ADR-0008 must first compare whether LangMem, Hindsight, or Letta/MemFS can supply enough of those semantics cleanly. A minimal Ada-owned implementation remains the control/fallback option only if reuse candidates do not justify their cost.
 
 This moves the remaining ReMe decision work away from basic runtime feasibility and toward:
 
-- design of the Ada-owned canonical fact/lifecycle adapter required above ReMe;
+- side-by-side characterization of ReMe, LangMem, Hindsight, and Letta/MemFS on identical semantic fixtures;
 - external document reference/lifecycle fit;
 - exact transitive license/security audit;
 - maintenance/AgentScope dependency cost;
