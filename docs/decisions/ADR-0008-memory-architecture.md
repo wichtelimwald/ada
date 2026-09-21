@@ -898,14 +898,14 @@ Legend: ✅ strong fit / 🟡 partial or adapter required / ❓ not yet verified
 | Top-level license compatible with Ada MIT strategy | ✅ Apache-2.0 | ✅ MIT | ✅ Apache-2.0 | ✅ MIT |
 | Human-readable authoritative files | ✅ Markdown/YAML is source of truth | ❌ bank/database is primary state; Markdown knowledge pages are projections | ✅ git-backed Markdown files | 🟡 storage-agnostic toolkit, not a file-native store itself |
 | Human direct edit/correction | ✅ first-class | 🟡 via APIs/export rather than canonical files | ✅ first-class file editing | 🟡 depends on chosen backing store |
-| Derived indexes rebuildable from files | ✅ explicit design goal | 🟡 observations can be regenerated from retained facts, but Ada-owned-file rebuild path is not established | 🟡 MemFS syncs files and agent state; full rebuild semantics need verification | 🟡 depends on backing store |
+| Derived indexes rebuildable from files | ✅ via source-file watcher/recovery lifecycle; `reindex` alone is not a full rebuild | 🟡 observations can be regenerated from retained bank facts, but Ada-owned-file rebuild path is not established | 🟡 MemFS syncs files and agent state; full rebuild semantics need verification | 🟡 depends on backing store |
 | Learning / consolidation | ✅ auto-memory / auto-dream / digest refinement | ✅ particularly strong: evidence-backed observations and mental models | ✅ reflection/background memory patterns | ✅ extraction, consolidation, update, hot/background paths |
 | Evidence / provenance model | ✅ source links from digest to sessions/resources | ✅ particularly strong supporting-evidence model | 🟡 needs characterization | 🟡 application-defined |
-| Per-person/private isolation | ❓ workspace separation exists conceptually; enforceable Ada-style protection domains not yet verified | ✅ strict bank isolation | ❓ agent/repository separation exists; household privacy model not verified | ❌ no isolation model supplied by the library |
+| Per-person/private isolation | 🟡 one workspace per Ada protection domain is plausible; concurrent/enforceable isolation still needs characterization | ✅ strict bank isolation | ❓ agent/repository separation exists; household privacy model not verified | ❌ no isolation model supplied by the library |
 | Shared household Memory | ❓ requires Ada-specific design | 🟡 multi-bank composition is client-side; shared bank possible but Ada semantics required | 🟡 shared repositories exist, household semantics still Ada-owned | ❌ must be supplied by Ada |
 | Git-native history | 🟡 files are versionable but Git is not the core contract | ❌ | ✅ built in | ❌ |
 | Conversation/resource ingestion | ✅ sessions + resources are first-class source layers | ✅ conversations/documents can be retained | 🟡 external memory files/context repos; broader ingestion is runtime-dependent | ✅ conversation-oriented extraction |
-| Runtime independence from another agent framework | 🟡 Python package exists, but current self-evolving workflows depend on AgentScope components | ✅ standalone server/client/embedded options | ❌ tightly coupled to Letta runtime/SDK | 🟡 core primitives are storage-agnostic, but ecosystem is LangGraph-oriented |
+| Runtime independence from another agent framework | ❌ current package import/runtime path contains unconditional AgentScope imports; upstream package smoke installs the AgentScope extra | ✅ standalone server/client/embedded options | ❌ tightly coupled to Letta runtime/SDK | 🟡 core primitives are storage-agnostic, but ecosystem is LangGraph-oriented |
 | Fit as Ada authoritative Memory substrate | **✅ strongest current candidate** | ❌ | 🟡 architecture reference / possible component | ❌ |
 | Fit as Ada derived learning/recall layer | ✅ | **✅ strongest current candidate** | 🟡 | ✅ lightweight candidate |
 
@@ -925,8 +925,8 @@ Why it currently leads:
 Important unresolved gates before adoption:
 
 1. verify the full runtime/dependency license path, not only ReMe's top-level Apache-2.0 license;
-2. determine how much of ReMe can run without adopting AgentScope as Ada runtime infrastructure;
-3. verify out-of-band edit/reindex behavior under Ada's scenarios;
+2. decide whether accepting AgentScope as a Memory dependency is compatible with Ada's already accepted PydanticAI runtime boundary, or whether a narrower ReMe integration/decoupling is required;
+3. verify out-of-band edit and full watcher-based rebuild behavior under Ada's scenarios (`reindex` alone is insufficient);
 4. determine whether separate Ada protection domains can map cleanly to separate ReMe workspaces without cross-scope indexes/state;
 5. test correction, contradiction, deletion, episodic summaries, and external document references against Ada's semantics;
 6. characterize local-model/Ollama and Python 3.14 behavior on the accepted target platforms.
@@ -938,6 +938,12 @@ Its evidence-backed observations, strict banks, temporal/graph/lexical/semantic 
 **Letta MemFS** remains the strongest architecture/reference for Git-backed Markdown context repositories, but current runtime coupling makes it a weaker adoption candidate.
 
 **LangMem** remains the lightweight fallback for reusable extraction/consolidation logic if ReMe's or Hindsight's larger runtimes prove too invasive.
+
+Detailed source findings are tracked in:
+
+- `research/memory/reme/findings.md`
+- `research/memory/reme/scenario-matrix.md`
+- `research/memory/hindsight/findings.md`
 
 ### Candidates currently outside the primary shortlist
 
