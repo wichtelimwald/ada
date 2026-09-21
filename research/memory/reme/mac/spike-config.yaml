@@ -25,7 +25,13 @@ jobs:
 components:
   as_llm:
     default:
+      backend: ollama
+      model: ${OLLAMA_MODEL_NAME:-qwen3.5:9b}
+      stream: true
       context_size: 32768
+      max_retries: 1
+      credential:
+        host: ${OLLAMA_HOST:-http://127.0.0.1:11434}
       parameters:
         max_tokens: 4096
         thinking_enable: false
