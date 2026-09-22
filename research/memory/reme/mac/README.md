@@ -26,7 +26,7 @@ The learning cases deliberately do **not** reduce semantic correctness to brittl
 ## Safety properties
 
 - Fixtures are synthetic canaries only. Do not replace them with personal data.
-- Workspaces and the virtual environment live under the repository's Git-ignored `.artifacts/research/memory/reme/` tree by default.
+- Workspaces and the virtual environment live under the repository's Git-ignored `artifacts/research/memory/reme/` tree by default.
 - The script never installs ReMe into Ada's `.venv` or modifies `pyproject.toml`.
 - It never downloads an Ollama model. The already accepted local model must be present.
 - ReMe Studio and MCP serving are disabled for the spike.
@@ -99,10 +99,10 @@ Do not use `REME_VERSION` to silently move to a newer release. A version change 
 The final console output prints the repo-local result directory, for example:
 
 ```text
-.artifacts/research/memory/reme/run-20260922-063000
+artifacts/research/memory/reme/run-20260922-063000
 ```
 
-`.artifacts/research/memory/reme/latest` points to the newest default run.
+`artifacts/research/memory/reme/latest` points to the newest default run.
 
 Primary artifacts:
 
@@ -124,7 +124,7 @@ workspace-b/
 
 `summary.json` is intentionally compact. A `FAIL` is a **research finding**, not automatically a ReMe rejection. Always inspect the corresponding log and captured source artifacts.
 
-The complete `.artifacts/` tree is ignored by Git.
+The complete `artifacts/` tree is ignored by Git.
 
 ## Retry only the local LLM step
 
