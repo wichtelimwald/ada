@@ -15,8 +15,13 @@ if ! ADA_REME_SPIKE_ROOT="$RUNTIME" \
   REME_TOKEN_A="MEMCMP_ALPHA_PRIVATE_70B8D4" \
   REME_TOKEN_B="MEMCMP_BETA_PRIVATE_24E91A" \
   sh "$ROOT/research/memory/reme/mac/run.sh" >"$OUT/run.log" 2>&1; then
-  STATUS="FINDING"
-  NOTES="ReMe comparison run had findings; inspect run.log. Existing prior characterization remains separate evidence."
+  if [ -f "$RUNTIME/steps.tsv" ] && grep -q '^preflight[[:space:]]\+FAIL' "$RUNTIME/steps.tsv"; then
+    STATUS="BLOCKED"
+    NOTES="ReMe target-Mac lane was blocked by a missing/unavailable prerequisite; inspect runtime/logs/preflight.log."
+  else
+    STATUS="FINDING"
+    NOTES="ReMe comparison run reached characterization and had findings; inspect run.log. Existing prior characterization remains separate evidence."
+  fi
 fi
 if [ -d "$RUNTIME/llm-flow" ]; then
   sh "$ROOT/research/memory/reme/mac/collect-semantic-review.sh" "$RUNTIME/llm-flow" "$OUT/semantic-review.txt" >/dev/null 2>&1 || true
