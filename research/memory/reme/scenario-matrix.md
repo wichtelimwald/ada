@@ -17,7 +17,7 @@ Legend:
 | ---: | --- | --- | --- |
 | 1 | Personality bootstrap | **ADAPTER** | ReMe can store/edit Markdown, but it has no Ada personality seed-once/existing-wins lifecycle. Ada owns bootstrap and writes the resulting profile into the appropriate vault/workspace. |
 | 2 | Outside edit | **NATIVE / CHARACTERIZE** | File editing while stopped is consistent with ReMe's file-source design. Startup/watchers can rebuild metadata, but full rebuild behavior must be tested; `reindex` alone is insufficient. |
-| 3 | Correction | **ADAPTER — REQUIRED** | Runtime update works, but executable review found semantic inconsistency: corrected body = Thursday while generated description remained Wednesday, and Dream later inverted the correction direction. Ada must own canonical values/supersession. |
+| 3 | Correction | **PARTIAL / ADAPTER REQUIRED** | Independent runs differ: one produced contradictory generated metadata/digest text, while the later comparison run kept body and description consistently Thursday. Correction works operationally, but model-generated consolidation is not deterministic enough to define canonical truth. |
 | 4 | Contradiction | **PARTIAL / ADAPTER REQUIRED** | Executable review showed ReMe preserved two conflicting claims separately and did not last-write-win, but it created no deterministic contradiction relation/state. Ada must own that relation. |
 | 5 | Private/shared scope | **ADA-OWNED + CHARACTERIZE** | One ReMe workspace can plausibly map to one protection domain. Ada must choose which workspaces are accessible and create permitted minimized shared derivatives. |
 | 6 | Provenance after source deletion | **ADAPTER** | Digest nodes retain source links, but source deletion/lifecycle semantics are not Ada's minimized non-resolvable provenance contract. Need source-ref degradation behavior. |
@@ -28,10 +28,10 @@ Legend:
 | 11 | Gardening | **ADAPTER** | Auto Dream consolidates/refines/corrects automatically. Ada requires inspectable/confirmable destructive or material restructuring, so policy and proposal mode must wrap it. |
 | 12 | Preference learning | **PARTIAL / ADAPTER** | Explicit preference was preserved with provenance and digested successfully, but ReMe promoted it into model-generated 'binding' wording without Ada's subject/scope/maturity contract. |
 | 13 | Routine learning | **ADAPTER** | ReMe can consolidate recurring procedures/patterns; Ada must own maturity and ensure routine never becomes authority. |
-| 14 | Learning correction | **SEMANTIC FAIL NATIVE / ADAPTER REQUIRED** | Operational update passed, but body/frontmatter/digest disagreed and Dream inverted correction direction. ReMe-derived narratives cannot define Ada truth. |
+| 14 | Learning correction | **PARTIAL / ADAPTER REQUIRED** | Explicit correction works operationally. One run inverted derived text; a later run corrected consistently but Auto Dream integrated 0/3 extracted units because of receipt validation failures. ReMe-derived narratives cannot define Ada truth. |
 | 15 | Pattern aging | **GAP / ADAPTER** | No matching category-specific observed-pattern aging state was found. ReMe can use dates/search but does not expose Ada's `stale` lifecycle. |
 | 16 | Contradictory explicit statements | **PARTIAL / ADAPTER REQUIRED** | Both claims survived separately and were not treated as correction, but no first-class unresolved `contradicted` state linked them; Dream conflict consolidation was skipped. |
-| 17 | Explicit correction | **OPERATIONAL PASS / SEMANTIC FAIL NATIVE** | Daily body corrected Wednesday -> Thursday, but generated description stayed Wednesday and Dream later reversed original/corrected values. Ada-owned deterministic correction is mandatory. |
+| 17 | Explicit correction | **OPERATIONAL PASS / SEMANTICALLY NON-DETERMINISTIC** | Both runs updated the source note to Thursday. One run produced contradictory derived text; the later run kept generated description consistent. The model-driven derived layer is therefore not reliable enough to be canonical without external validation. |
 | 18 | Private vault isolation | **ADAPTER / CHARACTERIZE** | Separate workspaces are the promising topology. ReMe itself has no general-purpose user authentication/household model. Need multi-Application isolation/resource test. |
 | 19 | Shared derivative provenance | **ADA-OWNED** | Cross-protection-domain minimized derivatives and redacted provenance are an Ada privacy-policy function. |
 | 20 | Version recovery | **ADA-OWNED** | ReMe does not require Git. Ada's per-vault Git/versioning layer should provide rollback independently. |
@@ -77,13 +77,14 @@ More important is **where the gaps are**:
 
 ### Executable semantic integrity finding
 
-ReMe's generated derived text is **not internally authoritative** enough for Ada:
+ReMe's generated derived text is **not internally authoritative** enough for Ada, but the exact failure is not deterministic:
 
-- a corrected daily-note body and its generated description disagreed;
-- Auto Dream later inverted the correction direction in a procedure digest;
-- unresolved conflicting claims were preserved separately but not linked by a deterministic contradiction object.
+- the first semantic run produced disagreement between corrected source/body and generated description/digest text;
+- the later four-candidate run corrected Wednesday -> Thursday consistently in the source note and description, so the earlier inversion did **not** reproduce;
+- that later Auto Dream run extracted three plausible units but integrated 0/3 because the agent receipts failed validation;
+- unresolved conflicting claims were preserved separately in both runs but not linked by a deterministic contradiction object.
 
-Therefore Ada's adapter must own canonical fact/lifecycle state and validate any ReMe-derived summary before it influences authoritative recall.
+Therefore the conclusion is not "ReMe always corrupts corrections". The supported conclusion is narrower: model-generated consolidation varies across runs and requires an authoritative semantic/provenance boundary outside ReMe before derived text can influence canonical recall.
 
 ### ReMe has the largest functional gaps at
 
