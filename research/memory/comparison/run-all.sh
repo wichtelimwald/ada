@@ -4,7 +4,7 @@ set -u
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 HERE="$ROOT/research/memory/comparison"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
-BASE="$ROOT/.artifacts/research/memory/comparison"
+BASE="$ROOT/artifacts/research/memory/comparison"
 OUT="${ADA_MEMORY_COMPARE_ROOT:-$BASE/run-$STAMP}"
 MODEL="${OLLAMA_MODEL:-qwen3.5:9b}"
 DOCKER_OK=false
