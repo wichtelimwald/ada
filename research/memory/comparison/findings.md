@@ -73,14 +73,14 @@ Interpretation:
 
 No semantic result yet.
 
-The first sandboxed attempt was a **harness readiness timeout**, not a Hindsight semantic/runtime failure:
+Two sandbox attempts have exposed harness/image prerequisites rather than Hindsight Memory semantics:
 
-- API startup began successfully;
-- the first ONNX embedding-model download took roughly three minutes;
-- the server then initialized embeddings and verified the Ollama connection;
-- the comparison driver stopped waiting after 90 seconds and reported "API did not become ready".
+1. the first attempt timed out while the initial ONNX embedding model was still downloading;
+2. after extending readiness and reusing the downloaded model, Hindsight initialized embeddings and verified the local Ollama connection, but embedded PostgreSQL (pg0) failed because the generic `python:3.14-slim` sandbox lacked `libgssapi_krb5.so.2`.
 
-The retry path now reuses the existing result directory/venv/model cache and allows up to 420 seconds for readiness.
+The missing library is a Linux sandbox dependency for pg0's bundled PostgreSQL, not a host requirement and not a semantic failure.
+
+The Hindsight lane now uses a dedicated disposable research image derived from `python:3.14-slim` with only the required Kerberos GSSAPI runtime package added. The host and persistent Dev Container remain unchanged.
 
 ## Current comparison interpretation
 
@@ -91,6 +91,6 @@ The evidence currently supports distinct strengths rather than a winner:
 | ReMe | file-native authoritative substrate, edit/rebuild/forget/isolation | model consolidation is nondeterministic / can fail validation |
 | LangMem | structured correction and unresolved-conflict handling | no authoritative store; invented provenance in one fixture |
 | Letta/MemFS | Git-backed human-readable memory + readable correction/conflict representation | evidence-token corruption/invention; runtime coupling |
-| Hindsight | pending executable semantics | first run blocked only by harness startup timeout |
+| Hindsight | pending executable semantics | sandbox prerequisites exposed by first-start model setup and pg0 system-library dependency |
 
 Do **not** conclude that Ada should implement a custom semantic engine from these results. The next evidence needed is Hindsight's completed semantic lane, then the agreed weighted decision matrix.
