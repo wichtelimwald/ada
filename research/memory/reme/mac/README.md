@@ -26,15 +26,17 @@ The learning cases deliberately do **not** reduce semantic correctness to brittl
 ## Safety properties
 
 - Fixtures are synthetic canaries only. Do not replace them with personal data.
-- Workspaces and the virtual environment live under `/tmp` by default, outside the repository.
+- Workspaces and the virtual environment live under the repository's Git-ignored `.artifacts/research/memory/reme/` tree by default.
 - The script never installs ReMe into Ada's `.venv` or modifies `pyproject.toml`.
 - It never downloads an Ollama model. The already accepted local model must be present.
 - ReMe Studio and MCP serving are disabled for the spike.
 - Cloud-provider credentials are removed before runtime.
-- The runtime points ReMe's OpenAI-compatible model wrapper to `http://127.0.0.1:11434/v1`.
+- Runtime model access stays local to the host Ollama service.
 - A proxy-based deny guard is applied to ordinary non-loopback HTTP traffic after package installation.
 
-The proxy guard is **not a kernel-level proof of zero egress**. The result bundle also captures established ReMe TCP connections when `lsof` is available. A later hard-egress test can use a dedicated network sandbox if this becomes decision-changing.
+The proxy guard is **not a kernel-level proof of zero egress**. The result bundle also captures established ReMe TCP connections when `lsof` is available.
+
+This ReMe lane intentionally runs on the macOS host because one of its decision gates is the real target-Mac/Python-3.14 runtime. That is an explicit exception to the containerized comparison lanes, not the default pattern for new third-party research. LangMem, Hindsight, and Letta comparisons run in ephemeral sandbox containers.
 
 ## Pinned research baseline
 
@@ -84,24 +86,23 @@ The script checks prerequisites before changing anything. It requires:
 - `qwen3.5:9b` already installed;
 - network access during the isolated PyPI install step.
 
-Useful explicit overrides:
+Useful explicit overrides remain available for deliberate comparisons, but ordinary runs should keep the default repo-local artifact path:
 
 ```bash
-PYTHON_BIN=python3.14 \
-OLLAMA_MODEL=qwen3.5:9b \
-ADA_REME_SPIKE_ROOT=/tmp/ada-reme-explicit \
-sh research/memory/reme/mac/run.sh
+PYTHON_BIN=python3.14 OLLAMA_MODEL=qwen3.5:9b sh research/memory/reme/mac/run.sh
 ```
 
 Do not use `REME_VERSION` to silently move to a newer release. A version change is a separate characterization input and should be recorded as such.
 
 ## Output
 
-The final console output prints the result directory, for example:
+The final console output prints the repo-local result directory, for example:
 
 ```text
-/tmp/ada-reme-spike-20260921-161500
+.artifacts/research/memory/reme/run-20260922-063000
 ```
+
+`.artifacts/research/memory/reme/latest` points to the newest default run.
 
 Primary artifacts:
 
@@ -123,7 +124,7 @@ workspace-b/
 
 `summary.json` is intentionally compact. A `FAIL` is a **research finding**, not automatically a ReMe rejection. Always inspect the corresponding log and captured source artifacts.
 
-Do not commit the result directory.
+The complete `.artifacts/` tree is ignored by Git.
 
 ## Retry only the local LLM step
 
