@@ -3,10 +3,10 @@ set -eu
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 SRC="${1:-}"
-OUT="${2:-$ROOT/.artifacts/research/memory/reviews/reme-semantic-review.txt}"
+OUT="${2:-$ROOT/artifacts/research/memory/reviews/reme-semantic-review.txt}"
 
 if [ -z "$SRC" ]; then
-  RUN="$ROOT/.artifacts/research/memory/reme/latest"
+  RUN="$ROOT/artifacts/research/memory/reme/latest"
   if [ -d "$RUN" ]; then
     SRC="$(find "$RUN" -maxdepth 1 -type d -name 'llm-flow-retry-*' -print | sort | tail -n 1)"
     [ -n "$SRC" ] || SRC="$RUN/llm-flow"
