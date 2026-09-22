@@ -11,7 +11,7 @@ OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3.5:9b}"
 PORT_A="${REME_PORT_A:-24331}"
 PORT_B="${REME_PORT_B:-24332}"
 STAMP="$(date '+%Y%m%d-%H%M%S')"
-RESULT_DIR="${ADA_REME_SPIKE_ROOT:-${TMPDIR:-/tmp}/ada-reme-spike-$STAMP}"
+RESULT_BASE="$ROOT/.artifacts/research/memory/reme"\nRESULT_DIR="${ADA_REME_SPIKE_ROOT:-$RESULT_BASE/run-$STAMP}"
 VENV="$RESULT_DIR/venv"
 WORKSPACE_A="$RESULT_DIR/workspace-a"
 WORKSPACE_B="$RESULT_DIR/workspace-b"
@@ -29,7 +29,7 @@ PREFERENCE_TOKEN="${REME_PREFERENCE_TOKEN:-REME_PREF_3A6F11}"
 CORRECTION_TOKEN="${REME_CORRECTION_TOKEN:-REME_CORRECTION_88C2D5}"
 CONFLICT_TOKEN="${REME_CONFLICT_TOKEN:-REME_CONFLICT_61E7A9}"
 
-mkdir -p "$RESULT_DIR/logs" "$WORKSPACE_A" "$WORKSPACE_B"
+mkdir -p "$RESULT_DIR/logs" "$WORKSPACE_A" "$WORKSPACE_B"\nif [ -z "${ADA_REME_SPIKE_ROOT:-}" ]; then\n  mkdir -p "$RESULT_BASE"\n  ln -sfn "run-$STAMP" "$RESULT_BASE/latest"\nfi
 : > "$STEPS"
 
 say() {
@@ -248,7 +248,7 @@ snapshot_connections() {
 }
 
 say "Ada/ReMe macOS characterization spike"
-say "Results will stay outside the repository: $RESULT_DIR"
+say "Results are repo-local and git-ignored: $RESULT_DIR"
 say "Pinned ReMe: $REME_VERSION"
 say "Local model: $OLLAMA_MODEL"
 say ""
@@ -315,4 +315,4 @@ say "Result bundle: $RESULT_DIR"
 say "Primary summary: $RESULT_DIR/SUMMARY.md"
 say "Machine-readable summary: $RESULT_DIR/summary.json"
 say ""
-say "Do not commit the result bundle; it is intentionally outside the repository."
+say "Result bundle is under .artifacts/ and intentionally ignored by Git."
