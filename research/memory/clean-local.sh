@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-TARGET="$ROOT/.artifacts/research/memory"
+TARGET="$ROOT/artifacts/research/memory"
 
 if [ -d "$TARGET" ]; then
   rm -rf "$TARGET"
