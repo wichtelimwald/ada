@@ -94,6 +94,7 @@ artifacts/research/memory/comparison/
 ├── latest -> run-<timestamp>
 └── run-<timestamp>/
     ├── SUMMARY.md
+    ├── REVIEW-BUNDLE.txt
     ├── comparison.json
     ├── logs/
     ├── reme/
@@ -103,6 +104,8 @@ artifacts/research/memory/comparison/
 ```
 
 The complete `artifacts/` tree is ignored by Git.
+
+For review/sharing, use `REVIEW-BUNDLE.txt`. It contains the summary, candidate metadata, available semantic artifacts, and bounded log tails for blocked/failing lanes, so only one file needs to be shared.
 
 ## Legacy artifact migration
 
