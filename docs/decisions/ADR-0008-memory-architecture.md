@@ -1246,19 +1246,28 @@ The target-Mac characterization now passes the main substrate/runtime gates:
 - direct native Ollama tool calling with `qwen3.5:9b`;
 - full local Auto Memory -> Auto Dream workflow, including preference, correction, and contradiction fixtures.
 
-The semantic inspection found a material boundary condition:
+Repeated semantic characterization found a material boundary condition, but not a deterministic correction bug:
 
-- explicit correction executed successfully, but the corrected Markdown body (Thursday) disagreed with generated description metadata (Wednesday);
-- Auto Dream later inverted the correction direction again in a procedure digest;
-- two explicit contradictory pickup claims were preserved separately rather than overwritten, but ReMe created no deterministic contradiction relation/state.
+- the first ReMe semantic run corrected the Markdown body to Thursday while generated metadata/digest text disagreed or inverted the correction;
+- an independent later run corrected Wednesday -> Thursday consistently in both source note and generated description, so the earlier inversion did **not** reproduce;
+- that later Auto Dream run extracted three plausible units but integrated 0/3 because generated agent receipts failed validation;
+- two explicit contradictory pickup claims remained separate rather than last-write-wins, but ReMe still created no deterministic contradiction relation/state.
 
-Therefore ReMe can remain a candidate **file-native substrate**, but ReMe-generated descriptions/digests cannot by themselves be authoritative Ada truth. The missing canonical fact/lifecycle semantics must be supplied outside ReMe.
+Therefore ReMe can remain a candidate **file-native substrate**, but its model-generated consolidation cannot by itself be authoritative Ada truth. The missing canonical fact/lifecycle/provenance semantics must be supplied outside ReMe.
 
 That does **not** imply a custom Ada implementation. ADR-0008 must first compare whether LangMem, Hindsight, or Letta/MemFS can supply enough of those semantics cleanly. A minimal Ada-owned implementation remains the control/fallback option only if reuse candidates do not justify their cost.
 
+The first shared-fixture comparison provides additional evidence:
+
+- **LangMem** updated the same structured memory ID from Wednesday to Thursday and preserved two unresolved pickup claims as separate records, but invented a synthetic provenance value for the second claim when none was supplied;
+- **Letta/MemFS** produced readable Git-backed Markdown with explicit correction and separate conflicting claims, but corrupted/truncated one evidence token and invented another while later claiming verbatim preservation;
+- **Hindsight** has no semantic result yet: its first sandboxed run timed out only because first-start ONNX initialization exceeded the harness readiness window. The server otherwise initialized embeddings and verified the local Ollama connection before the harness stopped it.
+
+These results strengthen the need to evaluate **semantic correctness and provenance integrity separately** from storage/runtime success.
+
 This moves the remaining ReMe decision work away from basic runtime feasibility and toward:
 
-- side-by-side characterization of ReMe, LangMem, Hindsight, and Letta/MemFS on identical semantic fixtures;
+- complete Hindsight's shared-fixture semantic lane and then compare ReMe, LangMem, Hindsight, and Letta/MemFS on identical semantic/provenance fixtures;
 - external document reference/lifecycle fit;
 - exact transitive license/security audit;
 - maintenance/AgentScope dependency cost;
