@@ -219,4 +219,4 @@ __marimo__/
 
 # Local research / development artifacts
 # Reproducible but intentionally untracked outputs from local characterization runs.
-.artifacts/
+artifacts/
