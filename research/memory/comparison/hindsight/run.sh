@@ -7,6 +7,7 @@ PYTHON_BIN="${PYTHON_BIN:-python3.14}"
 MODEL="${OLLAMA_MODEL:-qwen3.5:9b}"
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434/v1}"
 PORT="${HINDSIGHT_PORT:-28888}"
+READY_TIMEOUT="${HINDSIGHT_READY_TIMEOUT:-420}"
 HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 PID=""
 mkdir -p "$OUT/home" "$OUT/data"
@@ -52,7 +53,7 @@ else
 
     "$OUT/venv/bin/hindsight-api" >"$OUT/server.log" 2>&1 &
     PID=$!
-    "$OUT/venv/bin/python" "$HERE/driver.py" "http://127.0.0.1:$PORT" "$FIXTURES" "$OUT" >"$OUT/run.log" 2>&1 || {
+    "$OUT/venv/bin/python" "$HERE/driver.py" "http://127.0.0.1:$PORT" "$FIXTURES" "$OUT" "$READY_TIMEOUT" >"$OUT/run.log" 2>&1 || {
       STATUS="FINDING"
       NOTE="Hindsight comparison lane failed; inspect server.log/run.log. First startup may download the local ONNX embedding model."
     }
