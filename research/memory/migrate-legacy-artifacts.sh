@@ -2,7 +2,7 @@
 set -eu
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-DEST="$ROOT/.artifacts/research/memory/legacy"
+DEST="$ROOT/artifacts/research/memory/legacy"
 mkdir -p "$DEST"
 
 moved=0
