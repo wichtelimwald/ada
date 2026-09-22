@@ -673,7 +673,7 @@ Caution:
 
 This reinforces the need for Ada-owned subject/scope/lifecycle metadata.
 
-### Explicit correction — semantic integrity failure
+### Explicit correction — repeat-run semantic variability
 
 Input sequence:
 
@@ -682,40 +682,31 @@ Input sequence:
 2. explicit correction: not Wednesday, Thursday 17:00
 ```
 
-ReMe's daily-note **body** correctly ended at:
+The first semantic review found a serious derived-text inconsistency:
 
-```text
-Day: Thursday
-Time: 17:00
-Status: Corrected and recorded
-```
+- the daily-note body correctly ended at Thursday 17:00;
+- generated description metadata still said Wednesday;
+- Auto Dream later inverted the correction direction in a derived procedure.
 
-However, the same note's frontmatter/index description still said that the lesson was **Wednesday at 17:00**, while the filename had been renamed to Thursday.
+The independent 2026-09-22 four-candidate comparison **did not reproduce that inversion**:
 
-Auto Dream then made the error worse: it synthesized a procedure that described the correction in the **wrong direction**, e.g. "shifted from Thursday 17:00 to Wednesday 17:00" and listed "Original schedule: Thursday" / "Corrected schedule: Wednesday".
+- the source note ended at Thursday 17:00;
+- the generated description also said Thursday 17:00;
+- the extracted Dream schedule unit also described Thursday 17:00.
 
-This is a material Ada hard-gate issue.
+However, Auto Dream then integrated **0/3** extracted units because its agent receipts failed validation.
 
-It demonstrates that model-generated derived metadata/digests can contradict the authoritative body even when the body itself is correct.
+The supported conclusion is therefore narrower than "ReMe corrupts corrections":
+
+- explicit correction works operationally;
+- model-generated derived semantics vary across independent runs;
+- the consolidation path can fail after producing plausible extracted units.
 
 **Ada implication:**
 
-- ReMe-generated descriptions/digests cannot be treated as authoritative truth.
-- Explicit correction lifecycle must be deterministic and Ada-owned.
-- A correction write must update canonical structured fields atomically or be rejected.
-- Derived summaries must be validated against canonical facts/provenance before they can influence recall.
-- Ada must preserve the old claim as superseded evidence rather than relying on a model-generated narrative of "what changed".
-
-This strongly supports:
-
-```text
-Authoritative Ada fact/lifecycle
-    -> deterministic structured fields
-    -> human-readable Markdown body
-    -> ReMe-derived descriptions/digests/indexes
-```
-
-rather than allowing ReMe Dream output to become the source of truth.
+- ReMe-generated descriptions/digests cannot by themselves define authoritative truth;
+- correction/supersession semantics and provenance validation must be supplied outside ReMe;
+- that external semantic boundary may come from another reusable component (for example LangMem/Hindsight) or a minimal Ada layer only if reuse proves insufficient.
 
 ### Unresolved contradiction — partial success, insufficient Ada semantics
 
@@ -775,12 +766,12 @@ The semantic review changes the ReMe assessment from:
 to:
 
 ```text
-"strong file-native substrate, but Ada must own canonical fact/lifecycle semantics"
+"strong file-native substrate, but canonical fact/lifecycle semantics must be supplied outside ReMe"
 ```
 
 This is still compatible with adopting ReMe, but ReMe alone is not sufficient for the semantic layer.
 
-The comparison must now determine whether the missing responsibilities can be reused from LangMem, Hindsight, or Letta/MemFS before Ada implements them itself. The required capabilities, regardless of implementation source, are:
+The comparison must determine whether the missing responsibilities can be reused from LangMem, Hindsight, or Letta/MemFS before Ada implements any minimal fallback itself. The required capabilities, regardless of implementation source, are:
 
 - canonical fact values;
 - subject and privacy scope;
