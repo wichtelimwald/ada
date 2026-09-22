@@ -83,7 +83,15 @@ This is development isolation, not Ada's production authorization model. Network
 
 Host Node/npm is no longer required; the Letta lane uses a pinned Node 22 container.
 
-The Hindsight lane may download its local ONNX embedding model on the first run.
+The Hindsight lane may download its local ONNX embedding model on the first run. That first initialization can take several minutes; the readiness window is intentionally longer than ordinary candidate startup.
+
+If only Hindsight was incomplete, reuse the existing latest result (including its Linux venv and downloaded model cache) instead of rerunning all four candidates:
+
+```bash
+sh research/memory/comparison/resume-hindsight.sh
+```
+
+The command updates the existing `latest/REVIEW-BUNDLE.txt` in place.
 
 ## Output
 
