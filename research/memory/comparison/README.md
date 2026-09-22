@@ -85,6 +85,8 @@ Host Node/npm is no longer required; the Letta lane uses a pinned Node 22 contai
 
 The Hindsight lane may download its local ONNX embedding model on the first run. That first initialization can take several minutes; the readiness window is intentionally longer than ordinary candidate startup.
 
+Hindsight also uses pg0's bundled PostgreSQL. Its Linux binary requires the Kerberos GSSAPI runtime library, so this lane builds a tiny dedicated research image from `python:3.14-slim` with `libgssapi-krb5-2`. This dependency is confined to the disposable candidate sandbox; it is not installed on the host or in Ada's Dev Container.
+
 If only Hindsight was incomplete, reuse the existing latest result (including its Linux venv and downloaded model cache) instead of rerunning all four candidates:
 
 ```bash
