@@ -128,11 +128,13 @@ The complete `.artifacts/` tree is ignored by Git.
 
 ## Retry only the local LLM step
 
-If the main run already passed installation/file/isolation tests and only `local-llm-memory-flow` failed, reuse the existing virtual environment and workspace instead of reinstalling ReMe:
+If the latest main run passed installation/file/isolation tests and only `local-llm-memory-flow` failed, reuse its existing virtual environment with:
 
 ```bash
-sh research/memory/reme/mac/resume-llm.sh /path/to/ada-reme-spike-RESULT
+sh research/memory/reme/mac/resume-llm.sh
 ```
+
+An explicit result directory can still be passed for an older run.
 
 The retry reuses the existing virtual environment but creates a **fresh ReMe workspace and output directory** for each attempt. This avoids contamination from a request that timed out after writing a partial session. It also prints the relevant driver/service log tails on failure.
 
@@ -171,9 +173,10 @@ Expected possibility. Inspect the generated artifacts and decide what the Ada ad
 
 ## Deliberately not automated yet
 
-Two prepared ADR tests remain outside this first executable harness:
+One prepared ADR test remains outside this first executable harness:
 
 - **External document adapter**: Ada has not yet accepted the provider-independent source-reference contract, so the harness must not invent production adapter code merely for the spike.
-- **ReMe vs Hindsight quality benchmark**: run this only after ReMe's native retrieval weaknesses are measured. Hindsight should not be introduced just to create a benchmark dependency.
+
+The broader ReMe/LangMem/Hindsight/Letta comparison now lives under `research/memory/comparison/`.
 
 See `../spike-plan.md` and `../scenario-matrix.md` for the full decision context.
