@@ -10,7 +10,15 @@ From the Ada repository root:
 sh research/memory/comparison/run-all.sh
 ```
 
-All virtual environments, npm packages, local databases, logs, and generated memory artifacts are written under a temporary result directory outside the repository. The final console output prints that directory and its `SUMMARY.md`.
+All virtual environments, npm packages, local databases, logs, and generated memory artifacts stay inside the checked-out repository under the Git-ignored `.artifacts/` tree.
+
+The default result path is:
+
+```text
+.artifacts/research/memory/comparison/run-<timestamp>/
+```
+
+`.artifacts/research/memory/comparison/latest` points to the most recent run.
 
 ## Fair-comparison rule
 
@@ -48,13 +56,32 @@ Runs an isolated embedded database with local Ollama and local ONNX embeddings. 
 
 Installs Letta Code into an isolated npm prefix and uses its experimental local backend with Ollama. The first lane focuses on whether the Git-backed Markdown MemFS represents the common preference/correction/conflict fixtures coherently. Forget/isolation remain follow-ups rather than being faked in the initial run.
 
+## Execution boundary
+
+The comparison deliberately does **not** install every candidate into the maintainer's host or persistent Dev Container.
+
+- **ReMe** remains a host-side exception because its existing lane explicitly characterizes the real macOS/Apple-Silicon/Python-3.14 target.
+- **LangMem, Hindsight, and Letta** run in short-lived Docker containers.
+- those containers use a read-only root filesystem;
+- Linux capabilities are dropped;
+- `no-new-privileges` is enabled;
+- PID count is bounded;
+- the Ada repository is mounted read-only;
+- only that candidate's `.artifacts/...` result directory is writable;
+- candidate containers are removed after the lane finishes.
+
+This keeps the persistent Dev Container clean while applying the same container/sandbox principle to unselected third-party candidates.
+
+This is development isolation, not Ada's production authorization model. Network access remains available because candidate installation and Hindsight's first local embedding-model setup may require downloads.
+
 ## Prerequisites
 
 - macOS Apple Silicon target used by Ada;
-- `python3.14`;
-- local Ollama with `qwen3.5:9b`;
-- internet access for isolated package installs;
-- Node/npm >= 22.19 for the Letta lane. If Node is missing/too old, Letta is reported `BLOCKED` and the other lanes still run.
+- `python3.14` and local Ollama with `qwen3.5:9b` for the ReMe target-Mac lane;
+- Docker available/running for LangMem, Hindsight, and Letta sandbox lanes;
+- internet access for isolated package/container/model downloads.
+
+Host Node/npm is no longer required; the Letta lane uses a pinned Node 22 container.
 
 The Hindsight lane may download its local ONNX embedding model on the first run.
 
@@ -63,14 +90,32 @@ The Hindsight lane may download its local ONNX embedding model on the first run.
 Typical result layout:
 
 ```text
-/tmp/ada-memory-compare-<timestamp>/
-├── SUMMARY.md
-├── comparison.json
-├── logs/
-├── reme/
-├── langmem/
-├── hindsight/
-└── letta/
+.artifacts/research/memory/comparison/
+├── latest -> run-<timestamp>
+└── run-<timestamp>/
+    ├── SUMMARY.md
+    ├── comparison.json
+    ├── logs/
+    ├── reme/
+    ├── langmem/
+    ├── hindsight/
+    └── letta/
 ```
 
-Do not commit result bundles. They are synthetic research artifacts.
+The complete `.artifacts/` tree is ignored by Git.
+
+## Cleanup
+
+Remove all repo-local Memory research artifacts:
+
+```bash
+sh research/memory/clean-local.sh
+```
+
+For the one-time cleanup of result directories created by older harness versions under macOS temporary directories:
+
+```bash
+sh research/memory/clean-local.sh --legacy
+```
+
+Both commands are intentionally scoped to Ada Memory research artifacts.
