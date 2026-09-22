@@ -1261,7 +1261,7 @@ The first shared-fixture comparison provides additional evidence:
 
 - **LangMem** updated the same structured memory ID from Wednesday to Thursday and preserved two unresolved pickup claims as separate records, but invented a synthetic provenance value for the second claim when none was supplied;
 - **Letta/MemFS** produced readable Git-backed Markdown with explicit correction and separate conflicting claims, but corrupted/truncated one evidence token and invented another while later claiming verbatim preservation;
-- **Hindsight** has no semantic result yet: its first sandboxed run timed out only because first-start ONNX initialization exceeded the harness readiness window. The server otherwise initialized embeddings and verified the local Ollama connection before the harness stopped it.
+- **Hindsight** has no semantic result yet: the first sandboxed run exposed a too-short readiness window during ONNX model setup; the focused retry then initialized embeddings and verified the local Ollama connection but exposed a missing Linux runtime dependency (`libgssapi_krb5.so.2`) required by pg0's bundled PostgreSQL inside the generic slim sandbox. This is classified as a research-image prerequisite, not a Hindsight semantic failure.
 
 These results strengthen the need to evaluate **semantic correctness and provenance integrity separately** from storage/runtime success.
 
