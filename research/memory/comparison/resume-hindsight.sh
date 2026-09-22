@@ -17,6 +17,13 @@ if ! command -v docker >/dev/null 2>&1 || ! docker info >/dev/null 2>&1; then
   exit 2
 fi
 
+IMAGE="ada-memory-hindsight:0.10.1"
+docker build \
+  -t "$IMAGE" \
+  -f "$HERE/hindsight/Dockerfile" \
+  "$HERE/hindsight" \
+  >"$RUN_DIR/logs/hindsight-image.log" 2>&1
+
 docker run --rm \
   --cap-drop=ALL \
   --security-opt=no-new-privileges \
@@ -33,7 +40,7 @@ docker run --rm \
   --env OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 \
   --env HINDSIGHT_READY_TIMEOUT=420 \
   --env PIP_NO_CACHE_DIR=1 \
-  python:3.14-slim \
+  "$IMAGE" \
   sh /workspace/research/memory/comparison/hindsight/run.sh \
     /results /workspace/research/memory/comparison/fixtures.json \
   >"$RUN_DIR/logs/hindsight.log" 2>&1
