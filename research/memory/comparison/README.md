@@ -104,6 +104,22 @@ Typical result layout:
 
 The complete `.artifacts/` tree is ignored by Git.
 
+## Legacy artifact migration
+
+Older harness versions wrote result bundles to macOS temporary directories. Preserve those results and bring them into the repository workspace with:
+
+```bash
+sh research/memory/migrate-legacy-artifacts.sh
+```
+
+They are moved under:
+
+```text
+.artifacts/research/memory/legacy/
+```
+
+Moved virtual environments are evidence only and should not be resumed after relocation.
+
 ## Cleanup
 
 Remove all repo-local Memory research artifacts:
@@ -112,10 +128,10 @@ Remove all repo-local Memory research artifacts:
 sh research/memory/clean-local.sh
 ```
 
-For the one-time cleanup of result directories created by older harness versions under macOS temporary directories:
+If the old temporary artifacts are no longer needed and were not migrated, they can be removed explicitly with:
 
 ```bash
 sh research/memory/clean-local.sh --legacy
 ```
 
-Both commands are intentionally scoped to Ada Memory research artifacts.
+Both cleanup commands are intentionally scoped to Ada Memory research artifacts.
