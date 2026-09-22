@@ -8,12 +8,13 @@ from pathlib import Path
 from hindsight_client import Hindsight
 
 base_url, fixture_path, out_path = sys.argv[1:4]
+ready_timeout = int(sys.argv[4]) if len(sys.argv) > 4 else 420
 fixtures = json.loads(Path(fixture_path).read_text())
 out = Path(out_path)
 out.mkdir(parents=True, exist_ok=True)
 client = Hindsight(base_url=base_url, timeout=600)
 
-for _ in range(90):
+for _ in range(ready_timeout):
     try:
         client.get_version()
         break
