@@ -66,8 +66,8 @@ run_container_lane() {
   mkdir -p "$OUT/$candidate"
 
   if [ "$DOCKER_OK" != true ]; then
-    echo "    BLOCKED: Docker is unavailable; no silent host fallback"
-    write_blocked "$candidate" "Docker unavailable; candidate intentionally not executed unsandboxed on the host."
+    echo "    BLOCKED: Docker runtime is unavailable; no silent host fallback"
+    write_blocked "$candidate" "Docker runtime unavailable (CLI missing or daemon/socket unreachable); candidate intentionally not executed unsandboxed on the host."
     return 0
   fi
 
