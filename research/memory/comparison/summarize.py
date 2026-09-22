@@ -28,7 +28,8 @@ lines = [
 ]
 for r in rows:
     sub = r.get("substrate", {})
-    art = r.get("semantic_artifact", "") or "—"
+    art_value = r.get("semantic_artifact", "") or ""
+    art = art_value if art_value and (root / art_value).exists() else "—"
     lines.append(
         f"| {r.get('candidate','?')} | {r.get('status','?')} | {sub.get('authority','?')} | "
         f"{sub.get('rebuild','?')} | {sub.get('forget','?')} | {sub.get('isolation','?')} | {art} |"
