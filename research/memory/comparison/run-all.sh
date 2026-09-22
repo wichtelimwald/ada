@@ -105,7 +105,21 @@ run_host_lane reme
 
 # New third-party candidates run outside the host process/filesystem by default.
 run_container_lane langmem python:3.14-slim
-run_container_lane hindsight python:3.14-slim
+
+HINDSIGHT_IMAGE="ada-memory-hindsight:0.10.1"
+if [ "$DOCKER_OK" = true ] && docker build \
+  -t "$HINDSIGHT_IMAGE" \
+  -f "$HERE/hindsight/Dockerfile" \
+  "$HERE/hindsight" \
+  >"$OUT/logs/hindsight-image.log" 2>&1
+then
+  run_container_lane hindsight "$HINDSIGHT_IMAGE"
+else
+  echo "==> hindsight"
+  echo "    BLOCKED: Hindsight sandbox image build failed"
+  write_blocked hindsight "Hindsight sandbox image build failed; see logs/hindsight-image.log."
+fi
+
 run_container_lane letta node:22-bookworm
 
 python3 "$HERE/summarize.py" "$OUT"
