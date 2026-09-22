@@ -9,7 +9,7 @@ if [ -z "$SRC" ] || [ ! -d "$SRC" ]; then
   exit 2
 fi
 
-: > "$OUT"
+mkdir -p "$(dirname "$OUT")"\n: > "$OUT"
 
 find "$SRC" -type f \( -name '*.md' -o -name '*.json' -o -name '*.jsonl' \) -print | sort |
 while IFS= read -r f; do
