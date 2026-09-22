@@ -12,6 +12,7 @@ fixtures = json.loads(Path(sys.argv[1]).read_text())
 out = Path(sys.argv[2])
 out.mkdir(parents=True, exist_ok=True)
 model_name = sys.argv[3]
+ollama_host = sys.argv[4]
 
 
 class MemoryRecord(BaseModel):
@@ -21,7 +22,7 @@ class MemoryRecord(BaseModel):
     evidence: list[str] = Field(default_factory=list, description="Evidence/source tokens copied verbatim when present")
 
 
-model = ChatOllama(model=model_name, reasoning=False, temperature=0, num_predict=2048, keep_alive="10m")
+model = ChatOllama(model=model_name, base_url=ollama_host, reasoning=False, temperature=0, num_predict=2048, keep_alive="10m")
 manager = create_memory_manager(
     model,
     schemas=[MemoryRecord],
