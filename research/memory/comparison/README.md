@@ -10,15 +10,15 @@ From the Ada repository root:
 sh research/memory/comparison/run-all.sh
 ```
 
-All virtual environments, npm packages, local databases, logs, and generated memory artifacts stay inside the checked-out repository under the Git-ignored `.artifacts/` tree.
+All virtual environments, npm packages, local databases, logs, and generated memory artifacts stay inside the checked-out repository under the Git-ignored `artifacts/` tree.
 
 The default result path is:
 
 ```text
-.artifacts/research/memory/comparison/run-<timestamp>/
+artifacts/research/memory/comparison/run-<timestamp>/
 ```
 
-`.artifacts/research/memory/comparison/latest` points to the most recent run.
+`artifacts/research/memory/comparison/latest` points to the most recent run.
 
 ## Fair-comparison rule
 
@@ -67,7 +67,7 @@ The comparison deliberately does **not** install every candidate into the mainta
 - `no-new-privileges` is enabled;
 - PID count is bounded;
 - the Ada repository is mounted read-only;
-- only that candidate's `.artifacts/...` result directory is writable;
+- only that candidate's `artifacts/...` result directory is writable;
 - candidate containers are removed after the lane finishes.
 
 This keeps the persistent Dev Container clean while applying the same container/sandbox principle to unselected third-party candidates.
@@ -90,7 +90,7 @@ The Hindsight lane may download its local ONNX embedding model on the first run.
 Typical result layout:
 
 ```text
-.artifacts/research/memory/comparison/
+artifacts/research/memory/comparison/
 ├── latest -> run-<timestamp>
 └── run-<timestamp>/
     ├── SUMMARY.md
@@ -102,7 +102,7 @@ Typical result layout:
     └── letta/
 ```
 
-The complete `.artifacts/` tree is ignored by Git.
+The complete `artifacts/` tree is ignored by Git.
 
 ## Legacy artifact migration
 
@@ -115,7 +115,7 @@ sh research/memory/migrate-legacy-artifacts.sh
 They are moved under:
 
 ```text
-.artifacts/research/memory/legacy/
+artifacts/research/memory/legacy/
 ```
 
 Moved virtual environments are evidence only and should not be resumed after relocation.
