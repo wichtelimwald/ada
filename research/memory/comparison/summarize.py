@@ -42,3 +42,29 @@ for r in rows:
     lines.append("")
 (root / "SUMMARY.md").write_text("\n".join(lines))
 print(root / "SUMMARY.md")
+
+bundle = [
+    "# Ada Memory comparison review bundle",
+    "",
+    (root / "SUMMARY.md").read_text(),
+]
+
+for r in rows:
+    name = r.get("candidate", "?")
+    bundle += ["", f"===== {name}: candidate.json =====", json.dumps(r, indent=2, ensure_ascii=False)]
+
+    art_value = r.get("semantic_artifact", "") or ""
+    if art_value:
+        art_path = root / art_value
+        if art_path.exists() and art_path.is_file():
+            bundle += ["", f"===== {name}: semantic artifact ({art_value}) =====", art_path.read_text(errors="replace")]
+
+    if r.get("status") != "PASS":
+        for log_path in (root / "logs" / f"{name}.log", root / name / "run.log", root / name / "server.log", root / name / "install.log"):
+            if log_path.exists() and log_path.is_file():
+                lines_tail = log_path.read_text(errors="replace").splitlines()[-120:]
+                bundle += ["", f"===== {name}: tail {log_path.relative_to(root)} =====", "\n".join(lines_tail)]
+
+(root / "REVIEW-BUNDLE.txt").write_text("\n".join(bundle) + "\n")
+print(root / "REVIEW-BUNDLE.txt")
+
