@@ -5,14 +5,15 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 HARNESS_DIR="$ROOT/research/memory/reme/mac"
 DRIVER="$HARNESS_DIR/driver.py"
 SPIKE_CONFIG="$HARNESS_DIR/spike-config.yaml"
-RESULT_DIR="${1:-}"
+RESULT_DIR="${1:-$ROOT/.artifacts/research/memory/reme/latest}"
 OLLAMA_MODEL="${OLLAMA_MODEL:-qwen3.5:9b}"
 PORT="${REME_PORT_A:-24331}"
 BASE="http://127.0.0.1:$PORT"
 PID=""
 
-if [ -z "$RESULT_DIR" ]; then
-  echo "Usage: sh research/memory/reme/mac/resume-llm.sh /path/to/ada-reme-spike-RESULT" >&2
+if [ ! -d "$RESULT_DIR" ]; then
+  echo "ReMe result directory not found: $RESULT_DIR" >&2
+  echo "Run the main characterization first or pass an explicit result directory." >&2
   exit 2
 fi
 
