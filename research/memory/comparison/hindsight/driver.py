@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import asyncio
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -10,6 +11,7 @@ from hindsight_client import Hindsight
 base_url, fixture_path, out_path = sys.argv[1:4]
 ready_timeout = int(sys.argv[4]) if len(sys.argv) > 4 else 420
 fixtures = json.loads(Path(fixture_path).read_text())
+run_reflect = os.environ.get("HINDSIGHT_COMPARE_REFLECT", "0") == "1"
 out = Path(out_path)
 out.mkdir(parents=True, exist_ok=True)
 semantic_path = out / "semantic.json"
@@ -29,6 +31,7 @@ result = {
     "meta": {
         "core_semantics_completed": False,
         "reflect_is_optional": True,
+        "reflect_enabled": run_reflect,
     }
 }
 
@@ -149,25 +152,30 @@ result["forget_after"] = recall(bf, "MEMCMP_FORGET_91C6E3")
 result["meta"]["core_semantics_completed"] = True
 save()
 
-# Reflect is a useful Hindsight capability benchmark, but it is not required for
-# the shared Memory semantics lane. On small local models it may be much slower
-# than direct recall.
-result["correction_reflect"] = optional_reflect(
-    bc,
-    "State the current music lesson time and explain the correction history without reversing it.",
-)
-save()
-
-# Do not spend another multi-minute timeout when the first optional reflect already
-# demonstrates that this local-model path is not viable.
-if result["correction_reflect"]["status"] == "ok":
-    result["conflict_reflect"] = optional_reflect(
-        bx,
-        "Are the pickup-time claims resolved or contradictory? Do not invent a correction.",
+# Reflect is a useful Hindsight-specific capability benchmark, but it is not part
+# of the common semantics gate. A prior qwen3.5:9b run timed out, so keep it opt-in.
+if run_reflect:
+    result["correction_reflect"] = optional_reflect(
+        bc,
+        "State the current music lesson time and explain the correction history without reversing it.",
     )
+    if result["correction_reflect"]["status"] == "ok":
+        result["conflict_reflect"] = optional_reflect(
+            bx,
+            "Are the pickup-time claims resolved or contradictory? Do not invent a correction.",
+        )
+    else:
+        result["conflict_reflect"] = {
+            "status": "skipped",
+            "reason": "correction_reflect did not complete; avoid a second long local-model timeout",
+        }
 else:
+    result["correction_reflect"] = {
+        "status": "skipped",
+        "reason": "optional benchmark disabled; prior local qwen3.5:9b reflect exceeded practical latency",
+    }
     result["conflict_reflect"] = {
         "status": "skipped",
-        "reason": "correction_reflect did not complete; avoid a second long local-model timeout",
+        "reason": "optional benchmark disabled",
     }
 save()
