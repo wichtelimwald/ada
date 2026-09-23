@@ -1,8 +1,8 @@
 {
-  "name": "Ada",
+  "name": "Ada local chat (Docker Desktop host networking)",
   "build": {
-    "dockerfile": "../Dockerfile",
-    "context": "..",
+    "dockerfile": "../../Dockerfile",
+    "context": "../..",
     "target": "development"
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
@@ -12,9 +12,10 @@
     "PYDANTIC_AI_NO_BANNER": "1"
   },
   "runArgs": [
+    "--network=host",
     "--cap-drop=ALL",
     "--security-opt=no-new-privileges",
     "--pids-limit=256"
   ],
-  "postCreateCommand": "python -m pip install --editable . && sh ./scripts/validate.sh"
+  "postCreateCommand": "sh ./scripts/validate.sh"
 }

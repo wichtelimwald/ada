@@ -208,7 +208,17 @@ The later Memory ADR will decide whether Ada uses a narrow external bind mount o
 
 For the initial macOS target, Ollama remains outside the Ada container.
 
-Ada reaches it through a configurable endpoint; Docker Desktop's `host.docker.internal` path is one implementation detail for local macOS development/runtime.
+The first local-chat profile is restricted by ADR-0006 to loopback, including
+its HTTP transport. On Docker Desktop for macOS, an **opt-in host-networked
+container** can reach a host Ollama service bound to loopback. The dedicated
+`.devcontainer/local-chat/devcontainer.json` profile uses this path; the
+default development container remains on its isolated Docker network. Host
+networking requires Docker Desktop 4.34+ and explicit enablement and does
+not work with Enhanced Container Isolation. It also lets processes inside
+that container reach other host network services; use only reviewed code and
+do not mount private Memory or secrets into this development profile.
+If these conditions cannot be met, local chat must fail closed; do not expose
+Ollama on all host interfaces as a workaround.
 
 No domain code may depend on that hostname.
 

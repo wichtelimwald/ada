@@ -63,6 +63,9 @@ Use **self-hosted Ollama** as Ada's initial local model-serving baseline.
 This means:
 
 - Ada connects only to a loopback Ollama endpoint in the first local-chat profile;
+- both readiness and model requests ignore environment/system proxy settings;
+- an opt-in Docker Desktop host-networked container may use the same loopback
+  endpoint, subject to ADR-0003's reduced network-isolation caveat;
 - Ollama remains outside Ada's domain model and behind the PydanticAI runtime adapter;
 - qwen3.5:9b is the current **target-hardware baseline model**, selected after a direct A/B test against qwen3:8b;
 - the model name and endpoint are configuration, not hard architectural dependencies;

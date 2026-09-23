@@ -4,8 +4,9 @@ from dataclasses import dataclass
 import json
 from urllib.error import URLError
 from urllib.parse import urlparse, urlunparse
-from urllib.request import urlopen
+from urllib.request import ProxyHandler, build_opener
 
+import httpx2
 import pydantic_ai
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.models.ollama import OllamaModel
@@ -79,7 +80,11 @@ def check_local_ollama_ready(
     )
 
     try:
-        with urlopen(tags_url, timeout=timeout_seconds) as response:
+        # URL validation alone is insufficient: urllib otherwise honors host
+        # proxy settings even for localhost when no bypass is configured.
+        with build_opener(ProxyHandler({})).open(
+            tags_url, timeout=timeout_seconds
+        ) as response:
             payload = json.load(response)
     except (OSError, URLError, ValueError) as exc:
         raise LocalModelUnavailableError(
@@ -118,7 +123,13 @@ def build_local_ollama_runtime(
     # observability banner for this product surface.
     pydantic_ai.BANNER_ENABLED = False
 
-    provider = OllamaProvider(base_url=config.base_url)
+    # The model call must use the same direct-transport rule as readiness.
+    # Passing a client also prevents PydanticAI from creating an ambient
+    # proxy-aware default client for later requests.
+    provider = OllamaProvider(
+        base_url=config.base_url,
+        http_client=httpx2.AsyncClient(trust_env=False),
+    )
     model = OllamaModel(
         config.model,
         provider=provider,

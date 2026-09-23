@@ -126,6 +126,23 @@ ada chat
 
 The first local-chat profile only accepts a loopback Ollama endpoint. Conversation history is kept in memory for the current process only and is **not** Ada Memory.
 
+For local chat in a container on macOS, select the separate
+`.devcontainer/local-chat/devcontainer.json` profile or run the runtime image
+with Docker Desktop host networking enabled (Docker Desktop 4.34+):
+
+```bash
+docker run --rm -it --network=host --cap-drop=ALL \
+  --security-opt=no-new-privileges --read-only --tmpfs /tmp:rw,noexec,nosuid \
+  --pids-limit=256 ada:dev chat
+```
+
+Keep Ollama bound to host loopback. Ada bypasses proxy settings for both its
+readiness check and model requests. Host networking allows the container to
+reach **other host services too** and cannot be used with Docker Desktop's
+Enhanced Container Isolation; this opt-in profile is for reviewed development
+code, without private Memory or secrets mounted. If unavailable, use native
+local chat rather than exposing Ollama on all interfaces.
+
 Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 
 Inside the chat:
