@@ -119,10 +119,39 @@ Because all criteria are equally weighted, the weighted result is simply the mea
 ### Interpretation
 
 The Markdown + captured Git history + basic-search control is not scored in
-this matrix. Its omission matters: a six-point lead for ReMe + LangMem over
-ReMe alone does not establish that either component is necessary for Ada's
-MVP. Measure the control against the same hard gates and criteria before a
-backend decision; do not assign it hypothetical points.
+this matrix. A small, dependency-free [control characterization](../control/README.md)
+now passes synthetic current-file search, explicit correction, separate
+conflicting claims, direct edit detection by Git diff, and removal from
+current-file search. It also demonstrates two **unclosed hard gates**: deleted
+data remains in Git history and separate vault directories under one OS
+principal are readable by the same process. The script explicitly snapshots
+the direct edit; it does not implement automatic capture. Search quality and
+scale, external source references, and household privacy enforcement are
+unmeasured. These observations do not justify a numeric score for the control.
+
+The six-point lead for ReMe + LangMem over ReMe alone does not establish that
+either component is necessary for Ada's MVP. Compare the control against the
+same hard gates and criteria on representative queries before choosing a
+backend; do not assign hypothetical points to the unmeasured dimensions.
+
+### First-release decision gate
+
+For the initial **source plus self-build Dockerfile** release plan, distinguish
+the Memory ADR choice from production deployment readiness. No option has yet
+demonstrated OS/process isolation of real private vaults, general semantic
+correction, captured edit history with retention-aware forgetting, or useful
+recall on representative family Memory. The current control uses no additional
+runtime packages; ReMe + LangMem adds AgentScope and LangChain-family
+dependencies and their transitive license review. Top-level permissive
+licenses do not clear an Ada-built image. Draft PR #27 addresses the already
+adopted baseline's distribution wording separately.
+
+**Recommendation for the next decision:** keep Markdown with one canonical
+place for each claim/source and the small direct-search control as the MVP
+starting option. Test an actual edit-capture/retention policy and protected
+per-domain storage before accepting it. Require representative recall results
+to justify adding ReMe's indexer or LangMem's semantic proposal helper.
+This is a recommendation, not a scored selection or accepted ADR.
 
 The frozen matrix supports three scored ReMe-containing options:
 
