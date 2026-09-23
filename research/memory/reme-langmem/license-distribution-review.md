@@ -30,12 +30,16 @@ every native library or prove that a proposed distribution complies.
 
 ## Exact-install attribution without repeating the full run
 
-On the Mac with the already completed run, from the Ada checkout on this
-branch, run:
+On the Mac with the already completed run, from the Ada checkout,
+fetch the PR branch and extract this script into the ignored run artifacts.
+This works even if the local checkout is on an older commit or another branch:
 
 ```sh
+git fetch origin docs/adr-memory-architecture
+git show FETCH_HEAD:research/memory/reme-langmem/license_paths.py \
+  > artifacts/research/memory/reme-langmem/latest/license_paths.py
 artifacts/research/memory/reme-langmem/latest/venv/bin/python \
-  research/memory/reme-langmem/license_paths.py \
+  artifacts/research/memory/reme-langmem/latest/license_paths.py \
   artifacts/research/memory/reme-langmem/latest \
   > artifacts/research/memory/reme-langmem/latest/license-paths.txt
 ```
