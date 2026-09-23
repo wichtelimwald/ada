@@ -207,12 +207,30 @@ If later deployment requirements make another DBOS-supported system database pre
 
 ## Licensing
 
-- DBOS Python: MIT — compatible with Ada's current MIT-owned project code.
+- DBOS Python: MIT — compatible at the top-level project-license level with
+  Ada's MIT-owned code. This does **not** clear its transitive dependencies or
+  any redistributed Ada artifact. DBOS 3.0.0 declares `psycopg[binary]>=3.1`;
+  a combined Ada/Memory research installation on macOS resolved `psycopg`
+  and `psycopg-binary` 3.3.6 (LGPL-3.0-only). The installed binary wheel
+  contains bundled native libraries with their own license obligations.
+  An Ada-only install and each intended release-platform artifact still need
+  separate verification. See the [Psycopg installation options](https://www.psycopg.org/psycopg3/docs/basic/install.html)
+  and [LGPLv3 terms](https://www.gnu.org/licenses/lgpl-3.0.html).
 - Temporal: MIT — license gate passes, but operational complexity is higher.
 - Restate Python SDK: MIT.
 - Restate runtime/server: BSL 1.1 with an additional production-use grant and future Apache-2.0 change license; treated as a conditional fit rather than an automatic rejection.
 
-License fit remains a mandatory gate for future durable-execution candidates.
+Ada's initial release plan distributes its own source and a Dockerfile for
+users to build locally, without publishing an Ada-built image or installer
+containing dependencies. Before an Ada-built image/installer is published,
+inventory the **exact Linux or other target artifacts**, inspect bundled
+libraries, preserve applicable notices/license texts, provide required access
+to covered source, and verify the applicable LGPL conditions. A general
+license mention alone does not close that distribution gate. The distinction
+between source distribution and bundled-artifact distribution applies to
+the already accepted DBOS path as well as future components; it does not
+change the DBOS technical decision. License fit remains a mandatory gate for
+future durable-execution candidates.
 
 ## Consequences
 

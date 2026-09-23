@@ -153,4 +153,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), and [PRIVACY.md]
 
 ## License
 
-Ada's project-owned source code is licensed under the [MIT License](LICENSE). Third-party code, models, assets, and services keep their own licenses and must be reviewed separately before use.
+Ada's project-owned source code is licensed under the [MIT License](LICENSE). Third-party code, models, assets, and services keep their own licenses and must be reviewed separately before use. The initial release plan is source plus a Dockerfile for users to build locally; publication of an Ada-built image/installer requires a separate review of its actual included dependencies and license obligations. See [NOTICE.md](NOTICE.md) for the existing transitive-license findings.
