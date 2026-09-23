@@ -95,6 +95,10 @@ sh research/memory/comparison/resume-hindsight.sh
 
 The command updates the existing `latest/REVIEW-BUNDLE.txt` in place.
 
+Each focused retry uses a **fresh pg0 database instance** so failed/repeated attempts cannot contaminate semantic results with duplicate retained memories. The existing Python venv and downloaded ONNX model cache are still reused.
+
+Hindsight's agentic `reflect` operation is **not part of the default comparison lane**. A characterized local `qwen3.5:9b` reflect call exceeded practical latency and timed out; direct retain/consolidation/recall remains the shared comparison path. Reflect can be re-enabled explicitly with `HINDSIGHT_COMPARE_REFLECT=1` for a dedicated performance experiment.
+
 ## Output
 
 Typical result layout:
