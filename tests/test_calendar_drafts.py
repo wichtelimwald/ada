@@ -182,6 +182,16 @@ class CalendarDraftTests(unittest.TestCase):
         )
         self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
+    def test_dotted_date_components_do_not_corroborate_time(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(date="2026-09-21", start_time="09:21", end_time="10:00"),
+            source_text=(
+                "Add a dentist appointment on 2026.09.21 "
+                "at 10:00 to the family calendar."
+            ),
+        )
+        self.assertEqual(assessment.missing, ("start_time",))
+
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):
             with self.subTest(invalid=invalid):

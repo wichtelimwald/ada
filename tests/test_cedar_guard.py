@@ -38,10 +38,18 @@ def request(**changes: object) -> AuthorizationRequest:
 
 
 class RequiredContextTests(unittest.TestCase):
-    def test_provenance_and_channel_must_be_supplied(self) -> None:
+    def test_provenance_must_be_supplied(self) -> None:
         with self.assertRaises(TypeError):
             AuthorizationRequest(  # type: ignore[call-arg]
-                actor="guardian-a", action="calendar.create", resource="calendar:family"
+                actor="guardian-a", action="calendar.create",
+                resource="calendar:family", channel="local-chat",
+            )
+
+    def test_channel_must_be_supplied(self) -> None:
+        with self.assertRaises(TypeError):
+            AuthorizationRequest(  # type: ignore[call-arg]
+                actor="guardian-a", action="calendar.create",
+                resource="calendar:family", provenance=InstructionProvenance.DIRECT,
             )
 
 
