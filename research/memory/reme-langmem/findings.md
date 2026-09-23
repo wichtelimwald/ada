@@ -411,6 +411,41 @@ proof of a general contradiction resolver. A final target-Mac run must still
 pass conflict validation, negative overwrite rejection, and out-of-band
 re-indexing before a decision.
 
+### Fourth target-Mac run (2026-09-23, head `be34013`)
+
+The **combined executable characterization passes all of its defined core
+steps** on macOS arm64 / Python 3.14.4. The combined Ada + ReMe + LangMem
+environment installed with 168 distributions (about 397 MiB). Security floors
+and `pip check` passed. `pip-audit` reported zero known vulnerabilities among
+the 165 dependencies it listed. ReMe's reported process RSS at the end of the
+synthetic integration was 72.38 MiB. This is one point-in-time run, not a
+general performance or security guarantee.
+
+The saved integration evidence confirms:
+
+- stdio MCP exposed exactly `read`, `search`, `status`, and `version`; the
+  Markdown index watcher remained internal;
+- pre-existing authoritative Markdown was readable and searchable;
+- LangMem proposed the Thursday correction with no caller-owned provenance
+  fields; Ada validated it, attached source references, wrote Markdown, and
+  ReMe found the changed text;
+- LangMem preserved the 16:00 pickup claim unchanged and proposed a separate
+  17:00 fact under the observed `pickup-time-17` label; Ada validated the
+  content, mapped it to its own ID/topic, and both files were searchable;
+- the synthetic silent-overwrite proposal was rejected;
+- after an out-of-band Friday edit, ReMe search and read returned the edited
+  Markdown without a model-mediated rewrite.
+
+The last test establishes **file change detection and retrieval**, not
+semantic/provenance integrity for arbitrary external edits. Its Friday body
+still carries source references for the preceding Wednesday/Thursday history
+and no new source for Friday. Ada needs a separate rule for recognizing and
+reconciling external edits before treating their metadata as verified. This
+run also uses one synthetic vault; it does not implement OS-level protection
+or household authorization, even though the earlier ReMe two-workspace canary
+test established basic query isolation. The scenario-specific LangMem fixture
+does not prove broad learning or contradiction resolution.
+
 ### Triage of the 11 flagged license metadata entries
 
 The inventory's substring classifier is a triage tool, not an SPDX parser.
@@ -438,9 +473,9 @@ been adopted by this research PR.
 
 ## 7. Current decision gate
 
-The executable runs exposed an index watcher omission and a mismatch between
-the model's distinct claim label and Ada's canonical topic. The final gate
-is still open.
+The combined executable characterization now passes its defined synthetic
+runtime, stdio, semantic, and file-change gates. This closes that experiment,
+not the ADR/adoption gates.
 
 The ReMe + LangMem option can move toward ADR selection **only if the final combined run confirms**:
 
@@ -451,4 +486,10 @@ The ReMe + LangMem option can move toward ADR selection **only if the final comb
 5. deterministic proposal validation passes the correction/conflict fixtures;
 6. file truth remains authoritative after an out-of-band edit.
 
-Until that bundle is reviewed, ADR-0008 remains Proposed.
+The fourth bundle has been reviewed against these six conditions: environment
+and semantic/file-change checks pass; the point-in-time vulnerability scan
+has zero reported records. The license metadata triage found no immediate
+incompatibility, but exact redistributed wheel contents/notices, protection
+domain enforcement, external-edit metadata semantics, external-document
+reference/lifecycle fit, and independent decision review remain open. Do not
+adopt ReMe/LangMem or mark ADR-0008 Accepted on this bundle alone.
