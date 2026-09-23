@@ -8,6 +8,7 @@ MODEL="${OLLAMA_MODEL:-qwen3.5:9b}"
 OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-http://127.0.0.1:11434/v1}"
 PORT="${HINDSIGHT_PORT:-28888}"
 READY_TIMEOUT="${HINDSIGHT_READY_TIMEOUT:-420}"
+DB_INSTANCE="${HINDSIGHT_DB_INSTANCE:-ada-memcmp-$PORT}"
 HERE="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 PID=""
 mkdir -p "$OUT/home" "$OUT/data"
@@ -19,7 +20,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 STATUS="PASS"
-NOTE="Hindsight retain/recall/reflect, bank isolation, and document forget lane completed."
+NOTE="Hindsight retain/recall, bank isolation, and document forget lane completed; reflect is an optional capability benchmark."
 
 if ! command -v "$PYTHON_BIN" >/dev/null 2>&1; then
   STATUS="BLOCKED"
@@ -38,7 +39,7 @@ else
   fi
 
   if [ "$STATUS" = PASS ]; then
-    export HINDSIGHT_API_DATABASE_URL="pg0://ada-memcmp-$PORT"
+    export HINDSIGHT_API_DATABASE_URL="pg0://$DB_INSTANCE"
     export HINDSIGHT_API_LLM_PROVIDER=ollama
     export HINDSIGHT_API_LLM_MODEL="$MODEL"
     export HINDSIGHT_API_LLM_BASE_URL="$OLLAMA_BASE_URL"
@@ -55,7 +56,7 @@ else
     PID=$!
     "$OUT/venv/bin/python" "$HERE/driver.py" "http://127.0.0.1:$PORT" "$FIXTURES" "$OUT" "$READY_TIMEOUT" >"$OUT/run.log" 2>&1 || {
       STATUS="FINDING"
-      NOTE="Hindsight comparison lane failed; inspect server.log/run.log. First startup may download the local ONNX embedding model."
+      NOTE="Hindsight core comparison lane did not complete; inspect server.log/run.log."
     }
   fi
 fi
