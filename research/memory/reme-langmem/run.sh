@@ -136,18 +136,23 @@ create_venv() {
 }
 
 install_runtime() {
-  "$VENV/bin/python" -m pip install     "reme-ai[as]==0.4.1.12"     "langmem==0.0.30"     "langchain-ollama==1.1.0"     "langchain-core>=1.3.3"     "langgraph>=1.0.10,<2"     "langgraph-checkpoint>=4.1.1"
+  # Install Ada itself plus both candidate components into one environment.
+  "$VENV/bin/python" -m pip install "$ROOT" "reme-ai[as]==0.4.1.12" "langmem==0.0.30" "langchain-ollama==1.1.0" "langchain-core>=1.3.3" "langgraph>=1.0.10,<2" "langgraph-checkpoint>=4.1.1"
   "$VENV/bin/python" -m pip check
   "$VENV/bin/python" - <<'PY'
+import importlib.metadata as md
 import reme
 if reme.__version__ != "0.4.1.12":
     raise SystemExit(f"Expected ReMe 0.4.1.12, got {reme.__version__}")
+if md.version("ada-assistant") != "0.0.1":
+    raise SystemExit("Ada package missing from combined environment")
 print("reme", reme.__version__)
+print("ada-assistant", md.version("ada-assistant"))
 PY
 }
-
 capture_runtime() {
   "$VENV/bin/python" -m pip freeze > "$OUT/pip-freeze.txt"
+  grep -v '^ada-assistant==' "$OUT/pip-freeze.txt" > "$OUT/pip-audit-requirements.txt"
   "$VENV/bin/python" -m pip inspect --local > "$OUT/pip-inspect.json"
   "$VENV/bin/python" "$DRIVER" inventory --out "$OUT/inventory.json"
   {
@@ -164,7 +169,7 @@ PY
 pip_audit() {
   "$PYTHON_BIN" -m venv "$AUDIT_VENV"
   "$AUDIT_VENV/bin/python" -m pip install pip-audit
-  "$AUDIT_VENV/bin/pip-audit"     -r "$OUT/pip-freeze.txt"     --format json     --output "$OUT/pip-audit.json"
+  "$AUDIT_VENV/bin/pip-audit"     -r "$OUT/pip-audit-requirements.txt"     --format json     --output "$OUT/pip-audit.json"
 }
 
 apply_runtime_guard() {
