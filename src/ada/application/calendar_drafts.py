@@ -103,7 +103,7 @@ def _valid_time(value: str | None) -> bool:
 
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
     hour, minute = (int(part) for part in value.strip().split(":"))
-    forms = [rf"(?<![\d:])0?{hour}[:.]{minute:02d}(?!\d)"]
+    forms = [rf"(?<![\w:.])0?{hour}[:.]{minute:02d}(?![\w:]|\.\d)"]
     if minute == 0:
         forms.append(rf"(?<!\d)0?{hour}\s+Uhr(?!\w)")
     return any(re.search(form, source_text, re.IGNORECASE) for form in forms)

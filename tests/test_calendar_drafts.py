@@ -172,6 +172,16 @@ class CalendarDraftTests(unittest.TestCase):
         )
         self.assertEqual(assessment.missing, ("end_time",))
 
+    def test_time_cannot_match_prefix_of_more_precise_source_time(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(start_time="16:00", end_time="16:30"),
+            source_text=(
+                "Please add a dentist appointment on 2026-09-21 from "
+                "16:00:30 to 16:30:45 to the family calendar."
+            ),
+        )
+        self.assertEqual(assessment.missing, ("start_time", "end_time"))
+
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):
             with self.subTest(invalid=invalid):
