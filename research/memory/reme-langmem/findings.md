@@ -523,6 +523,8 @@ code is apparent, but LGPL/MPL distribution obligations and notices remain a
 hard gate before adoption/packaging. No ReMe/LangMem production dependency has
 been adopted by this research PR.
 
+The five real LGPL/MPL findings have a separate [distribution-license review](license-distribution-review.md) with a read-only [installed-dependency trace](license_paths.py). The license gate remains open pending actual-wheel, native-library, source/notice and release-platform evidence; `pip-audit` does not clear it.
+
 ## 7. Current decision gate
 
 The combined executable characterization now passes its defined synthetic
