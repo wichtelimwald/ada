@@ -308,14 +308,16 @@ async def integration(args: argparse.Namespace) -> None:
     os.environ["OLLAMA_HOST"] = args.ollama_host
 
     transport = StdioTransport(
-        command=args.reme_bin,
+        command=args.reme_python,
         args=[
-            "start",
-            f"config={args.config}",
-            f"workspace_dir={workspace}",
-            "timezone=Europe/Berlin",
-            "language=en",
-            "enable_logo=false",
+            "-m",
+            "reme.components.agent_wrapper.codex_mcp_server",
+            "--config", str(args.config),
+            "--workspace", str(workspace),
+            "--job", "version",
+            "--job", "status",
+            "--job", "search",
+            "--job", "read",
         ],
         cwd=str(args.repo_root),
     )
@@ -328,7 +330,8 @@ async def integration(args: argparse.Namespace) -> None:
             "langmem_role": "typed semantic proposal only",
             "model_schema_fields": list(MemoryRecord.model_fields),
             "caller_owned_fields": ["source_refs", "scope", "authority", "permission", "lifecycle"],
-        }
+        },
+        "result": "INCOMPLETE",
     }
 
     async with Client(transport, timeout=120) as client:
@@ -340,6 +343,7 @@ async def integration(args: argparse.Namespace) -> None:
             raise RuntimeError(f"Unexpected ReMe stdio tool surface: expected {expected}, got {names}")
         if any(name in names for name in ("write", "edit", "move", "delete", "auto_memory", "auto_dream")):
             raise RuntimeError(f"Mutating/model-writing ReMe tool exposed: {names}")
+        write_json(out / "integration.json", evidence)
 
         evidence["reme_version"] = await call_text(client, "version", {})
         evidence["initial_search"] = await wait_search(client, MARK_WED, contains=MARK_WED)
@@ -359,6 +363,8 @@ async def integration(args: argparse.Namespace) -> None:
             },
         )
         correction_rows = proposal_rows(correction_items)
+        evidence["correction"] = {"proposal": correction_rows, "validated": False}
+        write_json(out / "integration.json", evidence)
         accepted_correction = validate_correction(initial_music, correction_rows, explicit_correction=True)
         proposal_blob = json.dumps(correction_rows, ensure_ascii=False)
         if SRC_WED in proposal_blob or SRC_THU in proposal_blob:
@@ -405,6 +411,8 @@ async def integration(args: argparse.Namespace) -> None:
             },
         )
         conflict_rows = proposal_rows(conflict_items)
+        evidence["conflict"] = {"proposal": conflict_rows, "validated": False}
+        write_json(out / "integration.json", evidence)
         accepted_new_claim = validate_noncorrection_conflict(
             initial_pickup,
             conflict_rows,
@@ -540,6 +548,7 @@ def summarize(result_dir: Path) -> None:
         "pip-freeze.txt",
         "inventory.json",
         "integration/integration.json",
+        "logs/integration.log",
         "pip-audit.json",
         "pip-audit.log",
     ):
@@ -547,6 +556,8 @@ def summarize(result_dir: Path) -> None:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
+        if filename == "logs/integration.log":
+            text = "\n".join(text.splitlines()[-100:])
         if filename == "inventory.json":
             try:
                 data = json.loads(text)
@@ -574,7 +585,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("integration")
     p.add_argument("--repo-root", type=Path, required=True)
-    p.add_argument("--reme-bin", required=True)
+    p.add_argument("--reme-python", required=True)
     p.add_argument("--config", type=Path, required=True)
     p.add_argument("--workspace", type=Path, required=True)
     p.add_argument("--model", required=True)

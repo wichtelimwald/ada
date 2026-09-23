@@ -85,3 +85,6 @@ artifacts/research/memory/reme-langmem/latest/REVIEW-BUNDLE.txt
 ```
 
 A failure is a research finding, not automatically a framework rejection.
+On failure, the bundle includes the last 100 lines of the integration log and
+any semantic proposals recorded before validation. An incomplete integration
+result is not a passing result.

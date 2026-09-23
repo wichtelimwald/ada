@@ -1,4 +1,6 @@
 extends: default
+timezone: Europe/Berlin
+language: en
 
 # ReMe + LangMem architecture characterization.
 #

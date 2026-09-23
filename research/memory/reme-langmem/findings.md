@@ -325,9 +325,41 @@ and captures:
 - ReMe recall after accepted write;
 - out-of-band Markdown edit -> ReMe re-index.
 
+### First target-Mac run (2026-09-23, head `c63e860`)
+
+The first combined run is **not a pass**. Python 3.14/macOS arm64 preflight,
+installation, `pip check`, security floors, and inventory passed. The combined
+environment contains 168 distributions (about 397 MiB on disk). `pip-audit`
+reported zero known vulnerabilities for the 165 dependencies it listed; this
+is point-in-time advisory evidence, not a general safety guarantee. Eleven
+license metadata entries require triage; several are obvious scanner false
+positives, while LGPL/MPL and unknown metadata need distribution review.
+
+The integration step failed for two independent reasons:
+
+1. Starting `reme start` with an stdio-MCP config sent ReMe Loguru messages to
+   **stdout**. The MCP client reported repeated JSON-RPC parse failures. The
+   first `Loading config` log is emitted before the application config turns
+   off console logging. ReMe 0.4.1.12 already ships
+   `reme.components.agent_wrapper.codex_mcp_server`, which resolves config
+   without console logs and exposes a selected job list. The research harness
+   now starts that upstream module with only `version`, `status`, `search`,
+   and `read`; it still checks the actual exposed tool list at runtime.
+2. LangMem's non-correction proposal did not pass the preservation validator:
+   `Proposal did not preserve one separate 17:00 conflicting claim`. The first
+   bundle did not retain the raw proposal, so it cannot distinguish a model
+   omission from a schema/validator mismatch. The validator is unchanged.
+   The harness now saves both raw proposals before validation and includes
+   the integration log tail in the review bundle.
+
+The earlier run does **not** establish a clean stdio boundary, successful
+conflict handling, or authoritative out-of-band reindexing. Rerun the updated
+spike on the target Mac and inspect the proposal if the semantic gate still
+fails. Do not accept ADR-0008 based on this run.
+
 ## 7. Current decision gate
 
-No new blocker has been found in source-level review.
+The first executable run exposed unresolved stdio and semantic findings above.
 
 The ReMe + LangMem option can move toward ADR selection **only if the final combined run confirms**:
 

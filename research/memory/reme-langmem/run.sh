@@ -193,7 +193,14 @@ apply_runtime_guard() {
 }
 
 integration() {
-  "$VENV/bin/python" "$DRIVER" integration     --repo-root "$ROOT"     --reme-bin "$VENV/bin/reme"     --config "$CONFIG"     --workspace "$WORKSPACE"     --model "$OLLAMA_MODEL"     --ollama-host "$OLLAMA_HOST"     --out "$OUT/integration"
+  "$VENV/bin/python" "$DRIVER" integration \
+    --repo-root "$ROOT" \
+    --reme-python "$VENV/bin/python" \
+    --config "$CONFIG" \
+    --workspace "$WORKSPACE" \
+    --model "$OLLAMA_MODEL" \
+    --ollama-host "$OLLAMA_HOST" \
+    --out "$OUT/integration"
 }
 
 printf 'Ada ReMe + LangMem final architecture characterization\n'
