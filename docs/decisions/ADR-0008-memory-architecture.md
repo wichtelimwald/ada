@@ -1299,7 +1299,7 @@ The executable four-candidate characterization is complete. A **draft weighted d
 
 `research/memory/comparison/decision-matrix.md`
 
-The matrix currently contains only **proposed criteria and weights**. Candidate scoring and weighted totals are deliberately deferred until those weights are explicitly confirmed. No architecture implication should be drawn from the matrix before that step.
+The matrix criteria and weights are now frozen **before candidate scoring**: five deliberately non-overlapping criteria at 20% each — Authoritative Memory fit, Semantic correctness & provenance, Privacy & isolation, Retrieval & learning quality, and Architecture & operational fit. License compatibility remains a hard gate; `Memory != Permission` remains an architecture invariant. Candidate scoring and weighted totals follow only after this freeze.
 
 Before this ADR can move to Accepted:
 
