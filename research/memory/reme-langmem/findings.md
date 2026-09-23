@@ -446,6 +446,24 @@ or household authorization, even though the earlier ReMe two-workspace canary
 test established basic query isolation. The scenario-specific LangMem fixture
 does not prove broad learning or contradiction resolution.
 
+### Clarification: the spike duplicates presentation data
+
+The synthetic music note repeats `source_refs` and the superseded Wednesday
+statement from YAML in the Markdown body. This makes the test canaries easy to
+inspect, but **is not an acceptable production schema**: it creates two places
+to update the same item. The target design must choose one canonical location
+for each claim and each metadata item; ReMe's search index is only a
+rebuildable derivative of those files. For example, the current claim could
+live once in readable Markdown, with source references recorded once in YAML.
+
+Removing that duplication does not by itself solve the external-edit question.
+If the Thursday claim is changed to Friday in the body while its sole YAML
+source reference still points to a Thursday source, the reference is stale
+even though no field is duplicated. An Ada-owned rule must bind evidence to
+the claim/revision it supports and identify edits made outside Ada before
+carrying old evidence forward. The exact representation and confirmation
+policy remain open; this is a design finding, not an added production schema.
+
 ### Triage of the 11 flagged license metadata entries
 
 The inventory's substring classifier is a triage tool, not an SPDX parser.
