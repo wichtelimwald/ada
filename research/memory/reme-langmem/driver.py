@@ -310,14 +310,9 @@ async def integration(args: argparse.Namespace) -> None:
     transport = StdioTransport(
         command=args.reme_python,
         args=[
-            "-m",
-            "reme.components.agent_wrapper.codex_mcp_server",
+            str(Path(__file__).with_name("reme_stdio.py")),
             "--config", str(args.config),
             "--workspace", str(workspace),
-            "--job", "version",
-            "--job", "status",
-            "--job", "search",
-            "--job", "read",
         ],
         cwd=str(args.repo_root),
     )
@@ -327,6 +322,7 @@ async def integration(args: argparse.Namespace) -> None:
             "transport": "stdio-mcp",
             "authoritative_store": "Markdown/YAML",
             "reme_role": "read/search/index only",
+            "internal_reme_index_job": "index_update_loop",
             "langmem_role": "typed semantic proposal only",
             "model_schema_fields": list(MemoryRecord.model_fields),
             "caller_owned_fields": ["source_refs", "scope", "authority", "permission", "lifecycle"],
@@ -346,6 +342,14 @@ async def integration(args: argparse.Namespace) -> None:
         write_json(out / "integration.json", evidence)
 
         evidence["reme_version"] = await call_text(client, "version", {})
+        evidence["initial_read"] = await call_text(
+            client,
+            "read",
+            {"path": "digest/personal/music-lesson.md", "start_line": 1, "end_line": 80},
+        )
+        write_json(out / "integration.json", evidence)
+        if MARK_WED not in evidence["initial_read"]:
+            raise RuntimeError("ReMe read did not return the pre-existing authoritative Markdown")
         evidence["initial_search"] = await wait_search(client, MARK_WED, contains=MARK_WED)
 
         mem_manager = manager(args.model, args.ollama_host)

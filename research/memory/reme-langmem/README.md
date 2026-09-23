@@ -33,7 +33,8 @@ The important boundaries are:
 - **AdaGuard remains authority**. Nothing in Memory or LangMem can grant rights.
 - ReMe runs out-of-process over **stdio MCP**, not unauthenticated localhost
   HTTP. The tool allowlist is read-only: `version`, `status`, `search`,
-  `read`.
+  `read`. The subprocess also runs ReMe's internal `index_update_loop` to
+  ingest Markdown at startup and watch later edits; it is not an MCP tool.
 - The test uses synthetic canaries only.
 
 ## What the run checks

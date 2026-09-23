@@ -296,6 +296,7 @@ research/memory/reme-langmem/
   README.md
   config.yaml
   driver.py
+  reme_stdio.py
   run.sh
 ```
 
@@ -342,9 +343,9 @@ The integration step failed for two independent reasons:
    first `Loading config` log is emitted before the application config turns
    off console logging. ReMe 0.4.1.12 already ships
    `reme.components.agent_wrapper.codex_mcp_server`, which resolves config
-   without console logs and exposes a selected job list. The research harness
-   now starts that upstream module with only `version`, `status`, `search`,
-   and `read`; it still checks the actual exposed tool list at runtime.
+   without console logs and exposes a selected job list. The second run used
+   this upstream bridge and confirmed the clean four-tool MCP surface, but
+   exposed a missing index watcher (below).
 2. LangMem's non-correction proposal did not pass the preservation validator:
    `Proposal did not preserve one separate 17:00 conflicting claim`. The first
    bundle did not retain the raw proposal, so it cannot distinguish a model
@@ -352,10 +353,33 @@ The integration step failed for two independent reasons:
    The harness now saves both raw proposals before validation and includes
    the integration log tail in the review bundle.
 
-The earlier run does **not** establish a clean stdio boundary, successful
-conflict handling, or authoritative out-of-band reindexing. Rerun the updated
-spike on the target Mac and inspect the proposal if the semantic gate still
-fails. Do not accept ADR-0008 based on this run.
+The first run does **not** establish a clean stdio boundary, successful
+conflict handling, or authoritative out-of-band reindexing.
+
+### Second target-Mac run (2026-09-23, head `a237359`)
+
+The second combined run is **not a pass**. Preflight, combined installation,
+runtime capture, and `pip-audit` passed again, with zero reported vulnerability
+records. ReMe started with a clean stdio transport and exposed exactly `read`,
+`search`, `status`, and `version`. Initial search for a Markdown fixture was
+empty for the entire 45-second wait. LangMem was not reached on this run, so
+the unresolved conflict finding from the first run remains open.
+
+The pinned ReMe source identifies the cause: the upstream Codex stdio bridge
+removes **all** background and cron jobs from its effective config, including
+`index_update_loop`. That job alone runs `init_changes_step` and
+`watch_changes_step` for Markdown, dispatching `update_index_step` to populate
+the search index. Its absence explains why the prewritten canary never became
+searchable.
+
+The research subprocess now resolves config without stdout logging and selects
+only the four read tools plus the internal `index_update_loop`. Its MCP service
+still exposes exactly the four read tools; the watcher is a non-served
+background job. A direct read of the prewritten Markdown is recorded before
+the initial search to distinguish file access from indexing on the next run.
+The runtime tool-list assertion, proposal validator, and all original gates
+remain in place. Rerun the updated spike on the target Mac; this change has
+only been checked statically in the development environment.
 
 ### Triage of the 11 flagged license metadata entries
 
@@ -384,7 +408,8 @@ been adopted by this research PR.
 
 ## 7. Current decision gate
 
-The first executable run exposed unresolved stdio and semantic findings above.
+The executable runs exposed an index watcher omission and an unresolved
+semantic conflict finding above.
 
 The ReMe + LangMem option can move toward ADR selection **only if the final combined run confirms**:
 
