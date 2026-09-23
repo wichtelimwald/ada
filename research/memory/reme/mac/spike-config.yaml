@@ -1,0 +1,46 @@
+extends: default
+
+# Ada characterization profile.
+#
+# This intentionally keeps ReMe's file/index and AgentScope Memory workflow but
+# constrains local-model work to the scale expected for Ada Memory maintenance.
+# Tag generation is excluded from the characterized auto_memory/auto_dream jobs
+# because it is a derived convenience layer, not an ADR-0008 hard gate.
+
+jobs:
+  auto_memory:
+    steps:
+      - backend: auto_memory_step
+
+  auto_dream:
+    steps:
+      - backend: dream_extract_step
+        file_catalog: dream
+        scan_days: 2
+        max_units: 5
+      - backend: dream_integrate_step
+      - backend: dream_finish_step
+        file_catalog: dream
+
+components:
+  as_llm:
+    default:
+      backend: ollama
+      model: ${OLLAMA_MODEL_NAME:-qwen3.5:9b}
+      stream: true
+      context_size: 32768
+      max_retries: 1
+      credential:
+        host: ${OLLAMA_HOST:-http://127.0.0.1:11434}
+      parameters:
+        max_tokens: 4096
+        thinking_enable: false
+
+  agent_wrapper:
+    default:
+      react_config:
+        max_iters: 8
+      context_config:
+        trigger_ratio: 0.8
+        reserve_ratio: 0.1
+        tool_result_limit: 12000

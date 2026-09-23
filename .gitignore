@@ -216,3 +216,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local research / development artifacts
+# Reproducible but intentionally untracked outputs from local characterization runs.
+artifacts/

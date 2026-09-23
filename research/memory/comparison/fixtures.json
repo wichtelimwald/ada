@@ -1,0 +1,11 @@
+{
+  "preference": "Synthetic characterization only. The test persona explicitly prefers concise bullet-point status updates. Evidence token: MEMCMP_PREF_5E39C2",
+  "correction_before": "Synthetic fixture: the music lesson is Wednesday at 17:00. Evidence token: MEMCMP_CORR_A1D884",
+  "correction_after": "Explicit correction to the synthetic fixture: not Wednesday. The music lesson is Thursday at 17:00.",
+  "conflict_a": "Synthetic unresolved-conflict fixture: pickup is at 16:00. Evidence token: MEMCMP_CONFLICT_C47B21",
+  "conflict_b": "Synthetic unresolved-conflict fixture: pickup is at 17:00. This is a separate explicit claim, not an explicit correction of another source.",
+  "forget": "Synthetic forget canary: MEMCMP_FORGET_91C6E3",
+  "private_a": "Synthetic private-A canary: MEMCMP_ALPHA_PRIVATE_70B8D4",
+  "private_b": "Synthetic private-B canary: MEMCMP_BETA_PRIVATE_24E91A",
+  "instructions": "Preserve evidence/source identifiers verbatim. Do not infer authorization. Treat an explicit correction as a correction. Do not silently resolve two conflicting explicit claims when the newer claim explicitly says it is not a correction."
+}
