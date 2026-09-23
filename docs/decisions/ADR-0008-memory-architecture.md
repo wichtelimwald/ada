@@ -1299,9 +1299,7 @@ The executable four-candidate characterization is complete. A **draft weighted d
 
 `research/memory/comparison/decision-matrix.md`
 
-Its proposed weighting currently favors a reuse-first **ReMe + LangMem** role split, with ReMe as file-native authoritative substrate and LangMem as a structured semantic-change proposal helper behind deterministic provenance/scope validation. ReMe alone remains the strongest single-framework substrate. Hindsight is retained as an optional derived-learning/recall candidate rather than authoritative truth; Letta/MemFS remains a strong design reference.
-
-Those are draft decision implications, not an accepted architecture.
+The matrix currently contains only **proposed criteria and weights**. Candidate scoring and weighted totals are deliberately deferred until those weights are explicitly confirmed. No architecture implication should be drawn from the matrix before that step.
 
 Before this ADR can move to Accepted:
 
