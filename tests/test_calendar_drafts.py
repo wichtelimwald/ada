@@ -192,6 +192,19 @@ class CalendarDraftTests(unittest.TestCase):
         )
         self.assertEqual(assessment.missing, ("start_time",))
 
+    def test_invalid_times_are_missing_without_source_parsing(self) -> None:
+        source = (
+            "Add a dentist appointment on 2026-09-21 "
+            "to the family calendar."
+        )
+        for invalid in (None, "six pm", "25:00", "16:0"):
+            with self.subTest(invalid=invalid):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time=invalid, end_time=invalid),
+                    source_text=source,
+                )
+                self.assertEqual(assessment.missing, ("start_time", "end_time"))
+
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):
             with self.subTest(invalid=invalid):
