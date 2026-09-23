@@ -25,25 +25,22 @@ The hard-gate table already rules out treating LangMem or Hindsight **alone** as
 
 It also means Letta/MemFS cannot be selected as the authoritative store from current evidence without more characterization.
 
-## Proposed weights — maintainer confirmation required
+## Agreed criteria and weights
 
-These weights are a **proposal only**. They must be agreed before candidate scoring is considered decision evidence. Until then, no weighted ranking is valid.
+The criteria and weights were agreed **before candidate scoring** and are now frozen for this decision round.
 
-The proposal reflects Ada's confirmed product constraints: correctness and inspectability before sophistication.
+License compatibility remains a **hard gate**, not a weighted criterion. Likewise, Ada's trust invariant `Memory != Permission` is an architecture constraint rather than something a candidate can compensate for with points elsewhere.
 
-| Criterion | Weight | Why it matters |
+| Criterion | Weight | Includes |
 | --- | ---: | --- |
-| Human-readable/editable authoritative truth | 18% | Core Ada requirement: user-owned Markdown/YAML, inspectable and editable outside Ada |
-| Correction / contradiction semantics | 16% | Explicit correction must differ from unresolved conflict |
-| Provenance integrity / explainability | 14% | Important memories must remain attributable; fabricated provenance is unacceptable |
-| Privacy / scope / isolation | 12% | Private/shared household boundaries must not collapse |
-| Forget / rebuild / lifecycle | 10% | Operational deletion and recovery from outside edits are core trust requirements |
-| Retrieval / context efficiency | 8% | Memory must remain useful without loading everything into context |
-| Local/offline + resource fit | 7% | MVP target includes Apple Silicon / constrained local execution |
-| Integration fit with Ada architecture | 6% | Avoid replacing accepted PydanticAI, DBOS, Cedar/AdaGuard boundaries |
-| Operational / maintenance simplicity | 5% | Family assistant should remain maintainable, not become a platform project |
-| Portability / replaceability | 4% | Data and implementation should remain movable to later Linux/vServer deployment |
+| **Authoritative Memory fit** | **20%** | human-readable/user-owned source of truth, external editability, rebuild, forget |
+| **Semantic correctness & provenance** | **20%** | correction vs contradiction, source integrity, no invented facts/metadata, explainability |
+| **Privacy & isolation** | **20%** | private/shared boundaries, person/vault/bank isolation, no scope leaks |
+| **Retrieval & learning quality** | **20%** | recall, consolidation/learning, context efficiency, growth to larger Memory |
+| **Architecture & operational fit** | **20%** | fit with PydanticAI/DBOS/AdaGuard, local/offline operation, dependencies, resources, maintenance, portability |
 | **Total** | **100%** | |
+
+The five criteria intentionally combine previously overlapping dimensions so the same underlying property is not rewarded multiple times.
 
 ## Scoring scale
 
@@ -58,11 +55,11 @@ Scores distinguish **demonstrated behavior** from hypothetical future capability
 
 ## Scoring status
 
-Candidate scoring is intentionally **deferred until the weights above are confirmed**.
+The criteria and weights above are now **frozen**.
 
-The previously calculated weighted totals were generated too early and are not retained as decision evidence.
+The previously calculated weighted totals were generated before weight agreement and are not retained as decision evidence.
 
-After weight confirmation, score each candidate and composite against the same frozen criteria and document the evidence for every score before calculating totals.
+The next step is to score each candidate and evidence-backed composite against these five frozen criteria, document the evidence for every score, and only then calculate totals.
 
 ## Evidence behind the main score differences
 
@@ -206,10 +203,11 @@ This is very different from writing a complete Ada Memory engine.
 
 ## Next step
 
-1. Confirm or adjust the proposed criteria and weights.
-2. Freeze them in this document.
-3. Score the candidates and composite options against the frozen matrix.
-4. Only then derive weighted totals and architecture implications.
+1. Score the candidates and evidence-backed composite options against the five frozen 20% criteria.
+2. Document the evidence/rationale for every score.
+3. Calculate weighted totals.
+4. Run a small sensitivity check only for disputed scores, not by changing the agreed weights after seeing the result.
+5. Derive the architecture implication.
 
 ## Remaining gates before ADR acceptance
 
