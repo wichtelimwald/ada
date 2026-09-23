@@ -122,12 +122,15 @@ The Markdown + captured Git history + basic-search control is not scored in
 this matrix. A small, dependency-free [control characterization](../control/README.md)
 now passes synthetic current-file search, explicit correction, separate
 conflicting claims, direct edit detection by Git diff, and removal from
-current-file search. It also demonstrates two **unclosed hard gates**: deleted
-data remains in Git history and separate vault directories under one OS
-principal are readable by the same process. The script explicitly snapshots
-the direct edit; it does not implement automatic capture. Search quality and
-scale, external source references, and household privacy enforcement are
-unmeasured. These observations do not justify a numeric score for the control.
+current-file search. Deleted data remains in Git history, consistent with
+ADR-0008's agreed split between operational forgetting and historical purge;
+this control has no derived index and does not test whether a future index
+ignores forgotten history. Separate vault directories under one OS principal
+are readable by the same process, so the storage-isolation hard gate is open.
+The script explicitly snapshots the direct edit; it does not implement
+automatic capture. Search quality and scale, external source references, and
+household privacy enforcement are unmeasured. These observations do not
+justify a numeric score for the control.
 
 The six-point lead for ReMe + LangMem over ReMe alone does not establish that
 either component is necessary for Ada's MVP. Compare the control against the
@@ -139,16 +142,16 @@ backend; do not assign hypothetical points to the unmeasured dimensions.
 For the initial **source plus self-build Dockerfile** release plan, distinguish
 the Memory ADR choice from production deployment readiness. No option has yet
 demonstrated OS/process isolation of real private vaults, general semantic
-correction, captured edit history with retention-aware forgetting, or useful
-recall on representative family Memory. The current control uses no additional
-runtime packages; ReMe + LangMem adds AgentScope and LangChain-family
+correction, automatic edit-history capture, forgetting across actual derived
+indexes, or useful recall on representative family Memory. The current
+control uses no additional runtime packages; ReMe + LangMem adds AgentScope and LangChain-family
 dependencies and their transitive license review. Top-level permissive
 licenses do not clear an Ada-built image. Draft PR #27 addresses the already
 adopted baseline's distribution wording separately.
 
 **Recommendation for the next decision:** keep Markdown with one canonical
 place for each claim/source and the small direct-search control as the MVP
-starting option. Test an actual edit-capture/retention policy and protected
+starting option. Test actual edit capture, operational forgetting and protected
 per-domain storage before accepting it. Require representative recall results
 to justify adding ReMe's indexer or LangMem's semantic proposal helper.
 This is a recommendation, not a scored selection or accepted ADR.
