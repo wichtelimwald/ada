@@ -53,13 +53,90 @@ The five criteria intentionally combine previously overlapping dimensions so the
 
 Scores distinguish **demonstrated behavior** from hypothetical future capability.
 
-## Scoring status
+## Scoring result
 
-The criteria and weights above are now **frozen**.
+The five criteria and 20% weights were frozen before scoring.
 
-The previously calculated weighted totals were generated before weight agreement and are not retained as decision evidence.
+A hard-gate failure is **not compensable by weighted points**. Scores for gate-failing standalone candidates are retained only to show component strengths and weaknesses; they are not decision-eligible architectures.
 
-The next step is to score each candidate and evidence-backed composite against these five frozen criteria, document the evidence for every score, and only then calculate totals.
+| Option | Authoritative Memory fit | Semantic correctness & provenance | Privacy & isolation | Retrieval & learning quality | Architecture & operational fit | Weighted result | Decision status |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| **ReMe + LangMem** | 5.0 | 4.0 | 4.0 | 4.0 | 2.5 | **78 / 100** | **Viable composite** |
+| **ReMe** | 5.0 | 3.0 | 4.0 | 3.0 | 3.0 | **72 / 100** | **Viable baseline** |
+| **ReMe + Hindsight** | 5.0 | 3.0 | 4.0 | 4.0 | 2.0 | **72 / 100** | **Viable composite, extra complexity** |
+| **LangMem** | 0.0 | 4.0 | 3.0 | 4.0 | 4.0 | **60 / 100** | **Not viable standalone — no authoritative store** |
+| **Hindsight** | 0.0 | 2.0 | 4.0 | 4.5 | 2.5 | **52 / 100** | **Not viable standalone — DB is primary truth** |
+| **Letta/MemFS** | 4.0 | 2.0 | 2.0 | 3.0 | 2.0 | **52 / 100** | **Not decision-ready — provenance failure; forget/isolation uncharacterized** |
+
+Because all criteria are equally weighted, the weighted result is simply the mean criterion score scaled to 100.
+
+### Score rationale by criterion
+
+#### 1. Authoritative Memory fit
+
+- **ReMe — 5.0:** demonstrated Markdown/YAML truth, outside edit, clean rebuild, and operational forget.
+- **LangMem — 0.0 standalone:** storage-agnostic helper; it does not provide Ada's required authoritative human-readable store.
+- **Hindsight — 0.0 standalone:** database memory bank is primary state; this violates the confirmed authoritative-Memory direction.
+- **Letta/MemFS — 4.0:** Git-backed human-readable Markdown is close, but outside-edit/rebuild and forget behavior were not fully characterized.
+- **ReMe composites — 5.0:** ReMe remains authoritative; the second component is derived/advisory.
+
+#### 2. Semantic correctness & provenance
+
+- **ReMe — 3.0:** source notes preserve the tested facts/conflicts, but Dream/consolidation is nondeterministic and one run contradicted corrected source text.
+- **LangMem — 4.0:** strongest tested correction/conflict behavior; loses a point because it invented a provenance value when the fixture provided none.
+- **Hindsight — 2.0:** explicit correction is recognized, but consolidation invented a validity interval and collapsed an unresolved conflict while mixing provenance.
+- **Letta/MemFS — 2.0:** correction/conflict representation is readable, but evidence identifiers were reformatted, truncated, and invented.
+- **ReMe + LangMem — 4.0:** ReMe can retain authoritative source/provenance while LangMem proposes structured semantic changes; still requires deterministic validation before write.
+- **ReMe + Hindsight — 3.0:** keeping ReMe authoritative limits damage, but Hindsight observations remain unsafe as canonical semantic truth.
+
+#### 3. Privacy & isolation
+
+- **ReMe — 4.0:** separate-workspace canary isolation is demonstrated; Ada's full household protection-domain topology still needs enforcement outside the model.
+- **LangMem — 3.0:** namespaces/store isolation are caller-owned rather than a demonstrated protection-domain implementation.
+- **Hindsight — 4.0:** native memory-bank isolation passed cross-bank canary checks; relevance validation is still needed because absent-token queries can return similar in-bank memories.
+- **Letta/MemFS — 2.0:** protection-domain isolation was not characterized.
+- **ReMe + LangMem — 4.0:** ReMe workspaces plus caller-controlled LangMem namespaces fit the intended partitioning, but Ada still owns enforcement.
+- **ReMe + Hindsight — 4.0:** both layers can be partitioned, but duplicate scope enforcement across two stores increases operational care.
+
+#### 4. Retrieval & learning quality
+
+- **ReMe — 3.0:** useful file-native retrieval and Dream concepts, but consolidation integration failed 0/3 in the comparison run.
+- **LangMem — 4.0:** strong structured extraction/update behavior and good conflict preservation; it is not itself the retrieval substrate.
+- **Hindsight — 4.5:** strongest specialized recall/observation capability, fast direct recall, source-fact links, and useful consolidation; local Reflect is too slow and observation semantics need validation.
+- **Letta/MemFS — 3.0:** useful persistent agent-memory behavior, but the comparison focused on persistence rather than proving superior retrieval/learning quality.
+- **ReMe + LangMem — 4.0:** combines adequate file retrieval with the strongest tested semantic update helper without adding a second database service.
+- **ReMe + Hindsight — 4.0:** powerful derived recall, but the score is capped because the composite itself was not exercised and Hindsight's preferred observations can be semantically unsafe.
+
+#### 5. Architecture & operational fit
+
+- **ReMe — 3.0:** local Python path works, but AgentScope is a meaningful dependency/runtime coupling beside PydanticAI.
+- **LangMem — 4.0:** Python, storage-agnostic, and comparatively easy to place behind an Ada-owned interface; LangChain-family dependency remains a cost.
+- **Hindsight — 2.5:** local execution works, but pg0, ONNX embeddings, a service process, substantial dependencies/resource use, and optional Reflect latency add operational weight.
+- **Letta/MemFS — 2.0:** whole-framework adoption introduces Node/Letta runtime coupling alongside Ada's already accepted Python/PydanticAI architecture.
+- **ReMe + LangMem — 2.5:** two dependency ecosystems lower simplicity, but both can remain behind narrow Ada interfaces and avoid a second database service.
+- **ReMe + Hindsight — 2.0:** two subsystems plus database/service/embedding infrastructure is materially heavier for the MVP.
+
+### Interpretation
+
+The frozen matrix supports three decision-relevant options:
+
+1. **ReMe + LangMem — 78/100**
+   - strongest combined fit;
+   - ReMe owns human-readable authoritative Memory;
+   - LangMem is a semantic-change **proposal** helper only;
+   - deterministic provenance/scope/correction validation remains Ada-owned.
+
+2. **ReMe — 72/100**
+   - simplest viable baseline;
+   - strongest demonstrated authoritative substrate;
+   - weaker semantic learning/consolidation can initially be constrained rather than replaced.
+
+3. **ReMe + Hindsight — 72/100**
+   - much stronger specialized retrieval/learning than ReMe alone;
+   - no total-score advantage because operational complexity and unsafe observation consolidation offset that benefit;
+   - best treated as an optional later derived layer if real-world retrieval evidence justifies it.
+
+LangMem and Hindsight remain valuable components despite failing as standalone authoritative architectures. Letta/MemFS remains useful design reference material but current evidence does not justify another characterization round for the MVP.
 
 ## Evidence behind the main score differences
 
@@ -137,7 +214,7 @@ Why it loses points:
 
 ### ReMe + LangMem
 
-This is the strongest evidence-backed composite in the current matrix.
+This is the highest-scoring decision-eligible option under the frozen five-criterion matrix.
 
 Potential role split:
 
@@ -203,11 +280,16 @@ This is very different from writing a complete Ada Memory engine.
 
 ## Next step
 
-1. Score the candidates and evidence-backed composite options against the five frozen 20% criteria.
-2. Document the evidence/rationale for every score.
-3. Calculate weighted totals.
-4. Run a small sensitivity check only for disputed scores, not by changing the agreed weights after seeing the result.
-5. Derive the architecture implication.
+The scoring step is complete.
+
+Before converting the matrix result into an ADR decision:
+
+1. review any **disputed individual scores** against the recorded evidence; do not change the frozen weights after seeing the result;
+2. run a small score-sensitivity check around genuinely disputed cells;
+3. complete the transitive license/security review for the likely dependency path;
+4. define the minimal deterministic validation boundary around LangMem proposals;
+5. close external document-reference/lifecycle fit;
+6. obtain independent review.
 
 ## Remaining gates before ADR acceptance
 
