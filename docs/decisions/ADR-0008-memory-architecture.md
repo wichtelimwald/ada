@@ -1299,7 +1299,19 @@ The executable four-candidate characterization is complete. A **draft weighted d
 
 `research/memory/comparison/decision-matrix.md`
 
-The matrix criteria and weights are now frozen **before candidate scoring**: five deliberately non-overlapping criteria at 20% each — Authoritative Memory fit, Semantic correctness & provenance, Privacy & isolation, Retrieval & learning quality, and Architecture & operational fit. License compatibility remains a hard gate; `Memory != Permission` remains an architecture invariant. Candidate scoring and weighted totals follow only after this freeze.
+The matrix criteria and weights were frozen **before candidate scoring**: five deliberately non-overlapping criteria at 20% each — Authoritative Memory fit, Semantic correctness & provenance, Privacy & isolation, Retrieval & learning quality, and Architecture & operational fit. License compatibility remains a hard gate; `Memory != Permission` remains an architecture invariant.
+
+Scoring is now complete. The decision-eligible results are:
+
+- **ReMe + LangMem: 78/100**
+- **ReMe: 72/100**
+- **ReMe + Hindsight: 72/100**
+
+LangMem and Hindsight are not decision-eligible standalone authoritative architectures because neither provides Ada's required human-readable source of truth. Letta/MemFS remains not decision-ready from current evidence because provenance failed and forget/isolation were not characterized.
+
+The current matrix implication is therefore **ReMe as the authoritative substrate, with LangMem as the strongest optional semantic-change proposal helper**. Hindsight remains an optional later derived-learning/retrieval layer if representative real-world retrieval tests justify its operational cost.
+
+This remains decision evidence, not an Accepted ADR.
 
 Before this ADR can move to Accepted:
 
