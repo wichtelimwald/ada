@@ -1313,6 +1313,22 @@ The current matrix implication is therefore **ReMe as the authoritative substrat
 
 This remains decision evidence, not an Accepted ADR.
 
+### ReMe + LangMem final-fit boundary
+
+Source/dependency review narrowed the leading composite further:
+
+- use pinned `reme-ai[as]==0.4.1.12`; AgentScope is effectively required by ReMe's import graph even though it is packaged as an optional extra;
+- do **not** use `reme-ai[core]`;
+- do **not** expose ReMe's unauthenticated/wildcard-CORS HTTP service as an Ada boundary;
+- run ReMe out of process over **stdio MCP**, with an initial read-only allowlist (`version`, `status`, `search`, `read`);
+- keep authoritative writes Ada-owned and file-native; ReMe observes/indexes the vault;
+- use LangMem only for typed semantic proposals whose schema excludes provenance, privacy scope, authority, permission, lifecycle state, and validity windows;
+- attach source references and lifecycle state deterministically in Ada after proposal validation;
+- enforce patched dependency floors for LangMem's broad ecosystem (`langchain-core>=1.3.3`, `langgraph>=1.0.10,<2`, `langgraph-checkpoint>=4.1.1`);
+- do not use LangGraph persistence, LangSmith, or cloud model providers for this Memory role.
+
+The final executable gate is documented under `research/memory/reme-langmem/` and tests the combined Ada + ReMe + LangMem environment on the target Mac, including exact dependency/license inventory, vulnerability audit, stdio tool restriction, semantic validation, and out-of-band Markdown authority.
+
 Before this ADR can move to Accepted:
 
 1. review/adjust the matrix weights and disputed scores;
