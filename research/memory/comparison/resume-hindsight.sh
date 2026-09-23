@@ -6,6 +6,19 @@ HERE="$ROOT/research/memory/comparison"
 RUN_DIR="${1:-$ROOT/artifacts/research/memory/comparison/latest}"
 OUT="$RUN_DIR/hindsight"
 MODEL="${OLLAMA_MODEL:-qwen3.5:9b}"
+MODE="full"
+
+if [ -f "$OUT/semantic.json" ] && python3 - "$OUT/semantic.json" <<'PY'
+import json
+import sys
+data = json.load(open(sys.argv[1]))
+required = {"preference", "correction", "conflict", "isolation_a_own", "isolation_a_cross", "isolation_b_cross"}
+raise SystemExit(0 if required.issubset(data) and "forget_after" not in data else 1)
+PY
+then
+  MODE="forget-only"
+  echo "Existing clean core evidence found; running only the remaining Hindsight forget scenario."
+fi
 
 if [ ! -d "$RUN_DIR" ] || [ ! -d "$OUT" ]; then
   echo "No existing comparison/Hindsight result found: $RUN_DIR" >&2
@@ -41,6 +54,7 @@ docker run --rm \
   --env OLLAMA_HOST=http://host.docker.internal:11434 \
   --env OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 \
   --env HINDSIGHT_READY_TIMEOUT=420 \
+  --env HINDSIGHT_COMPARE_MODE="$MODE" \
   --env HINDSIGHT_DB_INSTANCE="ada-memcmp-resume-$(date '+%Y%m%d-%H%M%S')" \
   --env PIP_NO_CACHE_DIR=1 \
   "$IMAGE" \
