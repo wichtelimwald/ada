@@ -261,20 +261,21 @@ class LocalChatRuntimeTests(unittest.TestCase):
 
         def make_server(name: str) -> ThreadingHTTPServer:
             class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.1"
+
                 def do_GET(self) -> None:
                     hits.append(f"{name}:GET")
+                    body = b'{"models": [{"name": "qwen3.5:9b"}]}'
                     self.send_response(200)
                     self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
                     self.end_headers()
-                    self.wfile.write(b'{"models": [{"name": "qwen3.5:9b"}]}')
+                    self.wfile.write(body)
 
                 def do_POST(self) -> None:
                     hits.append(f"{name}:POST:{self.path}")
                     self.rfile.read(int(self.headers["Content-Length"]))
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(json.dumps({
+                    body = json.dumps({
                         "id": "chatcmpl-local-test",
                         "object": "chat.completion",
                         "created": 1,
@@ -290,7 +291,12 @@ class LocalChatRuntimeTests(unittest.TestCase):
                             "finish_reason": "stop",
                         }],
                         "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
-                    }).encode())
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
 
                 def log_message(self, *args: object) -> None:
                     pass
