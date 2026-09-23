@@ -15,10 +15,13 @@ python3 research/memory/control/run.py
 The script creates three temporary Git repositories for two private domains
 and one shared domain, then discards them. It uses synthetic text only. Its
 assertions check current-file authority, basic search, a captured direct edit,
-and the persistence of deleted content in Git history. **A successful run is
-not a privacy, forgetting, or retrieval-quality PASS.** The output lists
-those unsolved gates explicitly. Git commit author fields in this fixture
-are synthetic and do not authenticate a real editor.
+and the persistence of deleted content in Git history. This matches ADR-0008's
+accepted distinction: Ada must stop retrieving a forgotten note from current
+Memory and derived indexes; historical versions may remain available for
+recovery, with permanent purge handled separately. **A successful run does
+not prove derived-index forgetting, privacy, or retrieval quality.** The
+output lists those unsolved gates explicitly. Git commit author fields in
+this fixture are synthetic and do not authenticate a real editor.
 
 For a backend decision, compare this control with the ReMe/LangMem run on
 the target Mac using representative vaults and queries. A score must not be
