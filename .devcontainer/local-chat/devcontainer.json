@@ -9,7 +9,8 @@
   "workspaceFolder": "/workspace",
   "remoteUser": "ada",
   "containerEnv": {
-    "PYDANTIC_AI_NO_BANNER": "1"
+    "PYDANTIC_AI_NO_BANNER": "1",
+    "PYTHONPATH": "/workspace/src"
   },
   "runArgs": [
     "--network=host",

@@ -251,7 +251,10 @@ class LocalChatRuntimeTests(unittest.TestCase):
         )
         self.assertIn("Do not invent material details", captured["instructions"])
         self.assertIn("Never claim that a calendar event was created", captured["instructions"])
-        asyncio.run(captured["http_client"].aclose())
+        self.assertEqual(captured["http_client"].timeout.read, 600.0)
+        runtime.close()
+        self.assertTrue(captured["http_client"].is_closed)
+        runtime.close()
 
     def test_local_chat_transport_ignores_proxy_settings(self) -> None:
         hits: list[str] = []
@@ -259,10 +262,35 @@ class LocalChatRuntimeTests(unittest.TestCase):
         def make_server(name: str) -> ThreadingHTTPServer:
             class Handler(BaseHTTPRequestHandler):
                 def do_GET(self) -> None:
-                    hits.append(name)
+                    hits.append(f"{name}:GET")
                     self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
                     self.end_headers()
                     self.wfile.write(b'{"models": [{"name": "qwen3.5:9b"}]}')
+
+                def do_POST(self) -> None:
+                    hits.append(f"{name}:POST:{self.path}")
+                    self.rfile.read(int(self.headers["Content-Length"]))
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({
+                        "id": "chatcmpl-local-test",
+                        "object": "chat.completion",
+                        "created": 1,
+                        "model": "qwen3.5:9b",
+                        "choices": [{
+                            "index": 0,
+                            "message": {"role": "assistant", "content": json.dumps({
+                                "result": {
+                                    "kind": "AgentTextReply",
+                                    "data": {"text": "Local only", "response_type": "chat.reply"},
+                                }
+                            })},
+                            "finish_reason": "stop",
+                        }],
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                    }).encode())
 
                 def log_message(self, *args: object) -> None:
                     pass
@@ -283,31 +311,16 @@ class LocalChatRuntimeTests(unittest.TestCase):
             }):
                 check_local_ollama_ready(LocalOllamaConfig(base_url=url))
 
-                # Inspect the exact client supplied to PydanticAI's provider.
-                captured: dict[str, httpx2.AsyncClient] = {}
-
-                class FakeProvider:
-                    def __init__(self, *, base_url: str, http_client: httpx2.AsyncClient) -> None:
-                        captured["client"] = http_client
-
-                with (
-                    patch("ada.adapters.local_ollama.OllamaProvider", FakeProvider),
-                    patch("ada.adapters.local_ollama.OllamaModel", lambda *a, **kw: object()),
-                    patch("ada.adapters.local_ollama.Agent", lambda *a, **kw: object()),
-                ):
-                    build_local_ollama_runtime(LocalOllamaConfig(base_url=url))
-
-                async def request() -> None:
-                    client = captured["client"]
+                runtime = build_local_ollama_runtime(LocalOllamaConfig(base_url=url))
+                with asyncio.Runner() as runner:
+                    runner.get_loop()
                     try:
-                        response = await client.get(f"http://localhost:{ollama.server_port}/api/tags")
-                        self.assertEqual(response.status_code, 200)
+                        reply = runtime.run(AgentRequest(text="Hello"))
+                        self.assertEqual(reply.text, "Local only")
                     finally:
-                        await client.aclose()
+                        runtime.close()
 
-                asyncio.run(request())
-
-            self.assertEqual(hits, ["ollama", "ollama"])
+            self.assertEqual(hits, ["ollama:GET", f"ollama:POST:/v1/chat/completions"])
         finally:
             proxy.shutdown()
             ollama.shutdown()

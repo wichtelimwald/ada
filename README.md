@@ -131,6 +131,7 @@ For local chat in a container on macOS, select the separate
 with Docker Desktop host networking enabled (Docker Desktop 4.34+):
 
 ```bash
+docker build --target runtime -t ada:dev .
 docker run --rm -it --network=host --cap-drop=ALL \
   --security-opt=no-new-privileges --read-only --tmpfs /tmp:rw,noexec,nosuid \
   --pids-limit=256 ada:dev chat
@@ -145,7 +146,9 @@ local chat rather than exposing Ollama on all interfaces.
 
 The development profile uses a read-only container root with temporary
 home and /tmp; editor extensions stored in the container home do not survive
-a rebuild. The repository bind mount remains writable for development.
+a rebuild. The repository bind mount remains writable for development;
+Python imports the mounted `/workspace/src` so edits take effect without a
+rebuild. Rebuild the image when dependencies or package metadata change.
 
 Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 

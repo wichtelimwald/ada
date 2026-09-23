@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Any, Protocol, Sequence
 
 from ada.core.actions import (
@@ -42,10 +43,12 @@ class PydanticAIRuntime(AgentRuntimePort):
         agent: _PydanticAgentLike,
         *,
         keep_session_history: bool = False,
+        close_callback: Callable[[], None] | None = None,
     ) -> None:
         self._agent = agent
         self._keep_session_history = keep_session_history
         self._message_history: tuple[Any, ...] = ()
+        self._close_callback = close_callback
 
     def run(self, request: AgentRequest) -> AgentResponse:
         if self._keep_session_history and self._message_history:
@@ -75,3 +78,10 @@ class PydanticAIRuntime(AgentRuntimePort):
         """Forget ephemeral conversation context held by this adapter."""
 
         self._message_history = ()
+
+    def close(self) -> None:
+        """Release resources owned by this runtime, once."""
+
+        callback, self._close_callback = self._close_callback, None
+        if callback is not None:
+            callback()

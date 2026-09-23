@@ -105,7 +105,8 @@ Personality instructions are operator-authored model instructions. They are not 
 
 - fastest path from the existing foundation to a genuinely interactive local Ada;
 - reuses a model/runtime combination proven on target hardware, with qwen3.5:9b selected after a direct qwen3:8b comparison;
-- no new Python dependency is required because the existing PydanticAI OpenAI extra supports Ollama;
+- the PydanticAI OpenAI extra supports Ollama; Ada pins its existing transitive
+  `httpx2` transport directly to configure proxy-independent local requests;
 - simple Mac/Linux path;
 - external model-process lifecycle stays out of Ada core.
 

@@ -4,9 +4,9 @@ import json
 import subprocess
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from ada.cli import _chat_loop, build_parser
+from ada.cli import _chat, _chat_loop, build_parser
 from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest, AgentResponse
 
@@ -72,6 +72,33 @@ class FailingRuntime:
 
 
 class CliTests(unittest.TestCase):
+    def test_chat_closes_runtime_on_quit_interrupt_and_failure(self) -> None:
+        for outcome, expected in (
+            (0, 0),
+            (KeyboardInterrupt(), 130),
+            (RuntimeError("boom"), 1),
+        ):
+            with self.subTest(outcome=outcome):
+                runtime = FakeChatRuntime()
+                runtime.close = Mock()
+                with (
+                    patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+                    patch(
+                        "ada.adapters.local_ollama.build_local_ollama_runtime",
+                        return_value=runtime,
+                    ),
+                    patch(
+                        "ada.cli._chat_loop",
+                        side_effect=outcome if isinstance(outcome, BaseException) else None,
+                        return_value=outcome if isinstance(outcome, int) else None,
+                    ),
+                ):
+                    self.assertEqual(
+                        _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1"),
+                        expected,
+                    )
+                runtime.close.assert_called_once_with()
+
     def test_chat_defaults_to_qwen35_9b(self) -> None:
         with patch("ada.cli.os.getenv", side_effect=lambda key, default=None: default):
             args = build_parser().parse_args(["chat"])

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import json
 from urllib.error import HTTPError, URLError
@@ -136,9 +137,10 @@ def build_local_ollama_runtime(
     # The model call must use the same direct-transport rule as readiness.
     # Passing a client also prevents PydanticAI from creating an ambient
     # proxy-aware default client for later requests.
+    http_client = httpx2.AsyncClient(trust_env=False, timeout=600.0)
     provider = OllamaProvider(
         base_url=config.base_url,
-        http_client=httpx2.AsyncClient(trust_env=False),
+        http_client=http_client,
     )
     model = OllamaModel(
         config.model,
@@ -190,4 +192,5 @@ execution.
     return PydanticAIRuntime(
         agent,
         keep_session_history=True,
+        close_callback=lambda: asyncio.run(http_client.aclose()),
     )
