@@ -357,6 +357,31 @@ conflict handling, or authoritative out-of-band reindexing. Rerun the updated
 spike on the target Mac and inspect the proposal if the semantic gate still
 fails. Do not accept ADR-0008 based on this run.
 
+### Triage of the 11 flagged license metadata entries
+
+The inventory's substring classifier is a triage tool, not an SPDX parser.
+The following checks use the **exact installed versions'** published package
+metadata; `cedarpy` is also checked against its release-tagged license file.
+
+| Distribution | Published license / status | Consequence for Ada |
+| --- | --- | --- |
+| [`psycopg` 3.3.6](https://pypi.org/project/psycopg/3.3.6/), [`psycopg-binary` 3.3.6](https://pypi.org/project/psycopg-binary/3.3.6/) | LGPL-3.0-only | Real redistribution obligation; both are already pulled by the accepted `dbos==3.0.0` (`psycopg[binary]>=3.1`). Review binary wheel content and notices before bundling an installer/container. |
+| [`bidict` 0.24.1](https://pypi.org/project/bidict/0.24.1/) | MPL-2.0 | Real file-level copyleft; enters through AgentScope's `python-socketio` dependency. Preserve license/source availability when redistributing. |
+| [`certifi` 2026.7.22](https://pypi.org/project/certifi/2026.7.22/) | MPL-2.0 | Real file-level copyleft and certificate-bundle notice/source review if redistributed. |
+| [`orjson` 3.12.0](https://pypi.org/project/orjson/3.12.0/) | `MPL-2.0 AND (Apache-2.0 OR MIT)` | Mixed-license source; do not treat the whole wheel as freely selectable MIT-only. Verify bundled notice/source obligations. |
+| [`uncalled-for` 0.4.0](https://pypi.org/project/uncalled-for/0.4.0/), [`langmem` 0.0.30](https://pypi.org/project/langmem/0.0.30/), [`beartype` 0.22.9](https://pypi.org/project/beartype/0.22.9/), [`tiktoken` 0.14.0](https://pypi.org/project/tiktoken/0.14.0/) | MIT in published license text | The classifier's weak-copyleft label is a metadata false positive. Normal MIT notice preservation remains. |
+| [`json5` 0.15.0](https://pypi.org/project/json5/0.15.0/) | Apache-2.0 for package code; some benchmarks use MIT | The weak-copyleft label is a metadata false positive. Check whether separately licensed benchmark data is present in any redistributed artifact. |
+| [`cedarpy` 4.12.0](https://github.com/k9securityio/cedar-py/blob/v4.12.0/LICENSE) | Apache-2.0 in the release-tagged LICENSE; package metadata omits it | Already adopted through ADR-0004 / `NOTICE.md`; this is a metadata gap, not an unknown project license. |
+
+Mozilla's [MPL 2.0 FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/)
+explains that MPL files can be combined with differently licensed files while
+the MPL obligations stay with those files. This is a **preliminary license
+triage**, not a complete binary-wheel/SBOM redistribution audit or legal
+sign-off. No newly identified metadata-level hard blocker for Ada's MIT-owned
+code is apparent, but LGPL/MPL distribution obligations and notices remain a
+hard gate before adoption/packaging. No ReMe/LangMem production dependency has
+been adopted by this research PR.
+
 ## 7. Current decision gate
 
 The first executable run exposed unresolved stdio and semantic findings above.
