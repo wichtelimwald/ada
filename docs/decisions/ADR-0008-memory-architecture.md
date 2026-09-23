@@ -1331,6 +1331,25 @@ Among the **scored** options, the current matrix points to ReMe as the file-nati
 
 This remains decision evidence, not an Accepted ADR.
 
+A dependency-free [Markdown/Git/direct-search control](../../research/memory/control/README.md)
+now exercises the same synthetic preference, correction, contradiction, and
+direct-edit cases. It succeeds at reading current files after a direct edit,
+preserving separate conflicting notes, and detecting a change in Git diff.
+Its explicit capture step is not an automatic watcher. Deleting a note leaves
+the content in Git history; separate repositories under the same OS identity
+do not enforce household privacy. Its search relevance and scale remain
+unmeasured. No numeric score or Memory-backend selection follows from this
+small control run.
+
+**Proposed staged MVP direction:** retain Markdown as the single human-editable
+authority, with source information adjacent to Ada-created claims, direct
+reads and basic search first. Treat per-domain Git history as a candidate
+change record subject to a verified capture, forgetting, and retention design.
+Add ReMe only when representative retrieval/indexing evidence justifies its
+AgentScope dependency; add LangMem only when a bounded semantic proposal
+helper demonstrably outperforms the simplest safe Ada-owned validation path.
+The recommendation must be revisited if the control fails required scenarios.
+
 ### ReMe + LangMem final-fit boundary
 
 Source/dependency review narrowed the leading composite further:
@@ -1365,8 +1384,14 @@ artifact evidence. No license distribution clearance is claimed.
 Before this ADR can move to Accepted:
 
 1. review/adjust the matrix weights and disputed scores;
-2. complete exact transitive license/security review for the intended dependency path;
-3. define the smallest deterministic validation boundary around semantic proposals;
-4. close external document-reference/lifecycle fit;
-5. obtain independent review;
-6. receive explicit maintainer acceptance.
+2. evaluate the control against representative retrieval/edit/forget scenarios
+   on the target platform, without inventing scores for missing evidence;
+3. define how out-of-band edits are captured, how old source references are
+   retired, and how Git history and backups interact with deliberate forgetting;
+4. demonstrate enforceable per-person protection domains and scoped indexes,
+   not only different folders or read-only MCP tool names;
+5. complete license/security review for the selected dependency path and
+   intended release scope; a published image requires separate artifact review;
+6. define the smallest deterministic validation boundary around semantic
+   proposals and close external document-reference/lifecycle fit;
+7. obtain independent review and explicit maintainer acceptance.
