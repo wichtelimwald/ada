@@ -1327,7 +1327,7 @@ Scoring is now complete. The decision-eligible results are:
 
 LangMem and Hindsight are not decision-eligible standalone authoritative architectures because neither provides Ada's required human-readable source of truth. Letta/MemFS remains not decision-ready from current evidence because provenance failed and forget/isolation were not characterized.
 
-The current matrix implication is therefore **ReMe as the authoritative substrate, with LangMem as the strongest optional semantic-change proposal helper**. Hindsight remains an optional later derived-learning/retrieval layer if representative real-world retrieval tests justify its operational cost.
+Among the **scored** options, the current matrix points to ReMe as the file-native reader/indexer with LangMem as an optional semantic-change proposal helper. The simpler Markdown + captured history + basic-search control is unscored. A backend decision must compare it before requiring either added component. Hindsight remains an optional later derived-learning/retrieval layer if representative real-world retrieval tests justify its operational cost.
 
 This remains decision evidence, not an Accepted ADR.
 
@@ -1346,6 +1346,21 @@ Source/dependency review narrowed the leading composite further:
 - do not use LangGraph persistence, LangSmith, or cloud model providers for this Memory role.
 
 The combined executable gate under `research/memory/reme-langmem/` **passed on the target Mac** (2026-09-23, head `be34013`). The pinned dependencies installed together with Ada; the stdio tool allowlist, synthetic correction and conflict handling, silent-overwrite rejection, and retrieval after an out-of-band file edit passed. `pip-audit` reported zero known vulnerabilities for the dependencies it listed. The research [fit review](../../research/memory/reme-langmem/findings.md) records the raw-run limitations: this is a single synthetic vault; the fixture repeats source/history metadata in YAML and Markdown, which a production schema must avoid; the Friday edit also leaves old source references without new Friday provenance, an issue that persists even without duplicate fields. Metadata-level license triage is not a redistributed-wheel audit. This is evidence for the candidate, not adoption or a general proof of semantic integrity.
+
+A second target-Mac run (2026-09-23, head `fde552f`) passed both the YAML
+comparison lane and the new **Markdown-only** lane. The latter repeated the
+synthetic preference/correction/conflict/overwrite/edit checks with source
+references adjacent to the current claim and no claim YAML. Its scripted
+direct edit removed the obsolete source line and was captured by a local Git
+diff; ReMe read/search returned the edited Markdown. This does not prove
+automatic capture of real user edits, human identity, forgetting, protection
+domain enforcement, or retrieval quality at scale. Dependency-path triage
+places `psycopg` and `psycopg-binary` in Ada's reconstructed DBOS baseline,
+`certifi` in its PydanticAI baseline, and newly attributes `bidict` to ReMe's
+AgentScope tree and `orjson` to LangMem's LangSmith tree. The installed macOS
+`psycopg-binary` package includes several native libraries; their exact
+redistribution obligations remain open. See the fit review for paths and
+artifact evidence. No license distribution clearance is claimed.
 
 Before this ADR can move to Accepted:
 

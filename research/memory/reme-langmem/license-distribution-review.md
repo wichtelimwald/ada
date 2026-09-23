@@ -4,18 +4,27 @@ Status: **conditional / open for redistribution** (2026-09-23). This is a
 research candidate assessment, not adoption, a license PASS, or legal advice.
 The combined Mac run passed its behavioral checks and reported no known
 `pip-audit` vulnerabilities; neither result clears distribution licenses.
-The recorded `REVIEW-BUNDLE.txt` reports versions and license metadata, but
-does not contain the full dependency graph, installed wheel file lists, or a
-redistributable release artifact. The exact installed artifacts must be
-checked before the project can close the license gate in `NOTICE.md`.
+The new `REVIEW-BUNDLE(20260923-144155).txt` reports versions, behavior, and
+license metadata. The separately uploaded `license-paths(1).txt` adds paths
+reconstructed from the combined installation and installed package file
+lists. Neither upload supplies the full license/notice **contents**, a
+redistributable release artifact, or license attribution for each native
+library. Those must be checked before the project can close the gate in
+`NOTICE.md`.
 
 | Distribution in combined Mac run | License and route | Decision / remaining evidence |
 | --- | --- | --- |
-| `psycopg==3.3.6` | `LGPL-3.0-only`; already required by adopted `dbos==3.0.0` through `psycopg[binary]` according to the research dependency analysis. | **Existing baseline obligation.** Verify the installed package's license text, source availability, and the chosen distribution method. Record this transitive obligation for DBOS too; do not attribute it solely to the memory candidates. |
-| `psycopg-binary==3.3.6` | `LGPL-3.0-only`; optional compiled Psycopg implementation selected by the `binary` extra. | **Existing baseline obligation plus bundled-library review.** Psycopg documents that this variant includes required native libraries. Inventory the exact macOS arm64 wheel's native files and their own licenses, source/notice and LGPL linking requirements. Repeat for each release platform; a macOS wheel does not clear a Linux container. |
-| `bidict==0.24.1` | `MPL-2.0`; preliminary route `reme-ai[as]` → `agentscope` → `python-socketio` → `bidict`. | **Memory candidate addition, pending graph confirmation.** If redistributed, preserve MPL-covered source and provide recipients a way to obtain it, including modifications if any. This does not relicense Ada-owned files. |
-| `certifi==2026.7.22` | `MPL-2.0`; exact Ada baseline / candidate route **not yet established** by the uploaded bundle. | **Attribution open.** Trace its installed dependency path; review certificate bundle and license files in the actual wheel and source-availability notice for any redistribution. |
-| `orjson==3.12.0` | `MPL-2.0 AND (Apache-2.0 OR MIT)`; exact Ada baseline / candidate route **not yet established** by the uploaded bundle. | **Attribution and artifact review open.** The package as a whole cannot be recorded as MIT-only. Inspect which files and native artifacts carry MPL versus Apache/MIT, preserve required notices and make MPL-covered source available when distributing a wheel. |
+| `psycopg==3.3.6` | `LGPL-3.0-only`; in the reconstructed Ada baseline: `ada-assistant` → `dbos` → `psycopg`. | **Existing baseline obligation.** The installed package lists `licenses/LICENSE.txt`. Verify license contents, source availability, and the chosen distribution method. Do not attribute it solely to the memory candidates. |
+| `psycopg-binary==3.3.6` | `LGPL-3.0-only`; reconstructed Ada route continues from `psycopg` → `psycopg-binary`. | **Existing baseline plus bundled-library review.** Its installed macOS file list includes `libpq`, `libssl`/`libcrypto`, Kerberos/GSSAPI, LDAP, and related `.dylib` files. Inspect their own licenses, notices, source and LGPL obligations in the exact wheel. Repeat for each release platform; this macOS installation does not clear a Linux container. |
+| `bidict==0.24.1` | `MPL-2.0`; newly attributed in the installed graph to `reme-ai` → `agentscope` → `python-socketio` → `bidict`. | **Memory candidate addition.** The installed distribution lists a `LICENSE` file. If redistributed, review MPL-covered source and recipient access, including modifications if any. This does not relicense Ada-owned files. |
+| `certifi==2026.7.22` | `MPL-2.0`; already reachable in the reconstructed Ada baseline through `pydantic-ai-slim` → `tiktoken` → `requests` → `certifi` (also reached through ReMe → `httpx`). | **Existing baseline obligation.** Its installed distribution lists a `LICENSE` file. Review actual wheel contents, certificate bundle, and any notice/source obligations before redistribution. |
+| `orjson==3.12.0` | `MPL-2.0 AND (Apache-2.0 OR MIT)`; newly attributed in the installed graph to `langmem` → `langsmith` → `orjson`. | **Memory candidate addition, artifact review open.** The installed package lists three license files and a native `.so`; the package cannot be recorded as MIT-only. Inspect file-level licensing, notices, and MPL-covered source for the exact wheel before redistribution. |
+
+The `BASELINE`/`NEW` distinction is computed from **combined-install metadata**
+using Ada's declared requirements; no Ada-only environment was independently
+installed. Paths establish dependency attribution, not actual runtime use or
+redistribution compliance. File lists establish names, not the files' license
+terms or bundled third-party source obligations.
 
 The official [Psycopg binary documentation](https://www.psycopg.org/psycopg3/docs/api/pq.html)
 confirms bundled native libraries. [Psycopg's package metadata](https://pypi.org/project/psycopg/3.3.6/),
@@ -57,8 +66,9 @@ silently giving a partial graph when installed metadata is missing.
 
 ## Closure criteria for packaging or adoption
 
-1. Confirm all five exact dependency routes against the installed graph and
-   distinguish already adopted DBOS transitive obligations from new additions.
+1. The five paths are traced for this combined installation. Recheck the
+   baseline with an independent Ada-only install if the classification affects
+   a distribution decision, and redo attribution when pinned versions change.
 2. Inspect license and notice **contents**, not merely their filenames, plus
    binary/native files in the exact wheels for each intended target platform.
    Identify third-party libraries bundled in wheels and their distribution

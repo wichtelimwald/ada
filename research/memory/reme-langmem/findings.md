@@ -470,22 +470,34 @@ minimized evidence adjacent to the claim in one human-readable unit. The exact
 representation and confirmation policy remain open; this is a design finding,
 not an added production schema.
 
-### Pending Markdown-only comparison
+### Markdown-only comparison on the target Mac (2026-09-23, head `fde552f`)
 
-The target-Mac runner now checks an explicit preference and repeats correction,
-unresolved-conflict, silent-overwrite rejection, ReMe read/search, and
-out-of-band edit checks in a
-second isolated vault containing Markdown without YAML front matter. Its
-Ada-created current claim carries one adjacent source line; a direct edit
-removes that source line and records the difference in synthetic local Git
-history. The original YAML lane remains intact for comparison. This new lane
-has not yet been run on the target Mac, so its ReMe indexing and semantic
-results are **unknown**. Even a pass would not prove human editor identity,
-automatic capture of every real-world edit, arbitrary claim reconciliation,
-or privacy-safe retention of old revisions. The prior standalone ReMe forget
-and two-vault isolation gates used YAML-backed fixtures; the combined
-Markdown-only lane does not repeat them. They remain separate checks before a
-Markdown-only production choice.
+The uploaded `REVIEW-BUNDLE(20260923-144155).txt` records **PASS** for both the
+original YAML-backed integration and the additional Markdown-only integration
+on macOS arm64 / Python 3.14.4, from head `fde552f`. In each isolated synthetic
+vault, the explicit preference, Wednesday-to-Thursday correction, separate
+16:00/17:00 pickup claims, silent-overwrite rejection, and ReMe read/search
+after an out-of-band Friday edit passed. The stdio interface exposed exactly
+the four read-only tools. The dependency/version floors passed, and
+`pip-audit` reported zero known vulnerability records among the packages it
+listed; 11 flagged license metadata entries were only preliminarily triaged.
+
+The Markdown-only current claim has one adjacent source line and **no YAML
+front matter**. The scripted direct edit removes the Thursday source when it
+changes the current claim to Friday. ReMe then reads/searches the Friday text
+without the retired current-source line. A synthetic local Git history records
+the initial files, Ada's accepted writes, and the direct edit; its diff shows
+both the changed time and removed source. The original YAML fixture still
+carries obsolete source links after the Friday edit, illustrating the
+previously identified drift. This result supports the narrower, single-format
+representation, not the assertion that ReMe or LangMem is required for it.
+
+The editor and commits were scripted; Git metadata does not establish a human
+identity or ensure that arbitrary external changes are captured. The prior
+standalone ReMe forget and two-vault isolation gates used YAML-backed
+fixtures; the combined Markdown-only lane does not repeat them. Realistic
+forgetting, privacy boundaries, edit capture, multi-claim reconciliation,
+history retention, and larger-vault retrieval remain open.
 
 **Simplification hypothesis:** for an MVP, ordinary Markdown files and
 per-protection-domain Git history can provide inspectable current state and
