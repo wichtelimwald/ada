@@ -1295,4 +1295,19 @@ This moves the remaining ReMe decision work away from basic runtime feasibility 
 
 No Memory backend is adopted by this draft.
 
-The next step is evidence-driven characterization of the file-native control path and the strongest reuse candidates, followed by an agreed weighted matrix and independent review before this ADR can move to Accepted.
+The executable four-candidate characterization is complete. A **draft weighted decision matrix** now lives at:
+
+`research/memory/comparison/decision-matrix.md`
+
+Its proposed weighting currently favors a reuse-first **ReMe + LangMem** role split, with ReMe as file-native authoritative substrate and LangMem as a structured semantic-change proposal helper behind deterministic provenance/scope validation. ReMe alone remains the strongest single-framework substrate. Hindsight is retained as an optional derived-learning/recall candidate rather than authoritative truth; Letta/MemFS remains a strong design reference.
+
+Those are draft decision implications, not an accepted architecture.
+
+Before this ADR can move to Accepted:
+
+1. review/adjust the matrix weights and disputed scores;
+2. complete exact transitive license/security review for the intended dependency path;
+3. define the smallest deterministic validation boundary around semantic proposals;
+4. close external document-reference/lifecycle fit;
+5. obtain independent review;
+6. receive explicit maintainer acceptance.
