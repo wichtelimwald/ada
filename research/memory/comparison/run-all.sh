@@ -108,6 +108,8 @@ run_container_lane langmem python:3.14-slim
 
 HINDSIGHT_IMAGE="ada-memory-hindsight:0.10.1"
 if [ "$DOCKER_OK" = true ] && docker build \
+  --build-arg HOST_UID="$(id -u)" \
+  --build-arg HOST_GID="$(id -g)" \
   -t "$HINDSIGHT_IMAGE" \
   -f "$HERE/hindsight/Dockerfile" \
   "$HERE/hindsight" \
