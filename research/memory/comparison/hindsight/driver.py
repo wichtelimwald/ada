@@ -14,6 +14,7 @@ base_url, fixture_path, out_path = sys.argv[1:4]
 ready_timeout = int(sys.argv[4]) if len(sys.argv) > 4 else 420
 fixtures = json.loads(Path(fixture_path).read_text())
 run_reflect = os.environ.get("HINDSIGHT_COMPARE_REFLECT", "0") == "1"
+mode = os.environ.get("HINDSIGHT_COMPARE_MODE", "full")
 out = Path(out_path)
 out.mkdir(parents=True, exist_ok=True)
 semantic_path = out / "semantic.json"
@@ -79,6 +80,58 @@ def recall(bid, query):
             max_tokens=2500,
         )
     )
+
+
+def delete_document_http(bid, document_id):
+    delete_url = (
+        f"{base_url}/v1/default/banks/{urllib.parse.quote(bid, safe='')}"
+        f"/documents/{urllib.parse.quote(document_id, safe='')}"
+    )
+    request = urllib.request.Request(delete_url, method="DELETE")
+    with urllib.request.urlopen(request, timeout=120) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+if mode == "forget-only":
+    if not semantic_path.exists():
+        raise RuntimeError("forget-only mode requires an existing semantic.json")
+    result = json.loads(semantic_path.read_text())
+    required = {
+        "preference",
+        "correction",
+        "conflict",
+        "isolation_a_own",
+        "isolation_a_cross",
+        "isolation_b_cross",
+    }
+    missing = sorted(required - set(result))
+    if missing:
+        raise RuntimeError(f"forget-only mode missing prior core results: {missing}")
+
+    bf = bank("forget-final")
+    retain(bf, fixtures["forget"], "forget-doc")
+    result["forget_before"] = recall(bf, "MEMCMP_FORGET_91C6E3")
+    save()
+    result["forget_delete"] = delete_document_http(bf, "forget-doc")
+    save()
+    time.sleep(1)
+    result["forget_after"] = recall(bf, "MEMCMP_FORGET_91C6E3")
+    result.setdefault("meta", {})["core_semantics_completed"] = True
+    result["meta"]["forget_completed_in_isolated_retry"] = True
+    result.setdefault(
+        "correction_reflect",
+        {
+            "status": "skipped",
+            "reason": "optional benchmark disabled; prior local qwen3.5:9b reflect exceeded practical latency",
+        },
+    )
+    result.setdefault(
+        "conflict_reflect",
+        {"status": "skipped", "reason": "optional benchmark disabled"},
+    )
+    save()
+    client.close()
+    raise SystemExit(0)
 
 
 def optional_reflect(bid, query):
@@ -150,17 +203,9 @@ save()
 result["forget_before"] = recall(bf, "MEMCMP_FORGET_91C6E3")
 save()
 
-# The generated low-level Documents API is async-only and its aiohttp session is
-# created by the sync Hindsight client's internal event-loop wrappers. Calling it
-# through a fresh asyncio.run() therefore crosses loop ownership. Exercise the
-# documented HTTP endpoint directly instead of testing an invalid client usage.
-delete_url = (
-    f"{base_url}/v1/default/banks/{urllib.parse.quote(bf, safe='')}"
-    f"/documents/{urllib.parse.quote('forget-doc', safe='')}"
-)
-request = urllib.request.Request(delete_url, method="DELETE")
-with urllib.request.urlopen(request, timeout=120) as response:
-    result["forget_delete"] = json.loads(response.read().decode("utf-8"))
+# The generated low-level Documents API is async-only. Exercise the documented
+# HTTP endpoint directly from this synchronous characterization driver.
+result["forget_delete"] = delete_document_http(bf, "forget-doc")
 save()
 
 time.sleep(1)
@@ -195,3 +240,4 @@ else:
         "reason": "optional benchmark disabled",
     }
 save()
+client.close()
