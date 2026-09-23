@@ -1,0 +1,36 @@
+extends: default
+
+# ReMe + LangMem architecture characterization.
+#
+# ReMe is deliberately exposed only over stdio MCP. No HTTP listener, Studio,
+# write, move, delete, auto_memory, or auto_dream tool is exposed to Ada.
+# Authoritative writes in this spike are performed by the Ada-side validator
+# directly against the synthetic Markdown vault; ReMe observes/indexes them.
+service:
+  backend: mcp
+  transport: stdio
+  jobs: [version, status, search, read]
+  tool_error_on_failure: true
+
+components:
+  as_llm:
+    default:
+      backend: ollama
+      model: ${OLLAMA_MODEL_NAME:-qwen3.5:9b}
+      stream: true
+      context_size: 32768
+      max_retries: 1
+      credential:
+        host: ${OLLAMA_HOST:-http://127.0.0.1:11434}
+      parameters:
+        max_tokens: 2048
+        thinking_enable: false
+
+  agent_wrapper:
+    default:
+      react_config:
+        max_iters: 4
+      context_config:
+        trigger_ratio: 0.8
+        reserve_ratio: 0.1
+        tool_result_limit: 8000
