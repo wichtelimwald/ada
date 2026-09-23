@@ -118,7 +118,13 @@ Because all criteria are equally weighted, the weighted result is simply the mea
 
 ### Interpretation
 
-The frozen matrix supports three decision-relevant options:
+The Markdown + captured Git history + basic-search control is not scored in
+this matrix. Its omission matters: a six-point lead for ReMe + LangMem over
+ReMe alone does not establish that either component is necessary for Ada's
+MVP. Measure the control against the same hard gates and criteria before a
+backend decision; do not assign it hypothetical points.
+
+The frozen matrix supports three scored ReMe-containing options:
 
 1. **ReMe + LangMem — 78/100**
    - strongest combined fit;
@@ -127,7 +133,7 @@ The frozen matrix supports three decision-relevant options:
    - deterministic provenance/scope/correction validation remains Ada-owned.
 
 2. **ReMe — 72/100**
-   - simplest viable baseline;
+   - simplest scored framework baseline;
    - strongest demonstrated authoritative substrate;
    - weaker semantic learning/consolidation can initially be constrained rather than replaced.
 

@@ -13,6 +13,7 @@ import importlib.metadata as md
 import json
 import os
 import re
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -33,12 +34,14 @@ SRC_WED = "COMBO_SRC_WED_3B021C"
 SRC_THU = "COMBO_SRC_THU_8C17A4"
 SRC_16 = "COMBO_SRC_PICKUP16_29AF10"
 SRC_17 = "COMBO_SRC_PICKUP17_BD74E1"
+SRC_PREF = "MEMCMP_PREF_5E39C2"
 
 MARK_WED = "COMBO_CURRENT_WED_1CC802"
 MARK_THU = "COMBO_CURRENT_THU_06C84F"
 MARK_FRI = "COMBO_CURRENT_FRI_MANUAL_E7A901"
 MARK_16 = "COMBO_PICKUP_16_4EF201"
 MARK_17 = "COMBO_PICKUP_17_1AD637"
+MARK_PREF = "COMBO_PREF_14AE7C"
 
 
 class MemoryRecord(BaseModel):
@@ -54,13 +57,35 @@ def write_json(path: Path, value: object) -> None:
     path.write_text(json.dumps(value, indent=2, ensure_ascii=False, default=str) + "\n", encoding="utf-8")
 
 
-def atomic_markdown(path: Path, metadata: dict, body: str) -> None:
+def atomic_markdown(path: Path, metadata: dict, body: str, *, plain: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    frontmatter = yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True).strip()
-    text = f"---\n{frontmatter}\n---\n\n{body.rstrip()}\n"
+    if plain:
+        text = body.rstrip() + "\n"
+        if text.startswith("---\n"):
+            raise ValueError("Plain Markdown fixture must have no front matter")
+    else:
+        frontmatter = yaml.safe_dump(metadata, sort_keys=False, allow_unicode=True).strip()
+        text = f"---\n{frontmatter}\n---\n\n{body.rstrip()}\n"
     tmp = path.with_suffix(path.suffix + ".tmp")
     tmp.write_text(text, encoding="utf-8")
     os.replace(tmp, path)
+
+
+def git(workspace: Path, *args: str) -> str:
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_AUTHOR_NAME": "Synthetic fixture", "GIT_AUTHOR_EMAIL": "fixture@example.invalid",
+           "GIT_COMMITTER_NAME": "Synthetic fixture", "GIT_COMMITTER_EMAIL": "fixture@example.invalid"}
+    result = subprocess.run(
+        ["git", *args], cwd=workspace, env=env, check=True, capture_output=True, text=True,
+    )
+    return result.stdout.strip()
+
+
+def commit_fixture(workspace: Path, label: str) -> str:
+    paths = ("music-lesson.md", "pickup-16.md", "pickup-17.md", "preference.md")
+    git(workspace, "add", "--", *(f"digest/personal/{p}" for p in paths if (workspace / "digest/personal" / p).exists()))
+    git(workspace, "commit", "-q", "-m", label)
+    return git(workspace, "rev-parse", "HEAD")
 
 
 def version_key(value: str) -> tuple[int, ...]:
@@ -273,12 +298,14 @@ async def wait_search(
 async def integration(args: argparse.Namespace) -> None:
     out = args.out
     workspace = args.workspace
+    plain = args.variant == "markdown-only"
     out.mkdir(parents=True, exist_ok=True)
     workspace.mkdir(parents=True, exist_ok=True)
 
     music_path = workspace / "digest/personal/music-lesson.md"
     pickup_16_path = workspace / "digest/personal/pickup-16.md"
     pickup_17_path = workspace / "digest/personal/pickup-17.md"
+    preference_path = workspace / "digest/personal/preference.md"
 
     initial_music = MemoryRecord(kind="fact", subject="music-lesson", statement="music lesson is Wednesday at 17:00")
     initial_pickup = MemoryRecord(kind="fact", subject="pickup-time", statement="pickup is at 16:00")
@@ -293,7 +320,9 @@ async def integration(args: argparse.Namespace) -> None:
             "confirmation_basis": "explicit_user",
             "source_refs": [SRC_WED],
         },
-        f"# Music lesson\n\nCurrent: Wednesday at 17:00\n\nSource: {SRC_WED}\n\nIndex canary: {MARK_WED}",
+        f"# Music lesson\n\nCurrent: Wednesday at 17:00\n\n"
+        f"{'Source for current claim' if plain else 'Source'}: {SRC_WED}\n\nIndex canary: {MARK_WED}",
+        plain=plain,
     )
     atomic_markdown(
         pickup_16_path,
@@ -306,7 +335,11 @@ async def integration(args: argparse.Namespace) -> None:
             "source_refs": [SRC_16],
         },
         f"# Pickup claim\n\nClaim: pickup is at 16:00\n\nSource: {SRC_16}\n\nIndex canary: {MARK_16}",
+        plain=plain,
     )
+    if plain:
+        git(workspace, "init", "-q")
+        initial_revision = commit_fixture(workspace, "fixture: initial notes")
 
     os.environ["OLLAMA_MODEL_NAME"] = args.model
     os.environ["OLLAMA_HOST"] = args.ollama_host
@@ -323,8 +356,9 @@ async def integration(args: argparse.Namespace) -> None:
 
     evidence: dict = {
         "boundary": {
+            "variant": args.variant,
             "transport": "stdio-mcp",
-            "authoritative_store": "Markdown/YAML",
+            "authoritative_store": "Markdown without front matter" if plain else "Markdown/YAML",
             "reme_role": "read/search/index only",
             "internal_reme_index_job": "index_update_loop",
             "langmem_role": "typed semantic proposal only",
@@ -333,6 +367,8 @@ async def integration(args: argparse.Namespace) -> None:
         },
         "result": "INCOMPLETE",
     }
+    if plain:
+        evidence["git_history"] = {"initial_revision": initial_revision}
 
     async with Client(transport, timeout=120) as client:
         tools = await client.list_tools()
@@ -357,6 +393,28 @@ async def integration(args: argparse.Namespace) -> None:
         evidence["initial_search"] = await wait_search(client, MARK_WED, contains=MARK_WED)
 
         mem_manager = manager(args.model, args.ollama_host)
+
+        preference_items = await asyncio.to_thread(
+            mem_manager.invoke,
+            {"messages": [{"role": "user", "content": "Explicit preference: I prefer concise status updates."}]},
+        )
+        preference_rows = proposal_rows(preference_items)
+        evidence["preference"] = {"proposal": preference_rows, "validated": False}
+        write_json(out / "integration.json", evidence)
+        if (len(preference_rows) != 1 or preference_rows[0]["kind"] != "preference"
+                or "concise" not in preference_rows[0]["statement"].lower()
+                or "status" not in preference_rows[0]["statement"].lower()
+                or SRC_PREF in json.dumps(preference_rows)):
+            raise RuntimeError("LangMem preference proposal failed semantic/source validation")
+        atomic_markdown(
+            preference_path,
+            {"name": "Response style", "state": "confirmed", "source_refs": [SRC_PREF]},
+            f"# Response style\n\nPreference: I prefer concise status updates.\n\n"
+            f"Source: {SRC_PREF}\n\nIndex canary: {MARK_PREF}",
+            plain=plain,
+        )
+        evidence["preference"]["validated"] = True
+        evidence["preference_search"] = await wait_search(client, MARK_PREF, contains=MARK_PREF)
 
         correction_items = await asyncio.to_thread(
             mem_manager.invoke,
@@ -397,12 +455,16 @@ async def integration(args: argparse.Namespace) -> None:
                 "superseded": [{"statement": initial_music.statement, "source_ref": SRC_WED}],
             },
             (
+                f"# Music lesson\n\nCurrent: Thursday at 17:00\n\n"
+                f"Source for current claim: {SRC_THU}\n\nIndex canary: {MARK_THU}"
+                if plain else
                 "# Music lesson\n\n"
                 "Current: Thursday at 17:00\n\n"
                 "Previous (superseded): Wednesday at 17:00\n\n"
                 f"Sources: {SRC_WED}, {SRC_THU}\n\n"
                 f"Index canary: {MARK_THU}"
             ),
+            plain=plain,
         )
         evidence["corrected_search"] = await wait_search(client, MARK_THU, contains=MARK_THU)
 
@@ -457,17 +519,42 @@ async def integration(args: argparse.Namespace) -> None:
                     "source_refs": [source_ref],
                 },
                 f"# Pickup claim\n\nClaim: {claim}\n\nSource: {source_ref}\n\nIndex canary: {marker}",
+                plain=plain,
             )
 
         evidence["conflict_search_16"] = await wait_search(client, MARK_16, contains=MARK_16)
         evidence["conflict_search_17"] = await wait_search(client, MARK_17, contains=MARK_17)
+
+        if plain:
+            evidence["git_history"]["ada_revision"] = commit_fixture(workspace, "fixture: Ada accepted correction and conflict")
+            write_json(out / "integration.json", evidence)
 
         # Out-of-band edit is authoritative. ReMe must re-index it without any
         # LangMem or ReMe model-mediated write.
         text = music_path.read_text(encoding="utf-8")
         text = text.replace("Current: Thursday at 17:00", "Current: Friday at 17:00")
         text = text.replace(MARK_THU, MARK_FRI)
+        if plain:
+            old_source = f"Source for current claim: {SRC_THU}\n\n"
+            if text.count(old_source) != 1:
+                raise RuntimeError("Expected exactly one current source to retire after direct edit")
+            text = text.replace(old_source, "")
         music_path.write_text(text, encoding="utf-8")
+        if plain:
+            history = evidence["git_history"]
+            history["manual_revision"] = commit_fixture(workspace, "fixture: direct edit of music lesson")
+            diff = git(workspace, "diff", history["ada_revision"], history["manual_revision"], "--", "digest/personal/music-lesson.md")
+            if (f"-Current: Thursday at 17:00" not in diff
+                    or f"+Current: Friday at 17:00" not in diff
+                    or f"-Source for current claim: {SRC_THU}" not in diff):
+                raise RuntimeError("Git history did not capture the direct edit and retired source")
+            history["manual_diff"] = diff
+            if SRC_THU in text or text.startswith("---\n"):
+                raise RuntimeError("Direct edit retained stale current evidence or YAML")
+            for path in (music_path, pickup_16_path, pickup_17_path, preference_path):
+                if path.read_text(encoding="utf-8").startswith("---\n"):
+                    raise RuntimeError(f"Plain Markdown variant gained YAML: {path}")
+            write_json(out / "integration.json", evidence)
         evidence["outside_edit_search"] = await wait_search(
             client,
             MARK_FRI,
@@ -481,6 +568,8 @@ async def integration(args: argparse.Namespace) -> None:
         )
         if "Current: Friday at 17:00" not in evidence["outside_edit_read"]:
             raise RuntimeError("ReMe read did not return authoritative out-of-band edit")
+        if plain and SRC_THU in evidence["outside_edit_read"]:
+            raise RuntimeError("ReMe read returned the retired current source after direct edit")
 
         evidence["status"] = await call_text(client, "status", {})
 
@@ -556,7 +645,9 @@ def summarize(result_dir: Path) -> None:
         "pip-freeze.txt",
         "inventory.json",
         "integration/integration.json",
+        "integration-markdown/integration.json",
         "logs/integration.log",
+        "logs/integration-markdown.log",
         "pip-audit.json",
         "pip-audit.log",
     ):
@@ -564,7 +655,7 @@ def summarize(result_dir: Path) -> None:
         if not path.exists():
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        if filename == "logs/integration.log":
+        if filename.startswith("logs/integration"):
             text = "\n".join(text.splitlines()[-100:])
         if filename == "inventory.json":
             try:
@@ -599,6 +690,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", required=True)
     p.add_argument("--ollama-host", required=True)
     p.add_argument("--out", type=Path, required=True)
+    p.add_argument("--variant", choices=("yaml", "markdown-only"), default="yaml")
     p.set_defaults(func=lambda a: asyncio.run(integration(a)))
 
     p = sub.add_parser("summary")

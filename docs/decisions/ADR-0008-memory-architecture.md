@@ -978,11 +978,14 @@ Detailed source findings are tracked in:
 
 No candidate is selected by this draft.
 
-### A. Ada-owned file-native Memory + derived SQLite index — control option
+### A. Ada-owned file-native Memory + optional derived index — control option
 
 Concept:
 
 - authoritative Markdown notes in a user-controlled Memory directory/vault;
+- a simpler MVP baseline uses direct Markdown reads and basic search first,
+  with captured per-domain Git history for direct edits; a derived index is
+  added only when measured retrieval needs justify it;
 - optional YAML properties/front matter only for distinct fields with one canonical representation; manually edited claims need no separate YAML provenance;
 - dedicated YAML/TOML records only where a narrow data type genuinely benefits from them;
 - no mandatory fixed ontology beyond the minimum metadata required for safety and scope isolation;
@@ -1000,9 +1003,18 @@ Potential strengths:
 - derived index can be destroyed and rebuilt;
 - Ada owns the semantic model without owning a complex database engine.
 
+This control must be measured before selecting a two-component ReMe + LangMem
+runtime. ReMe would add a replaceable reader/indexer if ordinary file access
+and search fall short; LangMem would add a replaceable semantic proposal helper
+only where its correction/learning benefit exceeds the extra dependencies.
+Neither component is required to define the authoritative file format.
+
 Risks / work:
 
 - Ada must define the Memory file schema and migration/versioning rules;
+- the versioning adapter must capture out-of-band edits; Git commit metadata
+  alone does not authenticate a human editor, and past sensitive content
+  remains in history until handled under a separate retention policy;
 - correction, contradiction, concurrent edit, and index reconciliation semantics are Ada-owned work;
 - semantic retrieval quality must be characterized rather than assumed.
 
@@ -1227,6 +1239,8 @@ Weights are deliberately not assigned by this draft.
 1. Define the smallest Ada-owned general Memory semantic model from the scenarios above without turning the vault into a rigid ontology.
 2. Characterize **Markdown-first notes with optional non-duplicated YAML properties**; capture manual edits in file history and use separate structured files only where justified by a concrete data type.
 3. Characterize structured/property lookup + Markdown links + FTS5 before adding more expensive retrieval infrastructure.
+   Measure direct file reads and basic search against ReMe on representative
+   vault sizes before requiring any derived index.
 4. Compare Graphify-style graph retrieval with vector/hybrid retrieval on representative family-memory questions, including context/token reduction.
 5. Verify candidate license/dependency chains from source, not search summaries.
 6. Evaluate whether Mem0 contributes enough reusable extraction/update logic without becoming the authoritative store.

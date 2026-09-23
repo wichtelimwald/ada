@@ -103,6 +103,10 @@ preflight() {
     echo "Missing $PYTHON_BIN." >&2
     return 1
   }
+  command -v git >/dev/null 2>&1 || {
+    echo "Git CLI is required for the Markdown-only revision test." >&2
+    return 1
+  }
   "$PYTHON_BIN" - <<'PY'
 import sys
 if sys.version_info[:2] != (3, 14):
@@ -203,6 +207,18 @@ integration() {
     --out "$OUT/integration"
 }
 
+integration_markdown() {
+  "$VENV/bin/python" "$DRIVER" integration \
+    --repo-root "$ROOT" \
+    --reme-python "$VENV/bin/python" \
+    --config "$CONFIG" \
+    --workspace "$OUT/workspace-markdown" \
+    --model "$OLLAMA_MODEL" \
+    --ollama-host "$OLLAMA_HOST" \
+    --out "$OUT/integration-markdown" \
+    --variant markdown-only
+}
+
 printf 'Ada ReMe + LangMem final architecture characterization\n'
 printf 'Results: %s\n\n' "$OUT"
 
@@ -217,5 +233,9 @@ run_optional pip-audit pip_audit
 cp "$OUT/logs/pip-audit.log" "$OUT/pip-audit.log" 2>/dev/null || true
 
 apply_runtime_guard
-critical integration integration
+run_step integration integration
+yaml_result=$?
+run_step integration-markdown integration_markdown
+markdown_result=$?
 finish
+[ "$yaml_result" -eq 0 ] && [ "$markdown_result" -eq 0 ]

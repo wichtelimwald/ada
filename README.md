@@ -44,6 +44,8 @@ Ada's architecture is deliberately designed so that the AI model is **not** the 
 
 The proposed [Memory architecture](docs/decisions/ADR-0008-memory-architecture.md) treats direct Markdown edits as authoritative file content. Captured file history is sufficient provenance for those manual edits; Ada should not require duplicate claim metadata in YAML or infer who edited a file. The versioning mechanism and Memory backend are still under evaluation.
 
+A simpler Markdown + captured history + basic-search MVP is also being evaluated against the proposed ReMe + LangMem integration. Both components must earn their added runtime and maintenance cost.
+
 Some of these protections are already implemented; others are architecture rules being implemented incrementally. The project documents accepted decisions separately from work that is still under evaluation.
 
 ## Reuse before reinvention

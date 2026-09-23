@@ -470,6 +470,34 @@ minimized evidence adjacent to the claim in one human-readable unit. The exact
 representation and confirmation policy remain open; this is a design finding,
 not an added production schema.
 
+### Pending Markdown-only comparison
+
+The target-Mac runner now checks an explicit preference and repeats correction,
+unresolved-conflict, silent-overwrite rejection, ReMe read/search, and
+out-of-band edit checks in a
+second isolated vault containing Markdown without YAML front matter. Its
+Ada-created current claim carries one adjacent source line; a direct edit
+removes that source line and records the difference in synthetic local Git
+history. The original YAML lane remains intact for comparison. This new lane
+has not yet been run on the target Mac, so its ReMe indexing and semantic
+results are **unknown**. Even a pass would not prove human editor identity,
+automatic capture of every real-world edit, arbitrary claim reconciliation,
+or privacy-safe retention of old revisions. The prior standalone ReMe forget
+and two-vault isolation gates used YAML-backed fixtures; the combined
+Markdown-only lane does not repeat them. They remain separate checks before a
+Markdown-only production choice.
+
+**Simplification hypothesis:** for an MVP, ordinary Markdown files and
+per-protection-domain Git history can provide inspectable current state and
+change history. Start with direct file reads and simple search; add a
+rebuildable local index only if representative queries or scale need it. Keep
+AdaGuard's domain choice and Ada's deterministic write/correction validation.
+Treat ReMe's reader/indexer and LangMem's semantic proposal helper as
+independent optional additions, each justified by measured value against this
+baseline. This control has not been scored in the existing frozen-weight
+matrix; its retrieval quality, automatic capture of external edits, and
+operational forgetting/retention require characterization before selection.
+
 ### Triage of the 11 flagged license metadata entries
 
 The inventory's substring classifier is a triage tool, not an SPDX parser.

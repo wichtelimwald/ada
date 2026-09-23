@@ -1,7 +1,8 @@
 # ReMe + LangMem final architecture characterization
 
-This research spike validates the **combined role split** selected by the frozen
-ADR-0008 decision matrix. It is not production Memory code.
+This research spike characterizes the **combined role split** ranked by the
+frozen ADR-0008 decision matrix. It is not production Memory code. The matrix
+has not yet scored the simpler Markdown + Git + basic-search control option.
 
 ## Architecture under test
 
@@ -65,6 +66,12 @@ The important boundaries are:
 10. ReMe finds accepted Markdown writes.
 11. An out-of-band Markdown edit remains authoritative and is re-indexed by
     ReMe.
+12. An explicit preference, correction, non-correction conflict, silent-overwrite rejection,
+    and out-of-band edit checks run again against Markdown **without YAML front
+    matter** in a separate vault. Source references appear once beside the
+    current claim. The manual edit retires the old current-source line, and a
+    synthetic local Git history captures initial, Ada, and direct-edit revisions.
+    Git author labels in this fixture do not establish a human editor identity.
 
 ## Run
 
@@ -90,3 +97,8 @@ A failure is a research finding, not automatically a framework rejection.
 On failure, the bundle includes the last 100 lines of the integration log and
 any semantic proposals recorded before validation. An incomplete integration
 result is not a passing result.
+
+The existing YAML-backed integration is retained as the first lane. The
+Markdown-only lane is an additional gate in the same run and uses its own
+workspace, `integration-markdown/integration.json`, and
+`logs/integration-markdown.log`. No new runtime dependency is introduced.
