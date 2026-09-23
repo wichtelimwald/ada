@@ -1313,6 +1313,18 @@ This moves the remaining ReMe decision work away from basic runtime feasibility 
 
 No Memory backend is adopted by this draft.
 
+**Maintainer-confirmed proposed MVP path (2026-09-23):** keep each current
+memory and its source information together in human-editable Markdown, with
+simple current-file reads and search as the first retrieval path. A manual
+edit to the file becomes the current authoritative content. Use Git history
+per protected domain as the candidate change record once capture of real
+out-of-band edits, concurrency, recovery and retention are designed and
+verified. Git commit identity alone does not authenticate who edited a note.
+Do not introduce separate claim YAML, ReMe or LangMem as a required MVP layer.
+This is an explicit direction for the next implementation and comparison,
+not acceptance of the architecture or a claim that the control has passed
+the open privacy, search-quality, edit-capture and forgetting gates below.
+
 The executable four-candidate characterization is complete. A **draft weighted decision matrix** now lives at:
 
 `research/memory/comparison/decision-matrix.md`
@@ -1343,14 +1355,10 @@ do not enforce household privacy. Its search relevance and scale remain
 unmeasured. No numeric score or Memory-backend selection follows from this
 small control run.
 
-**Proposed staged MVP direction:** retain Markdown as the single human-editable
-authority, with source information adjacent to Ada-created claims, direct
-reads and basic search first. Treat per-domain Git history as a candidate
-change record subject to a verified capture, forgetting, and retention design.
-Add ReMe only when representative retrieval/indexing evidence justifies its
-AgentScope dependency; add LangMem only when a bounded semantic proposal
-helper demonstrably outperforms the simplest safe Ada-owned validation path.
-The recommendation must be revisited if the control fails required scenarios.
+For this proposed MVP, add ReMe only when representative retrieval/indexing
+evidence justifies its AgentScope dependency; add LangMem only when a bounded
+semantic proposal helper demonstrably outperforms the simplest safe Ada-owned
+validation path. Revisit the direction if the control fails required scenarios.
 
 ### ReMe + LangMem final-fit boundary
 
