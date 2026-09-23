@@ -256,6 +256,39 @@ class LocalChatRuntimeTests(unittest.TestCase):
         self.assertTrue(captured["http_client"].is_closed)
         runtime.close()
 
+    def test_local_runtime_closes_client_when_construction_fails(self) -> None:
+        real_client = httpx2.AsyncClient
+
+        for failing_stage in ("OllamaProvider", "OllamaModel", "Agent"):
+            with self.subTest(stage=failing_stage):
+                clients: list[httpx2.AsyncClient] = []
+
+                def make_client(**kwargs: Any) -> httpx2.AsyncClient:
+                    client = real_client(**kwargs)
+                    clients.append(client)
+                    return client
+
+                def reject(*args: Any, **kwargs: Any) -> None:
+                    raise ValueError("invalid model configuration")
+
+                def constructor(stage: str) -> Any:
+                    if stage == failing_stage:
+                        return reject
+                    return lambda *args, **kwargs: object()
+
+                with (
+                    patch("ada.adapters.local_ollama.httpx2.AsyncClient", side_effect=make_client),
+                    patch("ada.adapters.local_ollama.OllamaProvider", constructor("OllamaProvider")),
+                    patch("ada.adapters.local_ollama.OllamaModel", constructor("OllamaModel")),
+                    patch("ada.adapters.local_ollama.Agent", constructor("Agent")),
+                    patch.object(pydantic_ai, "BANNER_ENABLED"),
+                ):
+                    with self.assertRaisesRegex(ValueError, "invalid model configuration"):
+                        build_local_ollama_runtime()
+
+                self.assertEqual(len(clients), 1)
+                self.assertTrue(clients[0].is_closed)
+
     def test_local_chat_transport_ignores_proxy_settings(self) -> None:
         hits: list[str] = []
 

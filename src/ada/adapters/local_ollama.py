@@ -134,21 +134,6 @@ def build_local_ollama_runtime(
     # observability banner for this product surface.
     pydantic_ai.BANNER_ENABLED = False
 
-    # The model call must use the same direct-transport rule as readiness.
-    # Passing a client also prevents PydanticAI from creating an ambient
-    # proxy-aware default client for later requests.
-    http_client = httpx2.AsyncClient(trust_env=False, timeout=600.0)
-    provider = OllamaProvider(
-        base_url=config.base_url,
-        http_client=http_client,
-    )
-    model = OllamaModel(
-        config.model,
-        provider=provider,
-        settings=OpenAIChatModelSettings(
-            openai_reasoning_effort="none",
-        ),
-    )
     instructions = render_personality_instructions(active_personality) + """
 
 For ordinary conversation, return an AgentTextReply.
@@ -177,20 +162,39 @@ no direct calendar/provider authority. A draft is not permission and not proof o
 execution.
 """.rstrip()
 
-    agent = Agent(
-        model,
-        instructions=instructions,
-        output_type=NativeOutput(
-            [AgentTextReply, CreateCalendarEventDraft],
-            name="ada_local_response",
-            description=(
-                "Return either a conversational reply or a non-executable "
-                "calendar draft."
+    # The model call must use the same direct-transport rule as readiness.
+    # Passing a client also prevents PydanticAI from creating an ambient
+    # proxy-aware default client for later requests.
+    http_client = httpx2.AsyncClient(trust_env=False, timeout=600.0)
+    try:
+        provider = OllamaProvider(
+            base_url=config.base_url,
+            http_client=http_client,
+        )
+        model = OllamaModel(
+            config.model,
+            provider=provider,
+            settings=OpenAIChatModelSettings(
+                openai_reasoning_effort="none",
             ),
-        ),
-    )
-    return PydanticAIRuntime(
-        agent,
-        keep_session_history=True,
-        close_callback=lambda: asyncio.run(http_client.aclose()),
-    )
+        )
+        agent = Agent(
+            model,
+            instructions=instructions,
+            output_type=NativeOutput(
+                [AgentTextReply, CreateCalendarEventDraft],
+                name="ada_local_response",
+                description=(
+                    "Return either a conversational reply or a non-executable "
+                    "calendar draft."
+                ),
+            ),
+        )
+        return PydanticAIRuntime(
+            agent,
+            keep_session_history=True,
+            close_callback=lambda: asyncio.run(http_client.aclose()),
+        )
+    except BaseException:
+        asyncio.run(http_client.aclose())
+        raise
