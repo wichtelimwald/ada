@@ -78,6 +78,7 @@ Positive:
 - explicit preference recall is correct and source-backed;
 - explicit correction resolves the current music lesson to **Thursday 17:00** while retaining both Wednesday and Thursday source facts;
 - bank isolation holds in the tested direction: cross-bank token queries return only memories from the queried bank, not the other bank's canary;
+- however, an absent cross-bank token query can still return semantically similar **in-bank** memories rather than an empty result; this is retrieval precision behavior, not a scope leak, and callers must validate match relevance;
 - direct recall is fast on the small characterized dataset (roughly 20–40 ms after model-side retain/consolidation work);
 - observations retain links to source fact IDs, and source facts retain document/source metadata.
 
