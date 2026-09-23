@@ -38,7 +38,7 @@ The authoritative Memory should feel closer to a durable personal knowledge base
 Current direction:
 
 - **Markdown-first** for ordinary memories, relationships, routines, explanations, and notes;
-- optional **YAML properties/front matter** for small machine-readable fields such as scope, subject, dates, addresses, lifecycle state, or provenance;
+- optional **YAML properties/front matter** only where a machine-readable field adds value without duplicating or silently diverging from a human-edited claim;
 - schema-light rather than ontology-first: useful structure may emerge over time instead of being fixed up front;
 - compatible with ordinary editors and tools such as Obsidian, but **not dependent on Obsidian** for correctness or runtime operation;
 - periodic "Memory gardening" may reorganize, deduplicate, summarize, or suggest cleanup, but destructive merges/deletions must remain visible and deliberate.
@@ -51,7 +51,7 @@ The maintainer confirmed the following separation:
 
 - **directory/vault placement expresses the privacy/audience boundary**;
 - **the storage protection boundary must enforce that placement** through separate storage roots, OS access control, encryption keys, or another deterministic mechanism;
-- **YAML properties/front matter carry metadata inside that boundary**;
+- **optional YAML properties/front matter may carry distinct file-level metadata inside that boundary**; claim-level metadata must not become a separate, drifting copy of human-edited text;
 - **Markdown is the primary human-readable content**.
 
 Illustrative layout:
@@ -76,15 +76,12 @@ A directory name **alone is not a security boundary** if the same filesystem pri
 
 Moving a note across a scope/storage boundary is a security-relevant operation and must eventually be mediated by deterministic Ada policy rather than silently inferred by the model.
 
-YAML metadata may describe properties such as:
-
-- subject/person;
-- type;
-- tags;
-- dates;
-- lifecycle/correction state;
-- provenance/source reference;
-- optional structured fields such as addresses.
+Optional YAML may carry distinct file-level properties such as a stable note
+identifier, title, tags, or creation date. Claim-specific provenance and
+lifecycle information must remain human-inspectable with the claim they
+describe; the same fact must not be maintained in both prose and YAML.
+Structured data such as an address may live in YAML only where YAML is its
+single canonical representation rather than a duplicate of the note body.
 
 YAML metadata must not be treated as an alternate authorization system. Authority remains owned by AdaGuard.
 
@@ -507,19 +504,20 @@ The exact representation remains open; Markdown/YAML or another human-readable a
 
 Provenance should explain **why Ada believes a memory** without retaining an unnecessary copy of the original source.
 
-For ordinary durable Memory, characterize a minimal human-readable provenance record such as:
+**Confirmed rule for direct manual edits:** the current Markdown is the
+authoritative content, and its file revision history is sufficient provenance
+for the manual edit. Do not require a second claim-level YAML provenance record
+for a person to edit a note. The selected versioning mechanism must actually
+capture such edits; an unrecorded edit has no historical provenance. Revision
+history shows what changed and when it was recorded, but does not by itself
+authenticate who made the edit. Ada must not invent an `explicit_user`
+confirmation basis or an editor identity from a filesystem event.
 
-```yaml
-state: confirmed
-confirmation_basis: explicit_user
-provenance:
-  source_kind: local_chat
-  source_ref: optional-stable-reference
-  recorded_at: 2026-09-21T14:30:00+02:00
-  reason: "Explicitly stated by the subject"
-```
-
-Potential source kinds include:
+For **Ada-extracted or externally sourced claims**, keep enough minimized
+evidence to explain why Ada created the claim and to preserve correction or
+contradiction history. Characterize a single human-readable claim unit with
+its evidence adjacent to it; do not maintain a second semantic copy in YAML.
+Exact syntax and required fields remain open. Optional source kinds include:
 
 - explicit user statement;
 - direct manual file edit;
@@ -536,6 +534,8 @@ Rules:
 - provenance must never create authority or widen audience;
 - cross-scope provenance must not leak private filenames, titles, snippets, or identifiers into a broader scope;
 - explicit manual edits remain first-class provenance and must not be treated as inferior merely because Ada did not create them;
+- a direct edit does not inherit a previous claim's source link as evidence
+  for the newly changed wording; the prior source remains historical;
 - superseded/contradicted entries retain enough provenance to explain how the current state was reached.
 
 ## Versioning, backup, and sync are separate concerns
@@ -547,6 +547,10 @@ The Memory design must treat these as three different mechanisms:
 - **sync** — replicate current state across authorized devices/users.
 
 Git-like history is attractive for Markdown because it provides diffs and rollback.
+If history is used as the provenance for manual edits, Ada must ensure that
+out-of-band changes become recorded revisions. This is a requirement on the
+eventual versioning adapter, not a claim that the current prototype already
+records them.
 
 The maintainer explicitly accepts the following semantic split:
 
@@ -979,7 +983,7 @@ No candidate is selected by this draft.
 Concept:
 
 - authoritative Markdown notes in a user-controlled Memory directory/vault;
-- optional YAML properties/front matter for compact structured fields such as scope, subject, provenance, lifecycle state, dates, or addresses;
+- optional YAML properties/front matter only for distinct fields with one canonical representation; manually edited claims need no separate YAML provenance;
 - dedicated YAML/TOML records only where a narrow data type genuinely benefits from them;
 - no mandatory fixed ontology beyond the minimum metadata required for safety and scope isolation;
 - standard SQLite/FTS5 as one possible derived local search index;
@@ -1221,7 +1225,7 @@ Weights are deliberately not assigned by this draft.
 ## Open research before a decision
 
 1. Define the smallest Ada-owned general Memory semantic model from the scenarios above without turning the vault into a rigid ontology.
-2. Characterize **Markdown + constrained YAML properties/front matter** as the canonical default representation; use separate structured files only where justified by a concrete data type.
+2. Characterize **Markdown-first notes with optional non-duplicated YAML properties**; capture manual edits in file history and use separate structured files only where justified by a concrete data type.
 3. Characterize structured/property lookup + Markdown links + FTS5 before adding more expensive retrieval infrastructure.
 4. Compare Graphify-style graph retrieval with vector/hybrid retrieval on representative family-memory questions, including context/token reduction.
 5. Verify candidate license/dependency chains from source, not search summaries.

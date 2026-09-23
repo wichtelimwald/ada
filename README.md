@@ -42,6 +42,8 @@ Ada's architecture is deliberately designed so that the AI model is **not** the 
 - **Technical success is not the same as real-world success.** A completed phone call does not automatically mean an appointment was booked; Ada should record only what can actually be verified.
 - **Memory remains user-controlled.** The authoritative long-term memory is designed to stay outside framework/runtime internals and remain inspectable and editable by the user.
 
+The proposed [Memory architecture](docs/decisions/ADR-0008-memory-architecture.md) treats direct Markdown edits as authoritative file content. Captured file history is sufficient provenance for those manual edits; Ada should not require duplicate claim metadata in YAML or infer who edited a file. The versioning mechanism and Memory backend are still under evaluation.
+
 Some of these protections are already implemented; others are architecture rules being implemented incrementally. The project documents accepted decisions separately from work that is still under evaluation.
 
 ## Reuse before reinvention

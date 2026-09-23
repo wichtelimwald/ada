@@ -453,16 +453,22 @@ statement from YAML in the Markdown body. This makes the test canaries easy to
 inspect, but **is not an acceptable production schema**: it creates two places
 to update the same item. The target design must choose one canonical location
 for each claim and each metadata item; ReMe's search index is only a
-rebuildable derivative of those files. For example, the current claim could
-live once in readable Markdown, with source references recorded once in YAML.
+rebuildable derivative of those files. A manually edited claim needs no
+second YAML provenance record; Ada-extracted claims still need their evidence
+visibly associated with the claim they support.
 
 Removing that duplication does not by itself solve the external-edit question.
 If the Thursday claim is changed to Friday in the body while its sole YAML
 source reference still points to a Thursday source, the reference is stale
-even though no field is duplicated. An Ada-owned rule must bind evidence to
-the claim/revision it supports and identify edits made outside Ada before
-carrying old evidence forward. The exact representation and confirmation
-policy remain open; this is a design finding, not an added production schema.
+even though no field is duplicated. The maintainer clarified the smaller rule
+for manual notes: the current file is authoritative, and captured file
+revision history is sufficient provenance for a direct edit; claim-level YAML
+provenance is not required. The revision must actually be recorded, and its
+history alone does not authenticate the editor. A prior source link must not
+be presented as proof of the edited claim. Ada-created claims still need
+minimized evidence adjacent to the claim in one human-readable unit. The exact
+representation and confirmation policy remain open; this is a design finding,
+not an added production schema.
 
 ### Triage of the 11 flagged license metadata entries
 
