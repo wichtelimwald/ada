@@ -1,7 +1,7 @@
 # WebUntis integration research
 
-> **Status:** research evidence, not an accepted Ada architecture decision  
-> **Researched:** 2026-09-23  
+> **Status:** research evidence, not an accepted Ada architecture decision
+> **Researched:** 2026-09-23
 > **Scope:** ways Ada could read school planning and information data from WebUntis without committing the product runtime to one Untis interface
 
 ## Executive summary
@@ -202,7 +202,7 @@ The private iCal URL should be treated as a **bearer credential**. Anyone posses
 - no account password in Ada;
 - no Untis-specific runtime client required;
 - naturally read-only;
-- easy to revoke/regenerate;
+- the account UI provides a way to disable the subscription link;
 - low maintenance burden.
 
 ### Limitations
@@ -604,46 +604,27 @@ These need either account-specific validation, vendor confirmation, product deci
 
 Accessed 2026-09-23.
 
-- Untis Developer Portal — Getting started / Platform Applications:  
-  <https://developer.untis.com/getting-started/overview/>
-- Getting a Platform Application:  
-  <https://developer.untis.com/getting-started/get-platform-application/>
-- WebUntis APIs overview:  
-  <https://developer.untis.com/api-reference/webuntis-apis/>
-- API overview / production endpoint / rate limit:  
-  <https://developer.untis.com/api-reference/api-overview/>
-- Authentication model:  
-  <https://developer.untis.com/core-concepts/authentication-model/>
-- Authorization model:  
-  <https://developer.untis.com/core-concepts/authorization-model/>
-- Timetable data API:  
-  <https://developer.untis.com/api-reference/webuntis-apis/timetable-data/>
-- Messaging API:  
-  <https://developer.untis.com/api-reference/webuntis-apis/messaging/>
-- Untis integration privacy information:  
-  <https://www.untis.at/en/privacy-policy-wu-integrations>
-- WebUntis support — JSON-RPC remains available:  
-  <https://help.untis.at/hc/en-150/articles/22597731127708-New-web-addresses-for-WebUntis>
-- WebUntis release notes, including JSON-RPC/2FA restriction:  
-  <https://help.untis.at/hc/en-150/articles/360008456699-WebUntis-Release-Notes>
-- WebUntis private iCal subscription:  
-  <https://help.untis.at/hc/de/articles/360014979580-Wie-funktioniert-das-iCal-Kalender-Abonnement-in-WebUntis>
+- [Untis Developer Portal — Getting started / Platform Applications](https://developer.untis.com/getting-started/overview/)
+- [Getting a Platform Application](https://developer.untis.com/getting-started/get-platform-application/)
+- [WebUntis APIs overview](https://developer.untis.com/api-reference/webuntis-apis/)
+- [API overview / production endpoint / rate limit](https://developer.untis.com/api-reference/api-overview/)
+- [Authentication model](https://developer.untis.com/core-concepts/authentication-model/)
+- [Authorization model](https://developer.untis.com/core-concepts/authorization-model/)
+- [Timetable data API](https://developer.untis.com/api-reference/webuntis-apis/timetable-data/)
+- [Messaging API](https://developer.untis.com/api-reference/webuntis-apis/messaging/)
+- [Untis integration privacy information](https://www.untis.at/en/privacy-policy-wu-integrations)
+- [WebUntis support — JSON-RPC remains available](https://help.untis.at/hc/en-150/articles/22597731127708-New-web-addresses-for-WebUntis)
+- [WebUntis release notes, including JSON-RPC/2FA restriction](https://help.untis.at/hc/en-150/articles/360008456699-WebUntis-Release-Notes)
+- [WebUntis private iCal subscription](https://help.untis.at/hc/de/articles/360014979580-Wie-funktioniert-das-iCal-Kalender-Abonnement-in-WebUntis)
 
 ### Open-source projects / community evidence
 
 Repository state inspected 2026-09-23.
 
-- python-webuntis:  
-  <https://github.com/python-webuntis/python-webuntis>
-- SchoolUtils/WebUntis:  
-  <https://github.com/SchoolUtils/WebUntis>
-- Community JSON-RPC sunset discussion — **not an official Untis announcement**:  
-  <https://github.com/SchoolUtils/WebUntis/issues/123>
-- Home Assistant WebUntis integration:  
-  <https://github.com/JonasJoKuJonas/homeassistant-WebUntis>
-- UntAPI:  
-  <https://github.com/4biddencode/UntAPI>
-- Internal-REST Home Assistant proof/reference:  
-  <https://github.com/Naumsede/webuntis-home-assistant>
-- UntisPlus:  
-  <https://github.com/ninocss/UntisPlus>
+- [python-webuntis](https://github.com/python-webuntis/python-webuntis)
+- [SchoolUtils/WebUntis](https://github.com/SchoolUtils/WebUntis)
+- [Community JSON-RPC sunset discussion — **not an official Untis announcement**](https://github.com/SchoolUtils/WebUntis/issues/123)
+- [Home Assistant WebUntis integration](https://github.com/JonasJoKuJonas/homeassistant-WebUntis)
+- [UntAPI](https://github.com/4biddencode/UntAPI)
+- [Internal-REST Home Assistant proof/reference](https://github.com/Naumsede/webuntis-home-assistant)
+- [UntisPlus](https://github.com/ninocss/UntisPlus)
