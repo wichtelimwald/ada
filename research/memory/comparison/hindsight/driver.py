@@ -4,6 +4,8 @@ import json
 import os
 import sys
 import time
+import urllib.parse
+import urllib.request
 from pathlib import Path
 
 from hindsight_client import Hindsight
@@ -146,7 +148,21 @@ result["isolation_b_cross"] = recall(bb, "MEMCMP_ALPHA_PRIVATE_70B8D4")
 save()
 
 result["forget_before"] = recall(bf, "MEMCMP_FORGET_91C6E3")
-asyncio.run(client.documents.delete_document(bf, "forget-doc"))
+save()
+
+# The generated low-level Documents API is async-only and its aiohttp session is
+# created by the sync Hindsight client's internal event-loop wrappers. Calling it
+# through a fresh asyncio.run() therefore crosses loop ownership. Exercise the
+# documented HTTP endpoint directly instead of testing an invalid client usage.
+delete_url = (
+    f"{base_url}/v1/default/banks/{urllib.parse.quote(bf, safe='')}"
+    f"/documents/{urllib.parse.quote('forget-doc', safe='')}"
+)
+request = urllib.request.Request(delete_url, method="DELETE")
+with urllib.request.urlopen(request, timeout=120) as response:
+    result["forget_delete"] = json.loads(response.read().decode("utf-8"))
+save()
+
 time.sleep(1)
 result["forget_after"] = recall(bf, "MEMCMP_FORGET_91C6E3")
 result["meta"]["core_semantics_completed"] = True
