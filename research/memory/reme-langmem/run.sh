@@ -152,7 +152,7 @@ PY
 }
 capture_runtime() {
   "$VENV/bin/python" -m pip freeze > "$OUT/pip-freeze.txt"
-  grep -v '^ada-assistant==' "$OUT/pip-freeze.txt" > "$OUT/pip-audit-requirements.txt"
+  grep -v '^ada-assistant' "$OUT/pip-freeze.txt" > "$OUT/pip-audit-requirements.txt"
   "$VENV/bin/python" -m pip inspect --local > "$OUT/pip-inspect.json"
   "$VENV/bin/python" "$DRIVER" inventory --out "$OUT/inventory.json"
   {
