@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import subprocess
 import tempfile
@@ -51,6 +52,79 @@ def search(root: Path, term: str) -> list[str]:
         for path in root.glob("*.md")
         if term.casefold() in path.read_text(encoding="utf-8").casefold()
     )
+
+
+def probe_failure_modes(base: Path) -> list[str]:
+    """Demonstrate unsafe baseline behaviors, without pretending to fix them."""
+    root = base / "failure-probes"
+    init(root)
+    write(root, "ada.md", "Current: 16:00\nSource: SRC_ADA\n")
+    write(root, "editor.md", "Current: 17:00\nSource: SRC_EDITOR\n")
+    snapshot(root, "initial synthetic notes")
+
+    # Unscoped staging attributes an unrelated manual change to Ada.
+    write(root, "editor.md", "Current: 17:30\nSource: SRC_EDITOR_NEW\n")
+    write(root, "ada.md", "Current: 16:30\nSource: SRC_ADA_NEW\n")
+    snapshot(root, "Ada changed ada.md")
+    assert "editor.md" in git(root, "show", "--format=%s", "--name-only", "HEAD")
+    # Capture the external edit separately, then stage only Ada's note.
+    write(root, "editor.md", "Current: 17:45\nSource: SRC_EDITOR_LATER\n")
+    git(root, "add", "--", "editor.md")
+    git(root, "commit", "-q", "-m", "external edit captured")
+    write(root, "ada.md", "Current: 16:45\nSource: SRC_ADA_LATER\n")
+    git(root, "add", "--", "ada.md")
+    git(root, "commit", "-q", "-m", "Ada updated scoped note")
+    assert "editor.md" not in git(root, "show", "--format=", "--name-only", "HEAD")
+
+    # A stale lock stops Git; never silently remove a possibly live lock.
+    lock = root / ".git" / "index.lock"
+    lock.write_text("synthetic stale lock", encoding="utf-8")
+    try:
+        try:
+            git(root, "add", "--", "ada.md")
+        except subprocess.CalledProcessError:
+            pass
+        else:
+            raise AssertionError("Git accepted a locked index")
+    finally:
+        lock.unlink()  # Fixture cleanup only, not a production recovery rule.
+
+    # A stale read detects the intervening change; the unsafe baseline would
+    # overwrite it if it wrote without checking and serializing writers.
+    note = root / "ada.md"
+    expected = hashlib.sha256(note.read_bytes()).digest()
+    note.write_text("Current: 17:00\nSource: SRC_EXTERNAL\n", encoding="utf-8")
+    assert hashlib.sha256(note.read_bytes()).digest() != expected
+    assert "Current: 17:00" in note.read_text(encoding="utf-8")
+    naive = root / "naive.md"
+    naive.write_text("Current: 16:00\n", encoding="utf-8")
+    naive.write_text("Current: 17:00\n", encoding="utf-8")  # Intervening editor.
+    naive.write_text("Current: 16:45\n", encoding="utf-8")  # Stale Ada write.
+    assert "17:00" not in naive.read_text(encoding="utf-8")
+
+    shared, private = base / "scope-shared", base / "scope-private"
+    init(shared)
+    init(private)
+    write(shared, "appointment.md", "SHARED_SECRET_CANARY\n")
+    snapshot(shared, "synthetic shared state")
+    write(private, "appointment.md", "SHARED_SECRET_CANARY\n")
+    snapshot(private, "synthetic private state")
+    (shared / "appointment.md").unlink()
+    snapshot(shared, "remove current shared copy")
+    assert search(shared, "SHARED_SECRET_CANARY") == []
+    assert "SHARED_SECRET_CANARY" in git(shared, "log", "--all", "-p")
+
+    # Plain text does not invalidate an unchanged source or classify conflict.
+    stale_source = "Current: Friday 17:00\nSource: SRC_THURSDAY\n"
+    assert "SRC_THURSDAY" in stale_source
+    assert "Unresolved" not in "Claim: 16:00\nClaim: 17:00\n"
+    return [
+        "unscoped staging attributes an external edit to an Ada commit",
+        "a Git index lock prevents capture until deliberate recovery",
+        "an intervening editor write invalidates Ada's old file snapshot",
+        "moving a shared note to private leaves the shared Git history readable",
+        "plain Markdown does not automatically retire old sources or label contradictions",
+    ]
 
 
 def run() -> dict[str, object]:
@@ -108,11 +182,12 @@ def run() -> dict[str, object]:
                 "a direct edit can be detected by Git diff and captured when a snapshot runs",
                 "deletion removes the note from current read/search",
             ],
+            "failure_probes": probe_failure_modes(base),
             "open_gates": [
-                "automatic capture of arbitrary external edits and crash/concurrency handling",
+                "automatic external-edit capture, path-scoped commits, and crash/concurrency handling",
                 "editor identity is not authenticated by Git commit metadata",
                 "history remains recoverable by design; exclusion from future Ada indexes is untested",
-                "eventual history/backup purge is a separate, uncharacterized operations policy",
+                "scope narrowing and eventual history/backup purge need a separate policy",
                 "separate roots under the same OS principal do not enforce privacy",
                 "search relevance, size and latency on representative vaults are unmeasured",
                 "source/document-reference lifecycle and generalized semantic validation are untested",

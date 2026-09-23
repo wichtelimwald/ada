@@ -175,19 +175,13 @@ For a confirmed memory, Ada should also preserve **how it became confirmed**. In
 - `observed_pattern` — promoted after repeated, sufficiently consistent observed outcomes without an explicit user confirmation;
 - `explicit_user` — explicitly confirmed/stated by the relevant user.
 
-This avoids conflating maturity with provenance. For example:
-
-```yaml
-state: confirmed
-confirmation_basis: observed_pattern
-```
-
-and:
-
-```yaml
-state: confirmed
-confirmation_basis: explicit_user
-```
+This avoids conflating maturity with provenance. In a future structured
+learning record, a confirmed observation would have an
+`observed_pattern` basis while a directly confirmed statement would have
+an `explicit_user` basis. This is a semantic distinction, **not** a
+requirement to store claim YAML alongside human-edited Markdown. Any state
+visible to the user must have one authoritative, inspectable representation;
+the research fixture's parallel YAML and prose are not the MVP schema.
 
 A memory confirmed through observation remains weaker evidence than an explicit confirmation for later contradiction resolution or sensitive decisions. Exact precedence rules still need characterization.
 
@@ -909,7 +903,7 @@ context assembly
 
 Ada's differentiator should remain that **the human/source layer and privacy/authority boundaries are Ada-owned**, while mature frameworks may be reused below that boundary.
 
-## Provisional decision matrix
+## Historical candidate matrix (superseded as implementation direction)
 
 This matrix is intentionally **role-aware**. Ada may use one component for authoritative file-native Memory and another for derived learning/retrieval. A candidate that is poor as the source of truth may still be strong behind an Ada-owned boundary.
 
@@ -928,12 +922,12 @@ Legend: ✅ strong fit / 🟡 partial or adapter required / ❓ not yet verified
 | Git-native history | 🟡 files are versionable but Git is not the core contract | ❌ | ✅ built in | ❌ |
 | Conversation/resource ingestion | ✅ sessions + resources are first-class source layers | ✅ conversations/documents can be retained | 🟡 external memory files/context repos; broader ingestion is runtime-dependent | ✅ conversation-oriented extraction |
 | Runtime independence from another agent framework | ❌ current package import/runtime path requires AgentScope in the characterized path; target-Mac spike confirmed this path works with native Ollama | ✅ standalone server/client/embedded options | ❌ tightly coupled to Letta runtime/SDK | 🟡 core primitives are storage-agnostic, but ecosystem is LangGraph-oriented |
-| Fit as Ada authoritative Memory substrate | **✅ strongest current candidate** | ❌ | 🟡 architecture reference / possible component | ❌ |
+| Fit as Ada authoritative Memory substrate in this earlier shortlist | ✅ leading evaluated library | ❌ | 🟡 architecture reference / possible component | ❌ |
 | Fit as Ada derived learning/recall layer | ✅ | **✅ strongest current candidate** | 🟡 | ✅ lightweight candidate |
 
-### Current working conclusion
+### Earlier working conclusion (superseded by staged MVP direction below)
 
-**Primary deep-dive candidate: ReMe** for the authoritative, human-readable Memory substrate.
+**Earlier primary deep-dive candidate: ReMe** for the authoritative, human-readable Memory substrate. This historical conclusion predates the Markdown/Git/direct-search control and is not a recommendation to adopt ReMe for the MVP.
 
 Why it currently leads:
 
@@ -1291,7 +1285,10 @@ Repeated semantic characterization found a material boundary condition, but not 
 
 Therefore ReMe can remain a candidate **file-native substrate**, but its model-generated consolidation cannot by itself be authoritative Ada truth. The missing canonical fact/lifecycle/provenance semantics must be supplied outside ReMe.
 
-That does **not** imply a custom Ada implementation. ADR-0008 must first compare whether LangMem, Hindsight, or Letta/MemFS can supply enough of those semantics cleanly. A minimal Ada-owned implementation remains the control/fallback option only if reuse candidates do not justify their cost.
+That did **not** establish ReMe as an Ada truth engine. The subsequently
+added Markdown/Git/direct-search control is the simplest staged MVP
+candidate; ReMe, LangMem and Hindsight remain optional research candidates
+if they demonstrate a measured benefit beyond that control.
 
 The first shared-fixture comparison provides additional evidence:
 
@@ -1329,7 +1326,7 @@ The executable four-candidate characterization is complete. A **draft weighted d
 
 `research/memory/comparison/decision-matrix.md`
 
-The matrix criteria and weights were frozen **before candidate scoring**: five deliberately non-overlapping criteria at 20% each — Authoritative Memory fit, Semantic correctness & provenance, Privacy & isolation, Retrieval & learning quality, and Architecture & operational fit. License compatibility remains a hard gate; `Memory != Permission` remains an architecture invariant.
+The matrix criteria and weights were frozen **for the completed research scoring run** before candidate scoring: five deliberately non-overlapping criteria at 20% each — Authoritative Memory fit, Semantic correctness & provenance, Privacy & isolation, Retrieval & learning quality, and Architecture & operational fit. This does not accept those weights as the final product decision or allow retrospective rescoring of the historical run. Any revised decision matrix needs a separately recorded rationale and a fresh comparison including the control. License compatibility remains a hard gate; `Memory != Permission` remains an architecture invariant.
 
 Scoring is now complete. The decision-eligible results are:
 
@@ -1393,7 +1390,7 @@ artifact evidence. No license distribution clearance is claimed.
 
 Before this ADR can move to Accepted:
 
-1. review/adjust the matrix weights and disputed scores;
+1. review disputed scores using the original frozen research weights; if the maintainer changes criteria/weights for a future decision, record a new comparison rather than editing the completed run;
 2. evaluate the control against representative retrieval/edit/forget scenarios
    on the target platform, without inventing scores for missing evidence;
 3. define how out-of-band edits are captured, how old source references are
@@ -1406,3 +1403,27 @@ Before this ADR can move to Accepted:
 6. define the smallest deterministic validation boundary around semantic
    proposals and close external document-reference/lifecycle fit;
 7. obtain independent review and explicit maintainer acceptance.
+
+Where an explicit correction requires explaining the old statement without
+consulting Git history, an illustrative **single Markdown note** can place
+the current statement and its source under "Current", and the replaced
+statement and its original source under "Superseded (not current)".
+Retrieval must not promote the superseded section back to a current fact.
+For competing unconfirmed statements, use an "Unresolved" section with both
+claims and their sources; ask for clarification rather than selecting one.
+This is a proposed human-readable convention, not a parser or implemented
+write path. A direct manual edit that changes a claim but leaves an old
+source cannot silently count as a sourced new claim.
+
+Operational Memory gates remain open. Before any Ada-originated write, capture
+out-of-band changes separately from Ada's own commit and stage only the
+intended path. Detect changed content before overwriting, and treat file/Git
+lock failures as a stopped operation requiring reconciliation; merely
+comparing a hash before an unprotected rename cannot close a concurrent
+editor race. A claim changed without its source being reviewed needs
+validation or an explicit unknown/stale-source marker. Keep mutually
+unresolved claims together and visibly unresolved in current Markdown; the
+two-file control fixture only demonstrates retention. Narrowing a shared
+scope to private must stop until a separate history/backup purge and reader
+revocation policy has been selected and verified. No narrower household
+scope is accepted implicitly by this proposed ADR.

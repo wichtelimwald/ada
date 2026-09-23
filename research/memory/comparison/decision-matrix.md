@@ -6,7 +6,7 @@
 - **Model baseline:** local `qwen3.5:9b`
 - **Purpose:** first agree criteria and weights; only then score viable Memory architecture roles
 
-This matrix is deliberately separate from ADR acceptance. The weights and scores are a research proposal and must be reviewed before they become decision evidence.
+This matrix is deliberately separate from ADR acceptance. The weights and scores record a completed research round, not an accepted backend or final product weighting. The Markdown/Git/direct-search control was not scored.
 
 ## Hard-gate observations
 
@@ -331,7 +331,7 @@ Before converting the matrix result into an ADR decision:
 
 ## Remaining gates before ADR acceptance
 
-1. Maintainer review/adjustment of weights and any disputed scores.
+1. Maintainer review of disputed scores with the frozen weights. Any changed criteria/weights require a separately recorded new comparison, including the unscored control; do not overwrite this research round.
 2. Exact transitive license/security review of the intended dependency path, especially ReMe -> AgentScope and LangMem/LangChain dependencies.
 3. Define the narrow deterministic boundary between:
    - model-generated semantic proposal;
