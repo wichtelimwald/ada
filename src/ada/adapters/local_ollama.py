@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
 from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
@@ -94,6 +94,9 @@ def check_local_ollama_ready(
         ) as response:
             payload = json.load(response)
     except (OSError, URLError, ValueError) as exc:
+        if isinstance(exc, HTTPError):
+            # Rejected redirects are HTTPError responses with an open body.
+            exc.close()
         raise LocalModelUnavailableError(
             f"cannot reach local Ollama at {parsed.scheme}://{parsed.netloc}"
         ) from exc

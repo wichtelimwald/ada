@@ -311,6 +311,8 @@ class LocalChatRuntimeTests(unittest.TestCase):
         finally:
             proxy.shutdown()
             ollama.shutdown()
+            proxy.server_close()
+            ollama.server_close()
 
     def test_readiness_does_not_follow_redirect_to_other_endpoint(self) -> None:
         hits: list[str] = []
@@ -350,6 +352,8 @@ class LocalChatRuntimeTests(unittest.TestCase):
         finally:
             redirect.shutdown()
             destination.shutdown()
+            redirect.server_close()
+            destination.server_close()
 
     def test_local_ollama_profile_rejects_non_loopback_endpoints(self) -> None:
         for url in (
