@@ -842,17 +842,35 @@ Reference: https://github.com/topoteretes/cognee
 
 #### OpenViking
 
-OpenViking unifies resources, memories, and skills behind a virtual filesystem, uses directory summaries and layered context loading, and can turn sessions into Memory through background extraction/consolidation.
+OpenViking unifies resources, memories, skills, and sessions behind a virtual filesystem and has evolved into a substantially closer architectural match for Ada than a generic RAG store.
 
-Its main project is currently **AGPLv3**, so it does not pass Ada's current permissive-runtime license gate.
+Relevant current capabilities include:
+
+- user- and peer-scoped Memory namespaces;
+- account/user authentication and tenant-aware retrieval;
+- shared resources with optional ACLs;
+- Memory files such as profile/identity/preferences/entities/events/experiences;
+- session commit -> asynchronous Memory extraction and memory-diff/audit artifacts;
+- hierarchical L0/L1/L2 context loading;
+- filesystem-like read/write/edit/forget/reindex operations;
+- local file/vector storage and optional at-rest encryption.
+
+However, its main project/runtime/server is currently **AGPLv3**, so it does not pass Ada's current permissive-runtime license gate.
+
+There is a second mismatch to characterize before treating it as an authoritative-Memory candidate even if licensing changed: OpenViking's supported contract is a server-mediated virtual filesystem/context database, not necessarily Ada's desired ordinary user-owned Markdown/YAML vault with arbitrary out-of-band edits and disposable derived indexes.
 
 Useful concepts to study without adopting the main runtime:
 
-- resources vs Memory vs skills as separate context types;
+- resources vs Memory vs skills vs sessions as separate context types;
+- user vs peer Memory for per-interlocutor adaptation;
 - hierarchical directory summaries (coarse-to-detailed context);
-- directory-scoped retrieval before vector ranking;
-- compiling source material into wiki/graph/report views;
-- session-to-memory consolidation.
+- tenant-aware retrieval and ACL patterns;
+- session-to-memory consolidation and memory-diff auditing;
+- explicit forget/reindex operations.
+
+Current status: **high-value Memory/context architecture benchmark; main runtime blocked by the current license strategy**.
+
+Detailed review: `docs/research/openviking-pizza-bot-fit.md`
 
 Reference: https://github.com/volcengine/OpenViking
 
