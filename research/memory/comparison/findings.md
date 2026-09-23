@@ -71,35 +71,45 @@ Interpretation:
 
 ## Hindsight
 
-No semantic result yet.
+The fresh-database comparison now provides usable core semantic evidence.
 
-Four sandbox attempts have exposed harness/image prerequisites rather than Hindsight Memory semantics:
+Positive:
 
-1. the first attempt timed out while the initial ONNX embedding model was still downloading;
-2. after extending readiness and reusing the downloaded model, Hindsight initialized embeddings and verified the local Ollama connection, but embedded PostgreSQL (pg0) failed because the generic `python:3.14-slim` sandbox lacked `libgssapi_krb5.so.2`;
-3. after adding that runtime library, pg0 reached `initdb` but failed because the container was executed with the host UID (501) and that UID had no passwd entry inside the image;
-4. after adding the matching passwd user, PostgreSQL started, but pg0 returned `uri=None`; Hindsight then rejected the missing DB URL before migrations.
+- explicit preference recall is correct and source-backed;
+- explicit correction resolves the current music lesson to **Thursday 17:00** while retaining both Wednesday and Thursday source facts;
+- bank isolation holds in the tested direction: cross-bank token queries return only memories from the queried bank, not the other bank's canary;
+- direct recall is fast on the small characterized dataset (roughly 20–40 ms after model-side retain/consolidation work);
+- observations retain links to source fact IDs, and source facts retain document/source metadata.
 
-The fourth failure was traced to pg0's current Unix process-liveness check: pg0 invokes the external `ps` command, while Debian/Python slim images do not include it by default. Without `ps`, pg0 can start PostgreSQL but misclassify the process as not running and expose no URI.
+Material semantic concerns:
 
-These are Linux sandbox prerequisites, not host requirements and not Hindsight semantic failures.
+1. **Invented temporal semantics on correction**
+   - the consolidated Thursday observation adds a validity interval from 2026-09-23 to 2026-12-31;
+   - no such interval exists in the fixture.
 
-The Hindsight lane now builds a dedicated disposable research image that:
-- installs the required Kerberos GSSAPI runtime library;
-- installs `procps` so pg0's `ps`-based process check works;
-- creates a non-root passwd-visible user matching the maintainer's host UID/GID;
-- preserves host ownership of repo-local result artifacts.
+2. **Unresolved contradiction is incorrectly collapsed**
+   - raw source facts correctly preserve pickup 16:00 and pickup 17:00 as separate documents;
+   - the preferred observation collapses them into a single pickup-at-17:00 memory;
+   - that 17:00 observation also carries the evidence token from the 16:00 claim.
 
-With those prerequisites fixed, the next run reached actual Memory operations:
-- retain/consolidation completed;
-- direct recall completed quickly (roughly 90 ms for preference and 37 ms for correction);
-- recall preferred consolidated observations over superseded raw facts;
-- Hindsight's agentic `reflect` call timed out against local `qwen3.5:9b` after several Ollama read timeouts and is therefore treated as an optional performance benchmark, not part of the common semantics gate.
+This is a material Ada hard-gate issue: Hindsight's observation consolidation is useful as a **derived interpretation**, but it cannot define Ada's authoritative contradiction/provenance semantics.
 
-That run is **not used as final semantic comparison evidence** because repeated resume attempts had reused the same pg0 instance; logs showed duplicate accumulated memories (for example 2 pending memories in a one-item isolation bank). Retries now use a fresh pg0 instance while preserving only the venv/model cache.
+3. **Reflect performance**
+   - agentic `reflect` repeatedly timed out against local `qwen3.5:9b`;
+   - it is now an optional Hindsight-specific performance benchmark, not part of the common Memory semantics gate.
+
+4. **Forget harness bug, not backend finding**
+   - the fresh run reached `forget_before`, but the harness then called Hindsight's async-only low-level Documents client through a fresh `asyncio.run()`;
+   - the generated aiohttp session belongs to the client's existing loop machinery, so the call failed with `Timeout context manager should be used inside a task`;
+   - the harness now exercises the documented HTTP DELETE endpoint directly and persists `forget_before` before deletion.
+
+Interpretation:
+
+- Hindsight is a strong candidate for **derived learning/recall**, evidence-backed observations, and bank-scoped retrieval;
+- it is **not suitable as Ada's canonical conflict/provenance truth layer without validation**, because its consolidation may reconcile ambiguity and invent temporal/provenance details;
+- a final focused retry is needed only to close the forget scenario, not to re-establish correction/conflict behavior.
 
 The host and persistent Dev Container remain unchanged.
-
 ## Current comparison interpretation
 
 The evidence currently supports distinct strengths rather than a winner:
@@ -109,6 +119,6 @@ The evidence currently supports distinct strengths rather than a winner:
 | ReMe | file-native authoritative substrate, edit/rebuild/forget/isolation | model consolidation is nondeterministic / can fail validation |
 | LangMem | structured correction and unresolved-conflict handling | no authoritative store; invented provenance in one fixture |
 | Letta/MemFS | Git-backed human-readable memory + readable correction/conflict representation | evidence-token corruption/invention; runtime coupling |
-| Hindsight | pending executable semantics | sandbox prerequisites exposed by first-start model setup and pg0 system-library dependency |
+| Hindsight | derived observations/recall with source-fact links and bank isolation | collapses unresolved contradiction; invents temporal/provenance details; DB-primary; local Reflect too slow |
 
-Do **not** conclude that Ada should implement a custom semantic engine from these results. The next evidence needed is Hindsight's completed semantic lane, then the agreed weighted decision matrix.
+Do **not** conclude that Ada should implement a custom semantic engine from these results. The only remaining Hindsight execution gap is the forget endpoint after fixing the harness call; after that, build the agreed weighted decision matrix.
