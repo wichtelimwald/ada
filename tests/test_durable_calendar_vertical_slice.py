@@ -473,7 +473,7 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         self.assertEqual(calendar.create_attempts, 2)
         self.assertEqual(calendar.effect_count, 1)
 
-    def test_provider_without_duplicate_safety_fails_closed_as_ambiguous(self) -> None:
+    def test_provider_without_duplicate_safety_is_not_attempted(self) -> None:
         calendar = InMemoryCalendarAdapter(
             create_capability=ProviderCapability.NONE,
         )
@@ -492,15 +492,15 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         assert response.execution is not None
         self.assertEqual(
             response.execution.provider.status,
-            ProviderOutcomeStatus.AMBIGUOUS,
+            ProviderOutcomeStatus.FAILED,
         )
         self.assertEqual(
             response.execution.business.status,
-            BusinessOutcomeStatus.AMBIGUOUS,
+            BusinessOutcomeStatus.FAILED,
         )
         self.assertEqual(calendar.create_attempts, 0)
         self.assertIn(
-            "will not retry it blindly",
+            "did not attempt to create",
             render_calendar_action_response(proposal(), response),
         )
 

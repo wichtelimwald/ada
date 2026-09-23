@@ -166,7 +166,7 @@ Current primary-source evidence shows this is not hypothetical:
 
 Ada must not expose the raw DBOS at-least-once retry behavior as safe.
 
-The Ada durable-action adapter must ensure recovery resolves to an explicit `ambiguous` state / manual handling rather than blindly repeating an uncertain external effect.
+The Ada durable-action adapter must reject an unsupported provider *before* any create attempt and report `failed` / `not attempted`. If an external effect has already been attempted and its result cannot be established, recovery must instead resolve to `ambiguous` / manual handling, without blindly repeating that effect. These states must remain distinguishable in the user-facing response.
 
 ## Privacy
 

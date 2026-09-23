@@ -158,6 +158,11 @@ def render_calendar_action_response(
     if status is BusinessOutcomeStatus.COMMITTED:
         return f"Created the calendar event: {proposal.title}."
     if status is BusinessOutcomeStatus.FAILED:
+        if response.execution.provider.error_code == "provider_not_recoverable":
+            return (
+                f"I did not attempt to create the calendar event: {proposal.title}. "
+                "This calendar provider cannot safely recover from a retry."
+            )
         return f"I could not create the calendar event: {proposal.title}."
     return (
         f"I cannot confirm whether the calendar event was created: {proposal.title}. "
