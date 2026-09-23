@@ -104,6 +104,10 @@ def inventory(out: Path) -> None:
 
     versions = {}
     for package in (
+        "ada-assistant",
+        "pydantic-ai-slim",
+        "cedarpy",
+        "dbos",
         "reme-ai",
         "agentscope",
         "langmem",
