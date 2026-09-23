@@ -1,6 +1,6 @@
 # Memory candidate comparison — executable findings
 
-- **Status:** Research in progress
+- **Status:** Four-candidate characterization complete
 - **Date:** 2026-09-22
 - **Scope:** ReMe 0.4.1.12, LangMem 0.0.30, Hindsight 0.10.1, Letta Code/MemFS 0.32.15
 - **Model baseline:** local `qwen3.5:9b`
@@ -99,16 +99,17 @@ This is a material Ada hard-gate issue: Hindsight's observation consolidation is
    - agentic `reflect` repeatedly timed out against local `qwen3.5:9b`;
    - it is now an optional Hindsight-specific performance benchmark, not part of the common Memory semantics gate.
 
-4. **Forget harness bug, not backend finding**
-   - the fresh run reached `forget_before`, but the harness then called Hindsight's async-only low-level Documents client through a fresh `asyncio.run()`;
-   - the generated aiohttp session belongs to the client's existing loop machinery, so the call failed with `Timeout context manager should be used inside a task`;
-   - the harness now exercises the documented HTTP DELETE endpoint directly and persists `forget_before` before deletion.
+4. **Forget passes**
+   - the canary is present before deletion;
+   - the documented HTTP DELETE endpoint reports success and exactly one associated memory unit deleted;
+   - subsequent recall returns no result;
+   - the final isolated retry completes the Hindsight core semantics lane.
 
 Interpretation:
 
-- Hindsight is a strong candidate for **derived learning/recall**, evidence-backed observations, and bank-scoped retrieval;
+- Hindsight is a strong candidate for **derived learning/recall**, evidence-backed observations, bank-scoped retrieval, and explicit document deletion;
 - it is **not suitable as Ada's canonical conflict/provenance truth layer without validation**, because its consolidation may reconcile ambiguity and invent temporal/provenance details;
-- a final focused retry is needed only to close the forget scenario, not to re-establish correction/conflict behavior.
+- Hindsight's core characterization is complete.
 
 The host and persistent Dev Container remain unchanged.
 ## Current comparison interpretation
@@ -122,4 +123,4 @@ The evidence currently supports distinct strengths rather than a winner:
 | Letta/MemFS | Git-backed human-readable memory + readable correction/conflict representation | evidence-token corruption/invention; runtime coupling |
 | Hindsight | derived observations/recall with source-fact links and bank isolation | collapses unresolved contradiction; invents temporal/provenance details; DB-primary; local Reflect too slow |
 
-Do **not** conclude that Ada should implement a custom semantic engine from these results. The only remaining Hindsight execution gap is the forget endpoint after fixing the harness call; after that, build the agreed weighted decision matrix.
+Do **not** conclude that Ada should implement a custom semantic engine from these results. The executable four-candidate characterization is complete; proceed to the weighted decision matrix and architecture trade-off review.
