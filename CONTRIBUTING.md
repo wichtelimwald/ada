@@ -18,15 +18,15 @@ Code, comments, documentation, issues, commits, pull requests, and GitHub review
 
 ## Product and architecture decisions
 
-The project is currently in discovery. Do not assume:
+ADR-0002 through ADR-0006 define the initial Python, container, PydanticAI, Cedar, DBOS, and Ollama foundation. Do not assume choices that remain open:
 
 - target UI framework,
-- target platform strategy,
+- additional target platform strategies,
 - memory implementation,
-- agent/orchestration framework,
+- additional agent/orchestration frameworks,
 - computer-control framework,
 - STT/TTS stack,
-- local model runtime,
+- additional local model runtimes or model artifacts,
 - cloud provider.
 
 For significant choices:

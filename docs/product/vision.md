@@ -47,14 +47,14 @@ Proceed through narrow end-to-end slices rather than selecting a comprehensive s
 
 ## Still deliberately open
 
-- programming language and execution architecture,
+- packaging and deployment beyond the accepted Python/container baseline,
 - local interaction/UI implementation,
-- model/runtime and optional remote assistance,
+- optional remote-model assistance and changes to the accepted local Ollama baseline,
 - memory representation and retrieval implementation,
 - email/calendar integration mechanism,
-- permission/policy implementation and action records,
+- production policy storage and provider integration beyond the accepted Cedar/DBOS boundaries,
 - remote-data boundary implementation,
-- orchestration approach,
+- orchestration beyond the accepted PydanticAI and DBOS roles,
 - packaging/update strategy,
 - speech/perception architecture,
 - detailed personal-context selection, calendar ownership, cancellation scopes, forgetting semantics, and offline integration behavior.

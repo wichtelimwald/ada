@@ -2,4 +2,4 @@
 
 Read and follow `AGENTS.md` and `.github/copilot-instructions.md` before working in this repository.
 
-The repository is intentionally in discovery/architecture phase. Do not infer unresolved technology choices or begin implementation without the required product/ADR decision.
+Ada has an accepted implementation foundation and a working local-chat slice. Follow the accepted ADRs and the current status in AGENTS.md; keep remaining product and architecture choices explicit before implementation.

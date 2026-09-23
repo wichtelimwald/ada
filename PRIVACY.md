@@ -1,6 +1,6 @@
 # Privacy principles
 
-> This document defines design commitments for Ada. It is not a statement about implemented behavior; the application does not yet exist.
+> This document defines design commitments for Ada. A narrow local-chat and synthetic calendar-action slice exists; the full privacy and Memory behavior described here is not yet implemented.
 
 ## Commitments
 
@@ -10,6 +10,7 @@
 4. **No telemetry by default.** Telemetry must be opt-in, documented, and separable from core functionality.
 5. **User-controlled memory.** Stored personal memory must be inspectable, editable, exportable, and deletable.
 6. **Deletion must cover derived local data.** Deleting source memory should also remove or invalidate associated indexes, embeddings, caches, transcripts, summaries, and logs where technically applicable. Data already transmitted to third parties is subject to that provider's retention/deletion capabilities and must not be presented as locally reversible.
+   Removal from current retrieval does not purge version-control history, backups, or shared copies. Permanent erasure and narrowing a previously shared note require a separate, verified purge policy; changing its current folder alone does not revoke access to its earlier shared history.
 7. **Separate secrets from memory.** Credentials and secrets must not live in prompts, normal memory, logs, repository files, or general-purpose note stores.
 8. **Sensitive data needs explicit boundaries.** Microphone, camera, screen content, personal documents, contacts, browser data, and private memory require explicit data-flow documentation.
 9. **Backup and sync are data egress.** A local file that is synchronized through iCloud, Dropbox, OneDrive, Git, backup software, or another service is not local-only. Sync/backup behavior must be explicit.

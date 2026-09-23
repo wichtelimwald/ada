@@ -4,16 +4,16 @@ Ada is a local-first, privacy-first personal AI assistant project.
 
 ## Current stage
 
-**Product discovery and architecture exploration.** No implementation stack is selected.
+The product-discovery baseline and initial Python/Cedar/PydanticAI/DBOS/Ollama architecture decisions are accepted (ADR-0002 through ADR-0006). The local-chat slice exists; general Memory (ADR-0008) is still proposed.
 
 Do not infer or silently select:
 
 - UI framework or cross-platform strategy,
 - memory backend,
-- agent/orchestration framework,
+- orchestration beyond the adopted runtime and durable-action boundaries,
 - computer-control framework,
 - speech-to-text or text-to-speech stack,
-- local inference runtime or model,
+- any new inference runtime or model artifact beyond the accepted local baseline,
 - cloud model/provider,
 - repository-intelligence tooling.
 

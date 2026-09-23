@@ -56,7 +56,7 @@ Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; t
 The adopted top-level dependencies do not have an entirely permissive
 transitive graph. In one **combined Ada + research candidates** installation
 on macOS, the declared Ada requirements led to these reconstructed baseline
-paths (the independently installed Ada-only graph remains to be checked):
+paths (see the independent resolution evidence below):
 
 | Path from Ada | Installed Mac example | Distribution review |
 | --- | --- | --- |
@@ -66,8 +66,13 @@ paths (the independently installed Ada-only graph remains to be checked):
 These paths explain why direct MIT/Apache-2.0 licenses alone did not close the
 earlier license gate. Installed Mac file names and package metadata do not
 establish compliance for a Linux image, and the combined environment is not
-an independent Ada-only resolution. No incompatibility with Ada-owned MIT
-code has been established from this evidence; distribution compliance remains
+proof of the exact Ada-only release graph. An external 2026-09-23 review
+reports an Ada-only binary-wheel resolution for Linux CPython 3.14 on x86_64
+and aarch64: 37 packages, including `psycopg-binary` and `certifi`. The raw
+resolver reports and exact wheel inventories have not been archived in this
+repository; reproduce and retain them before treating the release graph as
+verified. No incompatibility with Ada-owned MIT code has been established
+from this evidence; distribution compliance remains
 unverified. See [Psycopg's binary-install documentation](https://www.psycopg.org/psycopg3/docs/basic/install.html),
 the [LGPLv3 terms](https://www.gnu.org/licenses/lgpl-3.0.html), and the
 [MPL 2.0 distribution FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/).
@@ -87,7 +92,7 @@ described above.
 
 The first local-chat profile is designed to interoperate with separately installed software/model artifacts that are **not vendored or redistributed by Ada**:
 
-- **Ollama** — MIT-licensed local model runtime/service. ADR-0006 proposes it as the initial self-hosted model-serving baseline.
+- **Ollama** — MIT-licensed local model runtime/service. ADR-0006 accepts it as the initial self-hosted model-serving baseline.
 - **Qwen3.5 9B / Ollama tag `qwen3.5:9b`** — externally downloaded Q4_K_M model artifact used as the current target-hardware baseline after a direct A/B test on Ada's MacBook Air M1 / 16 GB target. Ollama currently reports a 6.6 GB artifact and Apache License 2.0. Ada does not redistribute the weights.
 - **Qwen3 8B / Ollama tag `qwen3:8b`** — earlier 5.2 GB target-hardware baseline retained as a tested fallback; Apache License 2.0. Ada does not redistribute the weights.
 
