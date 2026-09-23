@@ -41,6 +41,7 @@ docker run --rm \
   --env OLLAMA_HOST=http://host.docker.internal:11434 \
   --env OLLAMA_BASE_URL=http://host.docker.internal:11434/v1 \
   --env HINDSIGHT_READY_TIMEOUT=420 \
+  --env HINDSIGHT_DB_INSTANCE="ada-memcmp-resume-$(date '+%Y%m%d-%H%M%S')" \
   --env PIP_NO_CACHE_DIR=1 \
   "$IMAGE" \
   sh /workspace/research/memory/comparison/hindsight/run.sh \
