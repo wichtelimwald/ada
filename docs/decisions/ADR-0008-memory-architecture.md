@@ -1279,13 +1279,13 @@ The first shared-fixture comparison provides additional evidence:
 
 - **LangMem** updated the same structured memory ID from Wednesday to Thursday and preserved two unresolved pickup claims as separate records, but invented a synthetic provenance value for the second claim when none was supplied;
 - **Letta/MemFS** produced readable Git-backed Markdown with explicit correction and separate conflicting claims, but corrupted/truncated one evidence token and invented another while later claiming verbatim preservation;
-- **Hindsight** now has fresh-database semantic evidence. Preference recall is source-backed; explicit Wednesday -> Thursday correction resolves to Thursday while retaining both source facts; bank isolation holds in the tested cross-token queries; direct recall is fast. However, its consolidated correction observation invents a validity interval that was never supplied, and its unresolved 16:00/17:00 pickup claims are collapsed into a single preferred 17:00 observation that incorrectly carries the 16:00 evidence token. Therefore Hindsight is promising as a **derived learning/recall layer**, not as Ada's canonical contradiction/provenance truth. Agentic `reflect` also timed out against local `qwen3.5:9b` and remains an optional performance benchmark. The only unfinished core scenario is forget, currently blocked by a harness misuse of Hindsight's async-only low-level Documents client; the harness now calls the documented DELETE endpoint directly.
+- **Hindsight** now has complete fresh-database core evidence. Preference recall is source-backed; explicit Wednesday -> Thursday correction resolves to Thursday while retaining both source facts; bank isolation holds in the tested cross-token queries; direct recall is fast; document forget deletes the source document and its associated memory unit, after which recall is empty. However, its consolidated correction observation invents a validity interval that was never supplied, and its unresolved 16:00/17:00 pickup claims are collapsed into a single preferred 17:00 observation that incorrectly carries the 16:00 evidence token. Therefore Hindsight is promising as a **derived learning/recall layer**, not as Ada's canonical contradiction/provenance truth. Agentic `reflect` also timed out against local `qwen3.5:9b` and remains an optional performance benchmark.
 
 These results strengthen the need to evaluate **semantic correctness and provenance integrity separately** from storage/runtime success.
 
 This moves the remaining ReMe decision work away from basic runtime feasibility and toward:
 
-- close Hindsight's remaining forget scenario, then compare ReMe, LangMem, Hindsight, and Letta/MemFS with the weighted decision matrix;
+- compare ReMe, LangMem, Hindsight, Letta/MemFS, and the strongest evidence-backed composite options with the weighted decision matrix;
 - external document reference/lifecycle fit;
 - exact transitive license/security audit;
 - maintenance/AgentScope dependency cost;
