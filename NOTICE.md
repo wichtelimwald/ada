@@ -51,6 +51,38 @@ For Ada development:
 
 Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; third-party code is not relicensed as Ada MIT code. Required license and NOTICE material must be preserved when distribution obligations apply.
 
+## Existing transitive license findings and release scope
+
+The adopted top-level dependencies do not have an entirely permissive
+transitive graph. In one **combined Ada + research candidates** installation
+on macOS, the declared Ada requirements led to these reconstructed baseline
+paths (the independently installed Ada-only graph remains to be checked):
+
+| Path from Ada | Installed Mac example | Distribution review |
+| --- | --- | --- |
+| `dbos` → `psycopg` → `psycopg-binary` | 3.3.6 / 3.3.6, LGPL-3.0-only | The binary wheel bundles native client libraries, including `libpq` and OpenSSL. Inspect each exact platform wheel and its bundled licenses/source and applicable LGPL obligations before redistributing it. |
+| `pydantic-ai-slim` → `tiktoken` → `requests` → `certifi` | 2026.7.22, MPL-2.0 | Review the actual certificate bundle and package notices/source access if included in an Ada-distributed artifact. |
+
+These paths explain why direct MIT/Apache-2.0 licenses alone did not close the
+earlier license gate. Installed Mac file names and package metadata do not
+establish compliance for a Linux image, and the combined environment is not
+an independent Ada-only resolution. No incompatibility with Ada-owned MIT
+code has been established from this evidence; distribution compliance remains
+unverified. See [Psycopg's binary-install documentation](https://www.psycopg.org/psycopg3/docs/basic/install.html),
+the [LGPLv3 terms](https://www.gnu.org/licenses/lgpl-3.0.html), and the
+[MPL 2.0 distribution FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/).
+
+The initial release plan is Ada-owned source code plus the dependency manifest
+and Dockerfile for users to build locally. Ada does not currently publish a
+prebuilt runtime image or installer bundling those dependencies. Review the
+resolved Ada-only dependency graph and appropriate project notices before a
+source release. Any future Ada-built image or installer needs its own review
+of the exact release artifacts, license and copyright notices, covered-source
+availability, bundled native libraries, and applicable LGPL conditions
+**before publication**. A one-line notice is not sufficient evidence for
+that distribution mode. Model artifacts remain separately installed as
+described above.
+
 ## External local-model baseline
 
 The first local-chat profile is designed to interoperate with separately installed software/model artifacts that are **not vendored or redistributed by Ada**:
