@@ -216,7 +216,11 @@ default development container remains on its isolated Docker network. Host
 networking requires Docker Desktop 4.34+ and explicit enablement and does
 not work with Enhanced Container Isolation. It also lets processes inside
 that container reach other host network services; use only reviewed code and
-do not mount private Memory or secrets into this development profile.
+do not mount private Memory or secrets into this development profile. The
+host-network profile must not run a checkout-controlled `postCreateCommand`:
+review the repository first, and run validation in the default development
+profile. This removes one automatic execution path; it does not make an
+unreviewed checkout safe to execute in the host-network container.
 If these conditions cannot be met, local chat must fail closed; do not expose
 Ollama on all host interfaces as a workaround.
 

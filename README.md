@@ -148,7 +148,10 @@ The development profile uses a read-only container root with temporary
 home and /tmp; editor extensions stored in the container home do not survive
 a rebuild. The repository bind mount remains writable for development;
 Python imports the mounted `/workspace/src` so edits take effect without a
-rebuild. Rebuild the image when dependencies or package metadata change.
+rebuild. The host-network profile runs no repository setup script automatically.
+Review the checkout before running commands in it; use the default development
+profile for routine validation. Rebuild the image when dependencies or package
+metadata change.
 
 Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 
