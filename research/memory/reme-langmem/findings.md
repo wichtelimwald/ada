@@ -1,6 +1,6 @@
 # ReMe + LangMem final fit review
 
-- **Status:** Final executable gate pending
+- **Status:** Synthetic characterization complete; adoption and license gates open
 - **Date:** 2026-09-23
 - **Candidate role split:** ReMe authoritative file substrate + LangMem semantic-change proposal helper
 - **Pinned characterization versions:** ReMe 0.4.1.12, AgentScope 2.0.7.post1, LangMem 0.0.30, langchain-ollama 1.1.0
@@ -227,7 +227,7 @@ AdaGuard selects whether a protection domain may be accessed before Ada starts/u
 
 ### Runtime topology
 
-Preferred MVP topology:
+Candidate topology if ReMe + LangMem is later selected:
 
 ```text
 Ada Python process
