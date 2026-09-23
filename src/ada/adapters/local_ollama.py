@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import json
 from urllib.error import URLError
 from urllib.parse import urlparse, urlunparse
-from urllib.request import ProxyHandler, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
 import httpx2
 import pydantic_ai
@@ -33,6 +33,13 @@ class LocalModelConfigurationError(ValueError):
 
 class LocalModelUnavailableError(RuntimeError):
     """The configured loopback Ollama service/model is not ready."""
+
+
+class _RejectRedirects(HTTPRedirectHandler):
+    """Do not follow a local service redirect out of the loopback boundary."""
+
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -82,7 +89,7 @@ def check_local_ollama_ready(
     try:
         # URL validation alone is insufficient: urllib otherwise honors host
         # proxy settings even for localhost when no bypass is configured.
-        with build_opener(ProxyHandler({})).open(
+        with build_opener(ProxyHandler({}), _RejectRedirects()).open(
             tags_url, timeout=timeout_seconds
         ) as response:
             payload = json.load(response)

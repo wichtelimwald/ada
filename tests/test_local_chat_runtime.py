@@ -17,6 +17,7 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from ada.adapters.local_ollama import (
     LocalModelConfigurationError,
+    LocalModelUnavailableError,
     LocalOllamaConfig,
     build_local_ollama_runtime,
     check_local_ollama_ready,
@@ -310,6 +311,45 @@ class LocalChatRuntimeTests(unittest.TestCase):
         finally:
             proxy.shutdown()
             ollama.shutdown()
+
+    def test_readiness_does_not_follow_redirect_to_other_endpoint(self) -> None:
+        hits: list[str] = []
+
+        class Destination(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                hits.append("destination")
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"models": [{"name": "qwen3.5:9b"}]}')
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        destination = ThreadingHTTPServer(("127.0.0.1", 0), Destination)
+
+        class Redirect(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(302)
+                self.send_header(
+                    "Location", f"http://127.0.0.1:{destination.server_port}/api/tags"
+                )
+                self.end_headers()
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        redirect = ThreadingHTTPServer(("127.0.0.1", 0), Redirect)
+        for server in (destination, redirect):
+            Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            with self.assertRaises(LocalModelUnavailableError):
+                check_local_ollama_ready(
+                    LocalOllamaConfig(base_url=f"http://127.0.0.1:{redirect.server_port}/v1")
+                )
+            self.assertEqual(hits, [])
+        finally:
+            redirect.shutdown()
+            destination.shutdown()
 
     def test_local_ollama_profile_rejects_non_loopback_endpoints(self) -> None:
         for url in (
