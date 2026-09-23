@@ -4,7 +4,7 @@
 - **Date:** 2026-09-23
 - **Evidence base:** completed executable comparison of ReMe 0.4.1.12, LangMem 0.0.30, Hindsight 0.10.1, Letta Code/MemFS 0.32.15
 - **Model baseline:** local `qwen3.5:9b`
-- **Purpose:** compare viable Memory architecture roles, not force a single-framework winner
+- **Purpose:** first agree criteria and weights; only then score viable Memory architecture roles
 
 This matrix is deliberately separate from ADR acceptance. The weights and scores are a research proposal and must be reviewed before they become decision evidence.
 
@@ -25,9 +25,11 @@ The hard-gate table already rules out treating LangMem or Hindsight **alone** as
 
 It also means Letta/MemFS cannot be selected as the authoritative store from current evidence without more characterization.
 
-## Proposed weights
+## Proposed weights — maintainer confirmation required
 
-The weighting reflects Ada's confirmed product constraints: correctness and inspectability before sophistication.
+These weights are a **proposal only**. They must be agreed before candidate scoring is considered decision evidence. Until then, no weighted ranking is valid.
+
+The proposal reflects Ada's confirmed product constraints: correctness and inspectability before sophistication.
 
 | Criterion | Weight | Why it matters |
 | --- | ---: | --- |
@@ -54,23 +56,13 @@ The weighting reflects Ada's confirmed product constraints: correctness and insp
 
 Scores distinguish **demonstrated behavior** from hypothetical future capability.
 
-## Weighted matrix
+## Scoring status
 
-| Criterion | Weight | ReMe | LangMem | Hindsight | Letta/MemFS | ReMe + LangMem | ReMe + Hindsight |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Human-readable/editable authoritative truth | 18 | 5.0 | 1.0 | 1.0 | 4.0 | 5.0 | 5.0 |
-| Correction / contradiction semantics | 16 | 3.0 | 4.5 | 2.0 | 4.0 | 4.5 | 2.5 |
-| Provenance integrity / explainability | 14 | 4.0 | 2.5 | 2.5 | 1.5 | 4.0 | 3.0 |
-| Privacy / scope / isolation | 12 | 3.0 | 3.0 | 4.0 | 2.0 | 3.5 | 4.0 |
-| Forget / rebuild / lifecycle | 10 | 5.0 | 2.5 | 4.5 | 2.0 | 5.0 | 5.0 |
-| Retrieval / context efficiency | 8 | 3.0 | 3.5 | 4.5 | 3.5 | 3.5 | 4.5 |
-| Local/offline + resource fit | 7 | 4.0 | 4.0 | 2.5 | 3.0 | 3.5 | 2.0 |
-| Integration fit with Ada architecture | 6 | 2.0 | 4.0 | 3.0 | 1.0 | 2.0 | 2.0 |
-| Operational / maintenance simplicity | 5 | 2.5 | 4.0 | 2.0 | 2.0 | 1.5 | 1.0 |
-| Portability / replaceability | 4 | 4.0 | 4.0 | 2.5 | 3.0 | 4.0 | 3.0 |
-| **Weighted result / 100** | **100** | **74.5** | **60.4** | **53.9** | **55.6** | **79.6** | **69.8** |
+Candidate scoring is intentionally **deferred until the weights above are confirmed**.
 
-The numeric result is a decision aid, not a proof.
+The previously calculated weighted totals were generated too early and are not retained as decision evidence.
+
+After weight confirmation, score each candidate and composite against the same frozen criteria and document the evidence for every score before calculating totals.
 
 ## Evidence behind the main score differences
 
@@ -212,54 +204,12 @@ Custom work should only be justified for the smallest deterministic seams that n
 
 This is very different from writing a complete Ada Memory engine.
 
-## Sensitivity
+## Next step
 
-The current result is not driven only by low-level implementation convenience.
-
-Even with substantially higher weight on integration/operational simplicity and somewhat lower weight on correction/provenance, the relative pattern remains:
-
-1. ReMe + LangMem
-2. ReMe
-3. ReMe + Hindsight
-4. LangMem
-5. Letta/MemFS / Hindsight
-
-The exact numeric distance changes, but the architectural conclusion is stable:
-
-- **ReMe is the best demonstrated authoritative substrate.**
-- **LangMem is the most promising reusable semantic-change helper.**
-- **Hindsight is the strongest specialized derived-learning/recall candidate, but not required for MVP.**
-- **Letta/MemFS is valuable architecture reference material but does not justify runtime adoption from current evidence.**
-
-## Draft architecture implication
-
-The smallest reuse-first direction supported by current evidence is:
-
-```text
-Authoritative Memory
-Markdown/YAML in protected vaults
-        │
-        ▼
-ReMe substrate
-files / watch / rebuild / simple retrieval
-        │
-        ├───────────────┐
-        ▼               │
-LangMem proposal        │
-(extract/update)        │
-        │               │
-        ▼               │
-Ada deterministic       │
-validation + AdaGuard   │
-        │               │
-        └──── write ─────┘
-
-Optional later derived layers:
-- Hindsight, only if richer learning/recall shows material benefit;
-- graph/vector indexes, only if simpler retrieval is insufficient.
-```
-
-This is a **draft implication**, not yet an accepted ADR decision.
+1. Confirm or adjust the proposed criteria and weights.
+2. Freeze them in this document.
+3. Score the candidates and composite options against the frozen matrix.
+4. Only then derive weighted totals and architecture implications.
 
 ## Remaining gates before ADR acceptance
 
