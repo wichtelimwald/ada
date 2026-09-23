@@ -56,7 +56,7 @@ else
     PID=$!
     "$OUT/venv/bin/python" "$HERE/driver.py" "http://127.0.0.1:$PORT" "$FIXTURES" "$OUT" "$READY_TIMEOUT" >"$OUT/run.log" 2>&1 || {
       STATUS="FINDING"
-      NOTE="Hindsight core comparison lane did not complete; inspect server.log/run.log."
+      NOTE="Hindsight core comparison lane did not complete; inspect semantic.json and run.log. Partial semantic evidence is preserved."
     }
   fi
 fi
