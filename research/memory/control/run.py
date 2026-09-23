@@ -111,7 +111,8 @@ def run() -> dict[str, object]:
             "open_gates": [
                 "automatic capture of arbitrary external edits and crash/concurrency handling",
                 "editor identity is not authenticated by Git commit metadata",
-                "deleted data remains in Git history; retention and backup purge are unproven",
+                "history remains recoverable by design; exclusion from future Ada indexes is untested",
+                "eventual history/backup purge is a separate, uncharacterized operations policy",
                 "separate roots under the same OS principal do not enforce privacy",
                 "search relevance, size and latency on representative vaults are unmeasured",
                 "source/document-reference lifecycle and generalized semantic validation are untested",
