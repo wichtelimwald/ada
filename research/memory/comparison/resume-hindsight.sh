@@ -19,6 +19,8 @@ fi
 
 IMAGE="ada-memory-hindsight:0.10.1"
 docker build \
+  --build-arg HOST_UID="$(id -u)" \
+  --build-arg HOST_GID="$(id -g)" \
   -t "$IMAGE" \
   -f "$HERE/hindsight/Dockerfile" \
   "$HERE/hindsight" \
