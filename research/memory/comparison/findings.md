@@ -73,16 +73,20 @@ Interpretation:
 
 No semantic result yet.
 
-Three sandbox attempts have exposed harness/image prerequisites rather than Hindsight Memory semantics:
+Four sandbox attempts have exposed harness/image prerequisites rather than Hindsight Memory semantics:
 
 1. the first attempt timed out while the initial ONNX embedding model was still downloading;
 2. after extending readiness and reusing the downloaded model, Hindsight initialized embeddings and verified the local Ollama connection, but embedded PostgreSQL (pg0) failed because the generic `python:3.14-slim` sandbox lacked `libgssapi_krb5.so.2`;
-3. after adding that runtime library, pg0 reached `initdb` but failed because the container was executed with the host UID (501) and that UID had no passwd entry inside the image.
+3. after adding that runtime library, pg0 reached `initdb` but failed because the container was executed with the host UID (501) and that UID had no passwd entry inside the image;
+4. after adding the matching passwd user, PostgreSQL started, but pg0 returned `uri=None`; Hindsight then rejected the missing DB URL before migrations.
 
-Both later failures are Linux sandbox prerequisites for pg0's bundled PostgreSQL, not host requirements and not semantic failures.
+The fourth failure was traced to pg0's current Unix process-liveness check: pg0 invokes the external `ps` command, while Debian/Python slim images do not include it by default. Without `ps`, pg0 can start PostgreSQL but misclassify the process as not running and expose no URI.
+
+These are Linux sandbox prerequisites, not host requirements and not Hindsight semantic failures.
 
 The Hindsight lane now builds a dedicated disposable research image that:
-- installs only the required Kerberos GSSAPI runtime library;
+- installs the required Kerberos GSSAPI runtime library;
+- installs `procps` so pg0's `ps`-based process check works;
 - creates a non-root passwd-visible user matching the maintainer's host UID/GID;
 - preserves host ownership of repo-local result artifacts.
 
