@@ -90,6 +90,14 @@ The Hindsight lane now builds a dedicated disposable research image that:
 - creates a non-root passwd-visible user matching the maintainer's host UID/GID;
 - preserves host ownership of repo-local result artifacts.
 
+With those prerequisites fixed, the next run reached actual Memory operations:
+- retain/consolidation completed;
+- direct recall completed quickly (roughly 90 ms for preference and 37 ms for correction);
+- recall preferred consolidated observations over superseded raw facts;
+- Hindsight's agentic `reflect` call timed out against local `qwen3.5:9b` after several Ollama read timeouts and is therefore treated as an optional performance benchmark, not part of the common semantics gate.
+
+That run is **not used as final semantic comparison evidence** because repeated resume attempts had reused the same pg0 instance; logs showed duplicate accumulated memories (for example 2 pending memories in a one-item isolation bank). Retries now use a fresh pg0 instance while preserving only the venv/model cache.
+
 The host and persistent Dev Container remain unchanged.
 
 ## Current comparison interpretation
