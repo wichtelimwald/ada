@@ -206,17 +206,21 @@ def validate_noncorrection_conflict(existing: MemoryRecord, rows: list[dict], *,
     prior = by_id.get(PICKUP_ID)
     if prior is None:
         raise ValueError("Proposal silently dropped existing conflicting claim")
-    if prior["statement"] != existing.statement or prior["subject"] != existing.subject:
+    if (prior["statement"] != existing.statement or prior["subject"] != existing.subject
+            or prior["kind"] != existing.kind):
         raise ValueError("Proposal silently overwrote existing conflicting claim")
-    additions = [
-        row for row in rows
-        if row["id"] != PICKUP_ID
-        and row["subject"] == "pickup-time"
-        and "17:00" in row["statement"]
-    ]
-    if len(additions) != 1:
+    additions = [row for row in rows if row["id"] != PICKUP_ID]
+    if len(rows) != 2 or len(additions) != 1:
         raise ValueError("Proposal did not preserve one separate 17:00 conflicting claim")
-    return additions[0]
+    new_claim = additions[0]
+    # This fixture accepts only the observed disambiguation of the same topic.
+    # Ada owns the canonical subject and ID; model-generated labels are not
+    # promoted to file identity or authority.
+    if (new_claim["kind"] != "fact"
+            or new_claim["subject"] not in {existing.subject, f"{existing.subject}-17"}
+            or new_claim["statement"].strip().lower() != "pickup is at 17:00"):
+        raise ValueError("New claim is not the expected separate pickup-time fact")
+    return {**new_claim, "id": "pickup-17", "subject": existing.subject}
 
 
 def assert_silent_overwrite_rejected(existing: MemoryRecord) -> str:

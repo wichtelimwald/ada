@@ -27,7 +27,8 @@ The important boundaries are:
 - **ReMe/Markdown is authoritative**; ReMe model-generated Auto Memory/Dream is
   not used for canonical writes in this spike.
 - **LangMem only proposes semantic changes**. Its schema contains no provenance,
-  scope, authority, or permission fields.
+  scope, authority, or permission fields. Ada assigns canonical record identity;
+  model-generated labels remain proposal data.
 - **Ada supplies provenance externally** and validates correction/conflict
   behavior before any Markdown write.
 - **AdaGuard remains authority**. Nothing in Memory or LangMem can grant rights.

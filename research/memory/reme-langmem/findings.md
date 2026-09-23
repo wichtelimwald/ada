@@ -182,6 +182,8 @@ When `explicit_correction=false`:
 
 - an existing conflicting explicit claim must not be removed or rewritten;
 - a second contradictory claim may be proposed as a new fact;
+- Ada assigns the new claim's canonical ID and topic after validating its
+  semantic content; model-proposed labels are never authoritative identities;
 - Ada owns the resulting `contradicted` lifecycle state;
 - a silent overwrite is rejected.
 
@@ -381,6 +383,34 @@ The runtime tool-list assertion, proposal validator, and all original gates
 remain in place. Rerun the updated spike on the target Mac; this change has
 only been checked statically in the development environment.
 
+### Third target-Mac run (2026-09-23, head `f7477f2`)
+
+The third combined run remains **FINDINGS**. Preflight, combined dependency
+installation, runtime capture, and `pip-audit` passed (168 distributions; zero
+reported vulnerability records). ReMe's stdio service exposed exactly the
+four intended read tools. `read` and `search` returned the pre-existing
+Markdown, the explicit Thursday correction was validated, and ReMe re-indexed
+the Ada-written correction. Out-of-band edit/re-index was not reached.
+
+The saved raw LangMem conflict proposal establishes that the model **did**
+preserve the original 16:00 claim unchanged and propose one separate 17:00
+claim. It labeled the new claim `pickup-time-17` rather than the canonical
+`pickup-time`; the validator previously required an exact subject match and
+thus raised `Proposal did not preserve one separate 17:00 conflicting claim`.
+This was a validator/schema-boundary mismatch, not evidence of a dropped or
+overwritten claim. The first run's identical error cannot be retrospectively
+classified because its raw proposal was not captured.
+
+The research validator now accepts only the observed same-topic disambiguation
+(`pickup-time-17`) or the exact canonical topic, while requiring exactly two
+records, an unchanged existing claim (including kind), and the specific new
+17:00 fact. It assigns the new claim Ada's canonical ID `pickup-17` and topic
+`pickup-time` before any authoritative write. An unrelated subject or altered
+prior claim still fails closed. This fixture is **scenario-specific**, not
+proof of a general contradiction resolver. A final target-Mac run must still
+pass conflict validation, negative overwrite rejection, and out-of-band
+re-indexing before a decision.
+
 ### Triage of the 11 flagged license metadata entries
 
 The inventory's substring classifier is a triage tool, not an SPDX parser.
@@ -408,8 +438,9 @@ been adopted by this research PR.
 
 ## 7. Current decision gate
 
-The executable runs exposed an index watcher omission and an unresolved
-semantic conflict finding above.
+The executable runs exposed an index watcher omission and a mismatch between
+the model's distinct claim label and Ada's canonical topic. The final gate
+is still open.
 
 The ReMe + LangMem option can move toward ADR selection **only if the final combined run confirms**:
 
