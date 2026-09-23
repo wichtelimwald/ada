@@ -9,6 +9,10 @@ from ada.core.actions import CreateCalendarEventDraft
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+_MONTHS_DE = (
+    "januar", "februar", "märz", "april", "mai", "juni", "juli", "august",
+    "september", "oktober", "november", "dezember",
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +57,17 @@ def _source_explicitly_supports_date(
         rf"(?<!\d){year}\s*[-/.]\s*0?{month}\s*[-/.]\s*0?{day}(?!\d)",
         rf"(?<!\d)0?{day}\s*[-/.]\s*0?{month}\s*[-/.]\s*{year}(?!\d)",
     )
-    return any(re.search(pattern, source_text) for pattern in patterns)
+    if any(re.search(pattern, source_text) for pattern in patterns):
+        return True
+    # A written month is equally explicit; require day, month and four-digit
+    # year together so a year elsewhere in the message cannot corroborate it.
+    month_name = _MONTHS_DE[value.month - 1]
+    if month_name == "märz":
+        month_name = r"(?:märz|maerz)"
+    return bool(re.search(
+        rf"(?<!\d)0?{day}\.?(?:\s+){month_name}\s+{year}(?!\d)",
+        source_text, re.IGNORECASE,
+    ))
 
 
 def _source_explicitly_supports_calendar(
@@ -87,6 +101,14 @@ def _valid_time(value: str | None) -> bool:
     return bool(value and _TIME_RE.fullmatch(value.strip()))
 
 
+def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
+    hour, minute = (int(part) for part in value.strip().split(":"))
+    forms = [rf"(?<![\d:])0?{hour}[:.]{minute:02d}(?!\d)"]
+    if minute == 0:
+        forms.append(rf"(?<!\d)0?{hour}\s+Uhr(?!\w)")
+    return any(re.search(form, source_text, re.IGNORECASE) for form in forms)
+
+
 def assess_calendar_create_draft(
     draft: CreateCalendarEventDraft,
     *,
@@ -112,9 +134,13 @@ def assess_calendar_create_draft(
     start_valid = _valid_time(draft.start_time)
     end_valid = _valid_time(draft.end_time)
 
-    if not start_valid:
+    if not start_valid or not _source_explicitly_supports_time(
+        draft.start_time or "", source_text
+    ):
         missing.append("start_time")
-    if not end_valid:
+    if not end_valid or not _source_explicitly_supports_time(
+        draft.end_time or "", source_text
+    ):
         missing.append("end_time")
     elif start_valid:
         assert draft.start_time is not None

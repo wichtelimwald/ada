@@ -141,6 +141,37 @@ class CalendarDraftTests(unittest.TestCase):
 
         self.assertEqual(assessment.missing, ())
 
+    def test_written_german_month_supports_explicit_date(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(date="2026-10-12", language="de"),
+            source_text=(
+                "Zahnarzttermin am 12. Oktober 2026 von 16 Uhr bis 16:30 "
+                "in den Familienkalender eintragen."
+            ),
+        )
+        self.assertEqual(assessment.missing, ())
+
+    def test_model_cannot_invent_start_or_end_time(self) -> None:
+        source = (
+            "Please add a dentist appointment on 2026-09-21 at 16:00 "
+            "to the family calendar."
+        )
+        assessment = assess_calendar_create_draft(
+            _draft(start_time="15:00", end_time="16:30"),
+            source_text=source,
+        )
+        self.assertEqual(assessment.missing, ("start_time", "end_time"))
+
+    def test_model_cannot_invent_end_time_for_explicit_start(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(end_time="16:30"),
+            source_text=(
+                "Please add a dentist appointment on 2026-09-21 at 16:00 "
+                "to the family calendar."
+            ),
+        )
+        self.assertEqual(assessment.missing, ("end_time",))
+
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):
             with self.subTest(invalid=invalid):

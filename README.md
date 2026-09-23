@@ -139,7 +139,7 @@ The model and endpoint remain configurable:
 ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
 ```
 
-This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**. Ada-owned deterministic logic — not the model — decides which material fields are actually required and checks them against the original user request, so model-invented requirements or silently invented dates cannot become action requirements. Until a provider/default-calendar policy is explicitly defined, the target calendar remains a required material field rather than being guessed. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
+This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**. Ada-owned deterministic logic — not the model — decides which material fields are actually required and checks them against the original user request, so model-invented requirements or silently invented dates and times cannot become action requirements. Until a provider/default-calendar policy is explicitly defined, the target calendar remains a required material field rather than being guessed. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
 
 Runtime container sanity check:
 
