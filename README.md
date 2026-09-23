@@ -143,6 +143,10 @@ Enhanced Container Isolation; this opt-in profile is for reviewed development
 code, without private Memory or secrets mounted. If unavailable, use native
 local chat rather than exposing Ollama on all interfaces.
 
+The development profile uses a read-only container root with temporary
+home and /tmp; editor extensions stored in the container home do not survive
+a rebuild. The repository bind mount remains writable for development.
+
 Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 
 Inside the chat:

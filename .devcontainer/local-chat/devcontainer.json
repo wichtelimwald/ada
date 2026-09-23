@@ -15,6 +15,9 @@
     "--network=host",
     "--cap-drop=ALL",
     "--security-opt=no-new-privileges",
+    "--read-only",
+    "--tmpfs=/tmp:rw,nosuid,noexec,uid=10001,gid=10001",
+    "--tmpfs=/home/ada:rw,nosuid,uid=10001,gid=10001",
     "--pids-limit=256"
   ],
   "postCreateCommand": "sh ./scripts/validate.sh"
