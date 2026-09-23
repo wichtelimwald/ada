@@ -1335,8 +1335,10 @@ A dependency-free [Markdown/Git/direct-search control](../../research/memory/con
 now exercises the same synthetic preference, correction, contradiction, and
 direct-edit cases. It succeeds at reading current files after a direct edit,
 preserving separate conflicting notes, and detecting a change in Git diff.
-Its explicit capture step is not an automatic watcher. Deleting a note leaves
-the content in Git history; separate repositories under the same OS identity
+Its explicit capture step is not an automatic watcher. Deleting a note removes
+it from direct search while retaining historical versions, as permitted by
+the versioning/forgetting split above. A future derived index must likewise
+exclude forgotten content. Separate repositories under the same OS identity
 do not enforce household privacy. Its search relevance and scale remain
 unmeasured. No numeric score or Memory-backend selection follows from this
 small control run.
@@ -1387,7 +1389,8 @@ Before this ADR can move to Accepted:
 2. evaluate the control against representative retrieval/edit/forget scenarios
    on the target platform, without inventing scores for missing evidence;
 3. define how out-of-band edits are captured, how old source references are
-   retired, and how Git history and backups interact with deliberate forgetting;
+   retired, and how normal retrieval/indexes exclude forgotten content while
+   history and backup purge remain separate operations;
 4. demonstrate enforceable per-person protection domains and scoped indexes,
    not only different folders or read-only MCP tool names;
 5. complete license/security review for the selected dependency path and
