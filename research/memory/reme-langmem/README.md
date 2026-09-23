@@ -39,10 +39,14 @@ The important boundaries are:
 ## What the run checks
 
 1. Python 3.14 / Apple Silicon / local Ollama prerequisites.
-2. One combined venv with exact top-level versions:
+2. One combined venv containing **Ada's actual current package** plus:
+   - `pydantic-ai-slim[openai]==2.46.0`
+   - `cedarpy==4.12.0`
+   - `dbos==3.0.0`
    - `reme-ai[as]==0.4.1.12`
    - `langmem==0.0.30`
    - `langchain-ollama==1.1.0`
+   This makes dependency compatibility with Ada's accepted runtime part of the gate, not a later assumption.
 3. Security floors for vulnerable LangChain/LangGraph lines:
    - `langchain-core >= 1.3.3`
    - `langgraph >= 1.0.10,<2`
