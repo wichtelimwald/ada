@@ -141,6 +141,11 @@ ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
 
 This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**. Ada-owned deterministic logic — not the model — decides which material fields are actually required and checks them against the original user request, so model-invented requirements or silently invented dates and times cannot become action requirements. Until a provider/default-calendar policy is explicitly defined, the target calendar remains a required material field rather than being guessed. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
 
+Use `HH:MM` for unambiguous calendar times. Dotted values such as `09.10` can
+also mean a partial date, so they need `Uhr` or an unambiguous time in the same
+range. For example, `09.10 Uhr`, `09.10-10:30`, and `16.30-17.00` are recognized;
+`21.09.` alone does not supply a time.
+
 Runtime container sanity check:
 
 ```bash

@@ -239,6 +239,83 @@ class CalendarDraftTests(unittest.TestCase):
                 )
                 self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
+    def test_partial_dates_do_not_corroborate_dotted_times(self) -> None:
+        for source_date in ("21.09.", "21.09", "21 . 09."):
+            with self.subTest(source_date=source_date):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="21:09", end_time="22:00"),
+                    source_text=(
+                        f"Add a dentist appointment on {source_date} "
+                        "to 22:00 to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
+
+    def test_compact_time_ranges_are_not_masked_as_dates(self) -> None:
+        for time_range in (
+            "16.30-17.00", "16.30–17.00", "16.30 - 17:00",
+            "16:30-17.00", "16.30-17.00.",
+        ):
+            with self.subTest(time_range=time_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="16:30", end_time="17:00"),
+                    source_text=(
+                        "Add a dentist appointment on 2026-09-21 "
+                        f"from {time_range} to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ())
+
+    def test_ambiguous_dotted_date_ranges_require_a_time_marker(self) -> None:
+        for time_range in ("09.10-10.11", "09.10–10.11", "09.10. bis 10.11."):
+            with self.subTest(time_range=time_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="09:10", end_time="10:11"),
+                    source_text=(
+                        "Add a dentist appointment on 2026-09-21 "
+                        f"from {time_range} to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("start_time", "end_time"))
+
+        for time_range in ("09.10-10.11 Uhr", "09.10 Uhr bis 10.11 Uhr", "09:10-10:11"):
+            with self.subTest(time_range=time_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="09:10", end_time="10:11"),
+                    source_text=(
+                        "Add a dentist appointment on 2026-09-21 "
+                        f"from {time_range} to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ())
+
+    def test_explicit_time_in_range_disambiguates_dotted_endpoint(self) -> None:
+        for time_range in ("09.10-10.30", "09.10 bis 10:30", "09.10 to 10.30"):
+            with self.subTest(time_range=time_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="09:10", end_time="10:30"),
+                    source_text=(
+                        "Add a dentist appointment on 2026-09-21 "
+                        f"from {time_range} to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ())
+
+    def test_time_range_cannot_start_inside_a_spaced_date(self) -> None:
+        for source_date, start_time, missing in (
+            ("2026 - 09.21", "09:21", ("start_time",)),
+            ("21 . 09.26", "09:26", ("date_with_year", "start_time")),
+        ):
+            with self.subTest(source_date=source_date):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time=start_time, end_time="10:00"),
+                    source_text=(
+                        f"Add a dentist appointment on {source_date} "
+                        "to 10:00 to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, missing)
+
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):
             with self.subTest(invalid=invalid):

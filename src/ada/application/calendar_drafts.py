@@ -13,6 +13,13 @@ _NUMERIC_DATE_RE = re.compile(
     r"(?<!\d)(?:\d{4}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{1,2}|"
     r"\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*(?:\d{4}|\d{2}))(?!\d)"
 )
+_SOURCE_TIME_TOKEN = r"(?:[01]?\d|2[0-3])[:.][0-5]\d"
+_SOURCE_TIME_RANGE_RE = re.compile(
+    rf"(?<![\w:./-])(?P<start>{_SOURCE_TIME_TOKEN})\s*"
+    rf"(?:[-–—]|\b(?:to|bis)\b)\s*(?P<end>{_SOURCE_TIME_TOKEN})"
+    r"(?![\w:]|\.\d|[/-]\s*\d)",
+    re.IGNORECASE,
+)
 _MONTHS_DE = (
     "januar", "februar", "märz", "april", "mai", "juni", "juli", "august",
     "september", "oktober", "november", "dezember",
@@ -105,13 +112,51 @@ def _valid_time(value: str | None) -> bool:
     return bool(value and _TIME_RE.fullmatch(value.strip()))
 
 
+def _could_be_partial_date(token: str) -> bool:
+    if ":" in token:
+        return False
+    day, month = (int(part) for part in token.split("."))
+    return 1 <= day <= 31 and 1 <= month <= 12
+
+
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
     hour, minute = (int(part) for part in value.strip().split(":"))
+    date_spans = [match.span() for match in _NUMERIC_DATE_RE.finditer(source_text)]
+
+    def normalize_range(match: re.Match[str]) -> str:
+        if any(start < match.start() < end for start, end in date_spans):
+            # Do not turn a date suffix into a time: 2026 - 09.21 to 10:00.
+            return match.group(0)
+        start, end = match.group("start", "end")
+        if _could_be_partial_date(start) and re.search(
+            r"\b(?:am|on|den)\s*$", source_text[:match.start()], re.IGNORECASE
+        ):
+            return match.group(0)
+        has_time_marker = re.match(r"\s+Uhr\b", source_text[match.end():], re.IGNORECASE)
+        if (
+            _could_be_partial_date(start)
+            and _could_be_partial_date(end)
+            and not has_time_marker
+        ):
+            # A range such as 09.10-10.11 could mean two calendar dates.
+            return " "
+        # Protect an explicit time range before masking three-part dates;
+        # otherwise 16.30-17.00 is partly consumed as a date token.
+        return f"{start.replace('.', ':')} - {end.replace('.', ':')}"
+
+    time_ranges_normalized = _SOURCE_TIME_RANGE_RE.sub(normalize_range, source_text)
     # A complete numeric date may contain a dotted month/day fragment that
     # resembles a time, including when the date uses mixed separators.
     # Two-digit years are masked too, without using them to infer a century.
-    without_dates = _NUMERIC_DATE_RE.sub(" ", source_text)
-    forms = [rf"(?<![\w:.])0?{hour}[:.]{minute:02d}(?![\w:]|\.\d)"]
+    without_dates = _NUMERIC_DATE_RE.sub(" ", time_ranges_normalized)
+    forms = [rf"(?<![\w:.])0?{hour}:{minute:02d}(?![\w:]|\.\d)"]
+    dotted = rf"(?<![\w:./-])0?{hour}\.{minute:02d}"
+    if _could_be_partial_date(f"{hour}.{minute:02d}"):
+        # 21.09 or 21.09. alone is not evidence for 21:09.
+        dotted += r"\s+Uhr\b"
+    else:
+        dotted += r"(?![\w:]|\.\d)"
+    forms.append(dotted)
     if minute == 0:
         forms.append(rf"(?<!\d)0?{hour}\s+Uhr(?!\w)")
     return any(re.search(form, without_dates, re.IGNORECASE) for form in forms)
