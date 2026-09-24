@@ -37,8 +37,8 @@
 - Ada durable-action semantics ↔ DBOS system database / recovery engine,
 - DBOS workflow steps ↔ external providers with their own idempotency/reconciliation semantics,
 - Ada agent-runtime adapter ↔ separately running loopback Ollama/model process.
-- opt-in host-network development container ↔ other host network services;
-  mounted checkout code and editor actions are an execution boundary.
+- native macOS local-chat process ↔ host resources accessible to the logged-in
+  user; a bridged Dev Container does not isolate this separate native process.
 
 ## Threats to evaluate
 
@@ -69,8 +69,8 @@
 - ephemeral conversation context being mistaken for authoritative long-term Memory,
 - untrusted content or model output silently rewriting the persistent personality,
 - personality drift being used to smuggle new authority, disclosure rules, or false action claims into model behavior.
-- checkout-controlled setup scripts running automatically inside a host-networked
-  development container with access to other host services.
+- native local-chat dependencies or executed code accessing resources available
+  to the logged-in macOS user.
 
 ## Initial design targets
 
@@ -102,9 +102,8 @@
 - personality bootstrap seed copied only into empty authoritative Memory; existing Memory wins,
 - persistent personality changes must be inspectable, reversible, attributable, and isolated from permissions/privacy/action-truth rules,
 - untrusted content/model output cannot directly persist personality changes.
-- no automatic checkout-controlled setup command in the opt-in host-network
-  profile; use it only for reviewed code, without private mounts or secrets,
-  and run routine validation in the default development profile. Host services
-  are still reachable by code deliberately run in this container.
+- keep the first macOS chat CLI native alongside a loopback-bound Ollama and
+  run development and tests in the default bridged Dev Container; review any
+  future container-to-host Ollama connection before enabling it.
 
 Update this document whenever a new trust boundary, threat actor, data flow, or privileged capability is introduced.

@@ -126,32 +126,13 @@ ada chat
 
 The first local-chat profile only accepts a loopback Ollama endpoint. Conversation history is kept in memory for the current process only and is **not** Ada Memory.
 
-For local chat in a container on macOS, select the separate
-`.devcontainer/local-chat/devcontainer.json` profile or run the runtime image
-with Docker Desktop host networking enabled (Docker Desktop 4.34+):
-
-```bash
-docker build --target runtime -t ada:dev .
-docker run --rm -it --network=host --cap-drop=ALL \
-  --security-opt=no-new-privileges --read-only --tmpfs /tmp:rw,noexec,nosuid \
-  --pids-limit=256 ada:dev chat
-```
-
-Keep Ollama bound to host loopback. Ada bypasses proxy settings for both its
-readiness check and model requests. Host networking allows the container to
-reach **other host services too** and cannot be used with Docker Desktop's
-Enhanced Container Isolation; this opt-in profile is for reviewed development
-code, without private Memory or secrets mounted. If unavailable, use native
-local chat rather than exposing Ollama on all interfaces.
-
-The development profile uses a read-only container root with temporary
-home and /tmp; editor extensions stored in the container home do not survive
-a rebuild. The repository bind mount remains writable for development;
-Python imports the mounted `/workspace/src` so edits take effect without a
-rebuild. The host-network profile runs no repository setup script automatically.
-Review the checkout before running commands in it; use the default development
-profile for routine validation. Rebuild the image when dependencies or package
-metadata change.
+On macOS, run this initial chat **natively** alongside the separately installed
+Ollama service, with Ollama bound to host loopback. Use the default bridged Dev
+Container for development and tests; it cannot reach the Mac's loopback-only
+Ollama service. Ada disables ambient proxy discovery for both readiness and
+model requests. This first chat path runs with the macOS user's permissions;
+it is not isolated by a runtime container. Containerized local chat needs a
+separately reviewed, restricted Ollama connection before it is supported.
 
 Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 

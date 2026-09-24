@@ -42,8 +42,9 @@ integration and maintenance burden for this narrow use case.
   CLI exit. The model client processes conversation contents locally and
   contacts the configured loopback service. The client library is general
   purpose; these constraints apply to **this Ada use**, not every use of it.
-  Host networking still exposes other host services to code run in that
-  container (see [threat model](../security/threat-model.md)).
+  The native chat process still has its macOS user's permissions; direct
+  transport only constrains this client's configured model traffic (see
+  [threat model](../security/threat-model.md)).
 
 ## License and artifact evidence
 

@@ -208,25 +208,24 @@ The later Memory ADR will decide whether Ada uses a narrow external bind mount o
 
 For the initial macOS target, Ollama remains outside the Ada container.
 
-The first local-chat profile is restricted by ADR-0006 to loopback, including
-its HTTP transport. On Docker Desktop for macOS, an **opt-in host-networked
-container** can reach a host Ollama service bound to loopback. The dedicated
-`.devcontainer/local-chat/devcontainer.json` profile uses this path; the
-default development container remains on its isolated Docker network. Host
-networking requires Docker Desktop 4.34+ and explicit enablement and does
-not work with Enhanced Container Isolation. It also lets processes inside
-that container reach other host network services; use only reviewed code and
-do not mount private Memory or secrets into this development profile. The
-host-network profile must not run a checkout-controlled `postCreateCommand`:
-review the repository first, and run validation in the default development
-profile. This removes one automatic execution path; it does not make an
-unreviewed checkout safe to execute in the host-network container.
-If these conditions cannot be met, local chat must fail closed; do not expose
-Ollama on all host interfaces as a workaround.
+The first loopback-only local-chat CLI on macOS is a narrow **native bootstrap
+exception** to the container-first runtime direction. Ollama and `ada chat`
+both run on the Mac; the default bridged Dev Container remains for development
+and tests. The CLI's readiness and model-request transports both bypass
+ambient proxy settings. Running the CLI natively grants its process the
+macOS user's permissions; this path does not provide container isolation.
 
-No domain code may depend on that hostname.
+Docker Desktop bridge networking does not give the development container
+access to the Mac's loopback-only Ollama service. A tested host-network
+development profile was rejected for the MVP because processes in it could
+also reach other host-local services. Do not expose Ollama on all host
+interfaces to work around this. If running chat in a container becomes a
+requirement, revisit a restricted host-side Ollama gateway with explicit
+access controls and target-Mac verification before adding that path.
 
-Later Linux/server deployments may use another host endpoint or a separate container/network topology without changing the agent-runtime port.
+No domain code may depend on a particular endpoint hostname. Later Linux or
+server deployments may use a different topology without changing the
+agent-runtime port.
 
 ## Consequences
 

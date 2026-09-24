@@ -64,8 +64,8 @@ This means:
 
 - Ada connects only to a loopback Ollama endpoint in the first local-chat profile;
 - both readiness and model requests ignore environment/system proxy settings;
-- an opt-in Docker Desktop host-networked container may use the same loopback
-  endpoint, subject to ADR-0003's reduced network-isolation caveat;
+- on macOS, the first chat CLI runs natively alongside Ollama while development
+  and tests use the default bridged Dev Container (see ADR-0003);
 - Ollama remains outside Ada's domain model and behind the PydanticAI runtime adapter;
 - qwen3.5:9b is the current **target-hardware baseline model**, selected after a direct A/B test against qwen3:8b;
 - the model name and endpoint are configuration, not hard architectural dependencies;
@@ -136,6 +136,8 @@ Re-open this decision if:
 - packaging requires embedding the model runtime instead of relying on an external local service;
 - llama.cpp materially lowers lifetime operational cost;
 - Linux/server deployment becomes incompatible with the chosen setup;
+- containerized local chat becomes a requirement, requiring an explicitly
+  reviewed and tested restricted Ollama connection;
 - a different model runtime provides clearly better privacy, lifecycle, or target-hardware performance without increasing maintenance burden.
 
 ## Acceptance validation
