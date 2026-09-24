@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 import json
-from urllib.error import URLError
+from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse, urlunparse
-from urllib.request import urlopen
+from urllib.request import HTTPRedirectHandler, ProxyHandler, build_opener
 
+import httpx2
 import pydantic_ai
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.models.ollama import OllamaModel
@@ -32,6 +34,13 @@ class LocalModelConfigurationError(ValueError):
 
 class LocalModelUnavailableError(RuntimeError):
     """The configured loopback Ollama service/model is not ready."""
+
+
+class _RejectRedirects(HTTPRedirectHandler):
+    """Do not follow a local service redirect out of the loopback boundary."""
+
+    def redirect_request(self, request, fp, code, msg, headers, newurl):
+        return None
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,9 +88,16 @@ def check_local_ollama_ready(
     )
 
     try:
-        with urlopen(tags_url, timeout=timeout_seconds) as response:
+        # URL validation alone is insufficient: urllib otherwise honors host
+        # proxy settings even for localhost when no bypass is configured.
+        with build_opener(ProxyHandler({}), _RejectRedirects()).open(
+            tags_url, timeout=timeout_seconds
+        ) as response:
             payload = json.load(response)
     except (OSError, URLError, ValueError) as exc:
+        if isinstance(exc, HTTPError):
+            # Rejected redirects are HTTPError responses with an open body.
+            exc.close()
         raise LocalModelUnavailableError(
             f"cannot reach local Ollama at {parsed.scheme}://{parsed.netloc}"
         ) from exc
@@ -118,14 +134,6 @@ def build_local_ollama_runtime(
     # observability banner for this product surface.
     pydantic_ai.BANNER_ENABLED = False
 
-    provider = OllamaProvider(base_url=config.base_url)
-    model = OllamaModel(
-        config.model,
-        provider=provider,
-        settings=OpenAIChatModelSettings(
-            openai_reasoning_effort="none",
-        ),
-    )
     instructions = render_personality_instructions(active_personality) + """
 
 For ordinary conversation, return an AgentTextReply.
@@ -154,19 +162,39 @@ no direct calendar/provider authority. A draft is not permission and not proof o
 execution.
 """.rstrip()
 
-    agent = Agent(
-        model,
-        instructions=instructions,
-        output_type=NativeOutput(
-            [AgentTextReply, CreateCalendarEventDraft],
-            name="ada_local_response",
-            description=(
-                "Return either a conversational reply or a non-executable "
-                "calendar draft."
+    # The model call must use the same direct-transport rule as readiness.
+    # Passing a client also prevents PydanticAI from creating an ambient
+    # proxy-aware default client for later requests.
+    http_client = httpx2.AsyncClient(trust_env=False, timeout=600.0)
+    try:
+        provider = OllamaProvider(
+            base_url=config.base_url,
+            http_client=http_client,
+        )
+        model = OllamaModel(
+            config.model,
+            provider=provider,
+            settings=OpenAIChatModelSettings(
+                openai_reasoning_effort="none",
             ),
-        ),
-    )
-    return PydanticAIRuntime(
-        agent,
-        keep_session_history=True,
-    )
+        )
+        agent = Agent(
+            model,
+            instructions=instructions,
+            output_type=NativeOutput(
+                [AgentTextReply, CreateCalendarEventDraft],
+                name="ada_local_response",
+                description=(
+                    "Return either a conversational reply or a non-executable "
+                    "calendar draft."
+                ),
+            ),
+        )
+        return PydanticAIRuntime(
+            agent,
+            keep_session_history=True,
+            close_callback=http_client.aclose,
+        )
+    except BaseException:
+        asyncio.run(http_client.aclose())
+        raise

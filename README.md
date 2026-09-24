@@ -126,6 +126,14 @@ ada chat
 
 The first local-chat profile only accepts a loopback Ollama endpoint. Conversation history is kept in memory for the current process only and is **not** Ada Memory.
 
+On macOS, run this initial chat **natively** alongside the separately installed
+Ollama service, with Ollama bound to host loopback. Use the default bridged Dev
+Container for development and tests; it cannot reach the Mac's loopback-only
+Ollama service. Ada disables ambient proxy discovery for both readiness and
+model requests. This first chat path runs with the macOS user's permissions;
+it is not isolated by a runtime container. Containerized local chat needs a
+separately reviewed, restricted Ollama connection before it is supported.
+
 Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 
 Inside the chat:

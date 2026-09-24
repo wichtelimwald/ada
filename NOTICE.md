@@ -44,6 +44,7 @@ For Ada development:
 ## Adopted dependencies
 
 - **PydanticAI 2.46.0** — MIT License. Used behind Ada's replaceable agent-runtime adapter.
+- **httpx2 2.13.1** — BSD-3-Clause. Already in PydanticAI's dependency graph; pinned directly for Ada's proxy-independent local Ollama transport. Its [focused dependency review](docs/research/httpx2-direct-transport-review.md) records provenance, maintenance, privacy, security advisories, the installed wheel license, and transitive scope. Redistributing Ada-built images/installers still requires the separate release-artifact review below.
 - **cedarpy 4.12.0** — Apache License 2.0. Community-maintained Python/PyO3 binding used only behind AdaGuard.
 - **Cedar Policy engine 4.12.0** — Apache License 2.0. Embedded by cedarpy as the authorization engine selected by ADR-0004.
 

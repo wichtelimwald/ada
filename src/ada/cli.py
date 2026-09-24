@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import argparse
 import json
 import os
@@ -98,14 +99,23 @@ def _chat(*, model: str, ollama_url: str) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    try:
-        return _chat_loop(runtime)
-    except KeyboardInterrupt:
-        print()
-        return 130
-    except Exception as exc:
-        print(f"error: local model request failed: {exc}", file=sys.stderr)
-        return 1
+    # PydanticAI's synchronous runner uses the current event loop. Own it for
+    # this CLI session so both the loop and the transport close on exit.
+    with asyncio.Runner() as runner:
+        runner.get_loop()
+        try:
+            return _chat_loop(runtime)
+        except KeyboardInterrupt:
+            print()
+            return 130
+        except Exception as exc:
+            print(f"error: local model request failed: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            try:
+                runner.run(runtime.aclose())
+            except Exception as exc:
+                print(f"warning: local model cleanup failed: {exc}", file=sys.stderr)
 
 
 def build_parser() -> argparse.ArgumentParser:
