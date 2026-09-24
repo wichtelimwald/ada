@@ -204,6 +204,28 @@ class CalendarDraftTests(unittest.TestCase):
         )
         self.assertEqual(assessment.missing, ())
 
+    def test_two_digit_year_date_does_not_corroborate_time(self) -> None:
+        for source_date in ("21.09.26", "21-09.26", "21/09.26", "21 . 09.26"):
+            with self.subTest(source_date=source_date):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="09:26", end_time="10:00"),
+                    source_text=(
+                        f"Add a dentist appointment on {source_date} "
+                        "at 10:00 to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
+
+    def test_two_digit_year_mask_preserves_separate_dotted_time(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(start_time="09:26", end_time="10:00"),
+            source_text=(
+                "Add a dentist appointment on 21-09.26 "
+                "from 09.26 to 10:00 to the family calendar."
+            ),
+        )
+        self.assertEqual(assessment.missing, ("date_with_year",))
+
     def test_invalid_times_are_missing_without_source_parsing(self) -> None:
         source = (
             "Add a dentist appointment on 2026-09-21 "

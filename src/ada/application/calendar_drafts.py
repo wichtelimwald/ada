@@ -11,7 +11,7 @@ _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 _NUMERIC_DATE_RE = re.compile(
     r"(?<!\d)(?:\d{4}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{1,2}|"
-    r"\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{4})(?!\d)"
+    r"\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*(?:\d{4}|\d{2}))(?!\d)"
 )
 _MONTHS_DE = (
     "januar", "februar", "märz", "april", "mai", "juni", "juli", "august",
@@ -109,6 +109,7 @@ def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
     hour, minute = (int(part) for part in value.strip().split(":"))
     # A complete numeric date may contain a dotted month/day fragment that
     # resembles a time, including when the date uses mixed separators.
+    # Two-digit years are masked too, without using them to infer a century.
     without_dates = _NUMERIC_DATE_RE.sub(" ", source_text)
     forms = [rf"(?<![\w:.])0?{hour}[:.]{minute:02d}(?![\w:]|\.\d)"]
     if minute == 0:
