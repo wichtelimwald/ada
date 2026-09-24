@@ -357,7 +357,7 @@ class LocalChatRuntimeTests(unittest.TestCase):
                         reply = runtime.run(AgentRequest(text="Hello"))
                         self.assertEqual(reply.text, "Local only")
                     finally:
-                        runtime.close()
+                        runner.run(runtime.aclose())
 
             self.assertEqual(hits, ["ollama:GET", f"ollama:POST:/v1/chat/completions"])
         finally:

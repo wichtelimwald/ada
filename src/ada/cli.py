@@ -112,7 +112,10 @@ def _chat(*, model: str, ollama_url: str) -> int:
             print(f"error: local model request failed: {exc}", file=sys.stderr)
             return 1
         finally:
-            runtime.close()
+            try:
+                runner.run(runtime.aclose())
+            except Exception as exc:
+                print(f"warning: local model cleanup failed: {exc}", file=sys.stderr)
 
 
 def build_parser() -> argparse.ArgumentParser:

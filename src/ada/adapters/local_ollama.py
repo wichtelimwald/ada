@@ -193,7 +193,7 @@ execution.
         return PydanticAIRuntime(
             agent,
             keep_session_history=True,
-            close_callback=lambda: asyncio.run(http_client.aclose()),
+            close_callback=http_client.aclose,
         )
     except BaseException:
         asyncio.run(http_client.aclose())

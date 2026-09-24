@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+from io import StringIO
 import json
 import subprocess
 import sys
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import AsyncMock, patch
 
 from ada.cli import _chat, _chat_loop, build_parser
 from ada.core.actions import CreateCalendarEventDraft
@@ -80,7 +82,7 @@ class CliTests(unittest.TestCase):
         ):
             with self.subTest(outcome=outcome):
                 runtime = FakeChatRuntime()
-                runtime.close = Mock()
+                runtime.aclose = AsyncMock()
                 with (
                     patch("ada.adapters.local_ollama.check_local_ollama_ready"),
                     patch(
@@ -97,7 +99,59 @@ class CliTests(unittest.TestCase):
                         _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1"),
                         expected,
                     )
-                runtime.close.assert_called_once_with()
+                runtime.aclose.assert_awaited_once_with()
+
+    def test_chat_closes_on_request_loop_without_masking_exit_code(self) -> None:
+        class LoopRuntime(FakeChatRuntime):
+            request_loop: asyncio.AbstractEventLoop | None = None
+            close_loop: asyncio.AbstractEventLoop | None = None
+
+            def run(self, request: AgentRequest) -> AgentResponse:
+                self.request_loop = asyncio.get_event_loop()
+                return super().run(request)
+
+            async def aclose(self) -> None:
+                self.close_loop = asyncio.get_running_loop()
+                raise RuntimeError("synthetic cleanup failure")
+
+        runtime = LoopRuntime()
+        inputs = iter(("hello", "/quit"))
+        stderr = StringIO()
+        with (
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch(
+                "ada.adapters.local_ollama.build_local_ollama_runtime",
+                return_value=runtime,
+            ),
+            patch(
+                "ada.cli._chat_loop",
+                side_effect=lambda active: _chat_loop(
+                    active, read=lambda prompt: next(inputs), write=lambda message: None
+                ),
+            ),
+            patch("ada.cli.sys.stderr", stderr),
+        ):
+            result = _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1")
+
+        self.assertEqual(result, 0)
+        self.assertIs(runtime.request_loop, runtime.close_loop)
+        self.assertIn("warning: local model cleanup failed", stderr.getvalue())
+
+        interrupt_runtime = LoopRuntime()
+        with (
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch(
+                "ada.adapters.local_ollama.build_local_ollama_runtime",
+                return_value=interrupt_runtime,
+            ),
+            patch("ada.cli._chat_loop", side_effect=KeyboardInterrupt),
+            patch("ada.cli.sys.stderr", StringIO()),
+        ):
+            self.assertEqual(
+                _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1"),
+                130,
+            )
+        self.assertIsNotNone(interrupt_runtime.close_loop)
 
     def test_chat_defaults_to_qwen35_9b(self) -> None:
         with patch("ada.cli.os.getenv", side_effect=lambda key, default=None: default):

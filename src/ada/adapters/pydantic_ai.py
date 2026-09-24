@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+import asyncio
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, Sequence
 
 from ada.core.actions import (
@@ -43,7 +44,7 @@ class PydanticAIRuntime(AgentRuntimePort):
         agent: _PydanticAgentLike,
         *,
         keep_session_history: bool = False,
-        close_callback: Callable[[], None] | None = None,
+        close_callback: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self._agent = agent
         self._keep_session_history = keep_session_history
@@ -79,9 +80,14 @@ class PydanticAIRuntime(AgentRuntimePort):
 
         self._message_history = ()
 
-    def close(self) -> None:
-        """Release resources owned by this runtime, once."""
+    async def aclose(self) -> None:
+        """Release resources on the event loop used for model requests."""
 
         callback, self._close_callback = self._close_callback, None
         if callback is not None:
-            callback()
+            await callback()
+
+    def close(self) -> None:
+        """Release resources when no event loop is already running."""
+
+        asyncio.run(self.aclose())
