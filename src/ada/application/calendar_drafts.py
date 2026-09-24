@@ -9,6 +9,10 @@ from ada.core.actions import CreateCalendarEventDraft
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+_NUMERIC_DATE_RE = re.compile(
+    r"(?<!\d)(?:\d{4}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{1,2}|"
+    r"\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{4})(?!\d)"
+)
 _MONTHS_DE = (
     "januar", "februar", "märz", "april", "mai", "juni", "juli", "august",
     "september", "oktober", "november", "dezember",
@@ -103,10 +107,13 @@ def _valid_time(value: str | None) -> bool:
 
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
     hour, minute = (int(part) for part in value.strip().split(":"))
+    # A complete numeric date may contain a dotted month/day fragment that
+    # resembles a time, including when the date uses mixed separators.
+    without_dates = _NUMERIC_DATE_RE.sub(" ", source_text)
     forms = [rf"(?<![\w:.])0?{hour}[:.]{minute:02d}(?![\w:]|\.\d)"]
     if minute == 0:
         forms.append(rf"(?<!\d)0?{hour}\s+Uhr(?!\w)")
-    return any(re.search(form, source_text, re.IGNORECASE) for form in forms)
+    return any(re.search(form, without_dates, re.IGNORECASE) for form in forms)
 
 
 def assess_calendar_create_draft(

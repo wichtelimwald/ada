@@ -183,14 +183,26 @@ class CalendarDraftTests(unittest.TestCase):
         self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
     def test_dotted_date_components_do_not_corroborate_time(self) -> None:
+        for source_date in ("2026.09.21", "2026-09.21", "2026/09.21"):
+            with self.subTest(source_date=source_date):
+                assessment = assess_calendar_create_draft(
+                    _draft(date="2026-09-21", start_time="09:21", end_time="10:00"),
+                    source_text=(
+                        f"Add a dentist appointment on {source_date} "
+                        "at 10:00 to the family calendar."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("start_time",))
+
+    def test_explicit_dotted_time_still_supports_draft(self) -> None:
         assessment = assess_calendar_create_draft(
             _draft(date="2026-09-21", start_time="09:21", end_time="10:00"),
             source_text=(
-                "Add a dentist appointment on 2026.09.21 "
-                "at 10:00 to the family calendar."
+                "Add a dentist appointment on 2026-09.21 "
+                "from 09.21 to 10:00 to the family calendar."
             ),
         )
-        self.assertEqual(assessment.missing, ("start_time",))
+        self.assertEqual(assessment.missing, ())
 
     def test_invalid_times_are_missing_without_source_parsing(self) -> None:
         source = (
