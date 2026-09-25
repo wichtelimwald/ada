@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import asyncio
+from io import StringIO
 import json
 import subprocess
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
-from ada.cli import _chat_loop, build_parser
+from ada.cli import _chat, _chat_loop, build_parser
 from ada.core.actions import CreateCalendarEventDraft
 from ada.ports.agent_runtime import AgentRequest, AgentResponse
 
@@ -72,6 +74,85 @@ class FailingRuntime:
 
 
 class CliTests(unittest.TestCase):
+    def test_chat_closes_runtime_on_quit_interrupt_and_failure(self) -> None:
+        for outcome, expected in (
+            (0, 0),
+            (KeyboardInterrupt(), 130),
+            (RuntimeError("boom"), 1),
+        ):
+            with self.subTest(outcome=outcome):
+                runtime = FakeChatRuntime()
+                runtime.aclose = AsyncMock()
+                with (
+                    patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+                    patch(
+                        "ada.adapters.local_ollama.build_local_ollama_runtime",
+                        return_value=runtime,
+                    ),
+                    patch(
+                        "ada.cli._chat_loop",
+                        side_effect=outcome if isinstance(outcome, BaseException) else None,
+                        return_value=outcome if isinstance(outcome, int) else None,
+                    ),
+                ):
+                    self.assertEqual(
+                        _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1"),
+                        expected,
+                    )
+                runtime.aclose.assert_awaited_once_with()
+
+    def test_chat_closes_on_request_loop_without_masking_exit_code(self) -> None:
+        class LoopRuntime(FakeChatRuntime):
+            request_loop: asyncio.AbstractEventLoop | None = None
+            close_loop: asyncio.AbstractEventLoop | None = None
+
+            def run(self, request: AgentRequest) -> AgentResponse:
+                self.request_loop = asyncio.get_event_loop()
+                return super().run(request)
+
+            async def aclose(self) -> None:
+                self.close_loop = asyncio.get_running_loop()
+                raise RuntimeError("synthetic cleanup failure")
+
+        runtime = LoopRuntime()
+        inputs = iter(("hello", "/quit"))
+        stderr = StringIO()
+        with (
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch(
+                "ada.adapters.local_ollama.build_local_ollama_runtime",
+                return_value=runtime,
+            ),
+            patch(
+                "ada.cli._chat_loop",
+                side_effect=lambda active: _chat_loop(
+                    active, read=lambda prompt: next(inputs), write=lambda message: None
+                ),
+            ),
+            patch("ada.cli.sys.stderr", stderr),
+        ):
+            result = _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1")
+
+        self.assertEqual(result, 0)
+        self.assertIs(runtime.request_loop, runtime.close_loop)
+        self.assertIn("warning: local model cleanup failed", stderr.getvalue())
+
+        interrupt_runtime = LoopRuntime()
+        with (
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch(
+                "ada.adapters.local_ollama.build_local_ollama_runtime",
+                return_value=interrupt_runtime,
+            ),
+            patch("ada.cli._chat_loop", side_effect=KeyboardInterrupt),
+            patch("ada.cli.sys.stderr", StringIO()),
+        ):
+            self.assertEqual(
+                _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1"),
+                130,
+            )
+        self.assertIsNotNone(interrupt_runtime.close_loop)
+
     def test_chat_defaults_to_qwen35_9b(self) -> None:
         with patch("ada.cli.os.getenv", side_effect=lambda key, default=None: default):
             args = build_parser().parse_args(["chat"])
@@ -102,9 +183,56 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         joined = "\n".join(output)
         self.assertIn("noch nichts in den Kalender eingetragen", joined)
-        self.assertIn("Endzeit oder Dauer", joined)
+        self.assertIn("gültige Endzeit", joined)
         self.assertNotIn("Termin wurde eingetragen", joined)
         self.assertNotIn("appointment was created", joined)
+
+    def test_calendar_followup_requests_a_complete_single_message(self) -> None:
+        for language, first, followup, complete, hint, understood in (
+            (
+                "de",
+                "Zahnarzt am 21.09.2026 um 16:00 im Familienkalender.",
+                "Bis 16:30.",
+                "Zahnarzt am 21.09.2026 von 16:00 bis 16:30 im Familienkalender.",
+                "in einer Nachricht",
+                "als Entwurf verstanden",
+            ),
+            (
+                "en",
+                "Dentist on 2026-09-21 at 16:00 in the family calendar.",
+                "Until 16:30.",
+                "Dentist on 2026-09-21 from 16:00 to 16:30 in the family calendar.",
+                "in one message",
+                "request as a draft",
+            ),
+        ):
+            with self.subTest(language=language):
+                draft = CreateCalendarEventDraft(
+                    title="Dentist", date="2026-09-21",
+                    start_time="16:00", end_time="16:30", calendar_id="family",
+                    location=None, language=language, unresolved=(),
+                )
+
+                class AccumulatedDraftRuntime:
+                    def run(self, request: AgentRequest) -> AgentResponse:
+                        # Simulate the model carrying details from earlier turns.
+                        return AgentResponse(text="", drafts=(draft,))
+
+                inputs = iter((first, followup, complete, "/quit"))
+                output: list[str] = []
+                result = _chat_loop(
+                    AccumulatedDraftRuntime(),
+                    read=lambda prompt: next(inputs),
+                    write=output.append,
+                )
+                self.assertEqual(result, 0)
+                self.assertEqual(len(output), 4)
+                for clarification in output[1:3]:
+                    self.assertIn(hint, clarification)
+                    self.assertIn("HH:MM", clarification)
+                    self.assertNotIn(understood, clarification)
+                self.assertIn(understood, output[3])
+                self.assertNotIn(hint, output[3])
 
     def test_chat_marks_false_completion_as_conversation_only(self) -> None:
         inputs = iter((

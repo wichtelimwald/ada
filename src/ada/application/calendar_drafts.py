@@ -17,7 +17,14 @@ _SOURCE_TIME_TOKEN = r"(?:[01]?\d|2[0-3])[:.][0-5]\d"
 _SOURCE_TIME_RANGE_RE = re.compile(
     rf"(?<![\w:./-])(?P<start>{_SOURCE_TIME_TOKEN})\s*"
     rf"(?:[-–—]|\b(?:to|bis)\b)\s*(?P<end>{_SOURCE_TIME_TOKEN})"
-    r"(?![\w:]|\.\d|[/-]\s*\d)",
+    # A range must not stop inside a date, including before a spaced year.
+    r"(?![\w:]|\s*[./-]\s*\d)",
+    re.IGNORECASE,
+)
+_MERIDIEM_TIME_RE = re.compile(
+    # Only a 12-hour clock can carry a meridiem. In German, "16:30 am ..."
+    # introduces a date; do not reinterpret its minutes as a separate hour.
+    r"(?<![\w:.])(?:0?[1-9]|1[0-2])(?:[:.]\d{2})?\s*[ap]\.?\s*m\.?(?!\w)",
     re.IGNORECASE,
 )
 _MONTHS_DE = (
@@ -120,12 +127,20 @@ def _could_be_partial_date(token: str) -> bool:
 
 
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
+    # This slice accepts 24-hour input only. Reject mixed/AM-PM requests as
+    # a whole rather than guessing the scope of a shared suffix (4-5 pm).
+    if _MERIDIEM_TIME_RE.search(source_text):
+        return False
     hour, minute = (int(part) for part in value.strip().split(":"))
     date_spans = [match.span() for match in _NUMERIC_DATE_RE.finditer(source_text)]
 
     def normalize_range(match: re.Match[str]) -> str:
-        if any(start < match.start() < end for start, end in date_spans):
-            # Do not turn a date suffix into a time: 2026 - 09.21 to 10:00.
+        if any(
+            start < match.start() < end or start < match.end() < end
+            for start, end in date_spans
+        ):
+            # Check both original boundaries before changing any dots: neither
+            # a date suffix nor a date prefix can become time evidence.
             return match.group(0)
         start, end = match.group("start", "end")
         if _could_be_partial_date(start) and re.search(
@@ -158,7 +173,7 @@ def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
         dotted += r"(?![\w:]|\.\d)"
     forms.append(dotted)
     if minute == 0:
-        forms.append(rf"(?<!\d)0?{hour}\s+Uhr(?!\w)")
+        forms.append(rf"(?<![\w:./])0?{hour}\s+Uhr(?!\w)")
     return any(re.search(form, without_dates, re.IGNORECASE) for form in forms)
 
 
@@ -243,7 +258,7 @@ _DE_LABELS = {
     "year": "Jahr",
     "date": "Datum",
     "start_time": "Startzeit",
-    "end_time": "gültige Endzeit oder Dauer",
+    "end_time": "gültige Endzeit",
     "calendar": "Zielkalender",
     "calendar_id": "Zielkalender",
 }
@@ -254,7 +269,7 @@ _EN_LABELS = {
     "year": "year",
     "date": "date",
     "start_time": "start time",
-    "end_time": "valid end time or duration",
+    "end_time": "valid end time",
     "calendar": "target calendar",
     "calendar_id": "target calendar",
 }
@@ -296,9 +311,14 @@ def render_calendar_draft_response(
     if german:
         return (
             "Ich habe noch nichts in den Kalender eingetragen. "
-            f"Mir fehlt noch: {joined}."
+            f"Mir fehlt noch: {joined}. "
+            "Bitte sende den vollständigen Termin mit Titel, Datum mit Jahr, "
+            "Start- und Endzeit (24-Stunden-Format HH:MM) sowie Zielkalender "
+            "in einer Nachricht."
         )
     return (
         "I have not changed the calendar. "
-        f"I still need: {joined}."
+        f"I still need: {joined}. "
+        "Please send the complete event with title, date including year, "
+        "start and end times (24-hour HH:MM), and target calendar in one message."
     )

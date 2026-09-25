@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from itertools import product
 
 from ada.application.calendar_drafts import (
     assess_calendar_create_draft,
@@ -61,7 +62,7 @@ class CalendarDraftTests(unittest.TestCase):
         self.assertIn("end_time", assessment.missing)
         self.assertIn("noch nichts in den Kalender eingetragen", response)
         self.assertIn("Datum mit Jahr", response)
-        self.assertIn("Endzeit oder Dauer", response)
+        self.assertIn("gültige Endzeit", response)
 
     def test_source_text_is_required_for_draft_assessment(self) -> None:
         draft = _draft()
@@ -315,6 +316,118 @@ class CalendarDraftTests(unittest.TestCase):
                     ),
                 )
                 self.assertEqual(assessment.missing, missing)
+
+    def test_range_endpoint_cannot_be_a_complete_date_prefix(self) -> None:
+        for start, separator, year in product(
+            ("09:00", "09.10"),
+            (".", ". ", " /", " / ", " -", " - "),
+            ("2026", "26"),
+        ):
+            source_range = f"{start} bis 10.11{separator}{year}"
+            with self.subTest(source_range=source_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time=start.replace(".", ":"), end_time="10:11"),
+                    source_text=(
+                        "Zahnarzt am 21.09.2026 im Familienkalender "
+                        f"von {source_range}."
+                    ),
+                )
+                self.assertIn("end_time", assessment.missing)
+
+    def test_range_start_cannot_be_a_complete_date_suffix(self) -> None:
+        for prefix, separator in product(
+            ("2026", "21"), (".", ". ", " /", " / ", " -", " - ")
+        ):
+            source_range = f"{prefix}{separator}09.21 bis 10:00"
+            with self.subTest(source_range=source_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="09:21", end_time="10:00"),
+                    source_text=(
+                        "Zahnarzt am 21.09.2026 im Familienkalender "
+                        f"von {source_range}."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("start_time",))
+
+    def test_meridiem_requests_require_explicit_24_hour_restatement(self) -> None:
+        # Reject the whole request's time evidence, including shared suffixes
+        # and mixtures: do not guess which endpoint an AM/PM marker modifies.
+        for times in (
+            "4:00 pm to 5:00 pm", "4:00 PM-5:00 PM", "4:00 p.m.-5:00 p.m.",
+            "4:00-5:00 pm", "4.00–5.00 p. m.", "4:00pm to 5:00pm",
+            "4:00 am to 5:00 am", "4:00 a.m.-5:00", "4 pm to 05:00",
+            "04:00 to 05:00; another appointment at 4:00 pm",
+        ):
+            with self.subTest(times=times):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="04:00", end_time="05:00"),
+                    source_text=(
+                        "Dentist on 2026-09-21 in the family calendar "
+                        f"from {times}."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("start_time", "end_time"))
+
+    def test_whole_hour_requires_a_separate_time_token(self) -> None:
+        for source_time in ("A16 Uhr", "16:16 Uhr", "26.16 Uhr", "A16Uhr"):
+            with self.subTest(source_time=source_time):
+                assessment = assess_calendar_create_draft(
+                    _draft(start_time="16:00", end_time="17:00"),
+                    source_text=(
+                        "Zahnarzt am 21.09.2026 im Familienkalender "
+                        f"{source_time}, Ende 17:00."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("start_time",))
+
+    def test_german_date_preposition_after_24_hour_times_is_supported(self) -> None:
+        for times in ("16:00 bis 16:30", "16.00-16.30", "16 Uhr-16:30 Uhr"):
+            with self.subTest(times=times):
+                assessment = assess_calendar_create_draft(
+                    _draft(),
+                    source_text=(
+                        f"Zahnarzt von {times} am 21.09.2026 "
+                        "im Familienkalender."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ())
+
+    def test_explicit_24_hour_ranges_remain_supported(self) -> None:
+        for hour, minute, separator, joiner in product(
+            (0, 7, 9, 16, 22), (0, 10, 30, 59), (":", "."),
+            (" - ", "–", " bis ", " to "),
+        ):
+            source_range = (
+                f"{hour:02d}{separator}{minute:02d}{joiner}"
+                f"{hour + 1:02d}{separator}{minute:02d} Uhr"
+            )
+            with self.subTest(source_range=source_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(
+                        start_time=f"{hour:02d}:{minute:02d}",
+                        end_time=f"{hour + 1:02d}:{minute:02d}",
+                    ),
+                    source_text=(
+                        "Zahnarzt am 21.09.2026 im Familienkalender "
+                        f"von {source_range}."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ())
+
+    def test_range_seconds_cannot_be_truncated_to_minutes(self) -> None:
+        for source_range in (
+            "16:00:30-16:30:45", "16.00.30-16.30.45",
+            "16:00.30 bis 16:30.45", "16.00:30 to 16.30:45",
+        ):
+            with self.subTest(source_range=source_range):
+                assessment = assess_calendar_create_draft(
+                    _draft(),
+                    source_text=(
+                        "Dentist on 2026-09-21 in the family calendar "
+                        f"from {source_range}."
+                    ),
+                )
+                self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):

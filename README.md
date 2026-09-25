@@ -126,6 +126,14 @@ ada chat
 
 The first local-chat profile only accepts a loopback Ollama endpoint. Conversation history is kept in memory for the current process only and is **not** Ada Memory.
 
+On macOS, run this initial chat **natively** alongside the separately installed
+Ollama service, with Ollama bound to host loopback. Use the default bridged Dev
+Container for development and tests; it cannot reach the Mac's loopback-only
+Ollama service. Ada disables ambient proxy discovery for both readiness and
+model requests. This first chat path runs with the macOS user's permissions;
+it is not isolated by a runtime container. Containerized local chat needs a
+separately reviewed, restricted Ollama connection before it is supported.
+
 Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 
 Inside the chat:
@@ -139,9 +147,20 @@ The model and endpoint remain configurable:
 ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
 ```
 
-This first chat milestone does not execute calendar actions. Calendar-create requests are first represented as a **non-executable typed draft**. Ada-owned deterministic logic — not the model — decides which material fields are actually required and checks them against the original user request, so model-invented requirements or silently invented dates and times cannot become action requirements. Until a provider/default-calendar policy is explicitly defined, the target calendar remains a required material field rather than being guessed. Only a later deterministic application step may turn a complete draft into an action proposal; proposals then follow the existing AdaGuard + durable-action path rather than giving the model direct privileged tools.
+This first chat milestone does not execute calendar actions. Calendar-create requests are represented as a **non-executable typed draft**. Ada-owned deterministic logic decides which fields are required and checks whether the draft's date, times, and target calendar occur in supported forms in the **current user message**. This is a conservative text check, not proof of user intent: it cannot reliably assign values to different events or interpret corrections and negations. A complete draft is neither authorization nor an executable proposal. Any future conversion into a proposal must address those limits and follow the AdaGuard + durable-action path.
 
-Use `HH:MM` for unambiguous calendar times. Dotted values such as `09.10` can
+For now, supply the complete event in one message: title, full date including
+year, start and end times, and target calendar. When Ada asks for missing details,
+repeat the complete request with those details added. Conversation history is
+available to the model, but is not authoritative evidence for this check.
+Multi-turn draft clarification is not implemented; durations are not converted
+into end times, and no default calendar is assumed.
+
+Use 24-hour `HH:MM` for calendar times. If a message contains an AM/PM time
+expression (including mixed formats or shared suffixes such as `4:00-5:00 pm`),
+Ada asks for both times again in 24-hour form instead of guessing. Place the date
+before the times to avoid ambiguity with the German preposition `am` after a
+morning time. Dotted values such as `09.10` can
 also mean a partial date, so they need `Uhr` or an unambiguous time in the same
 range. For example, `09.10 Uhr`, `09.10-10:30`, and `16.30-17.00` are recognized;
 `21.09.` alone does not supply a time.
