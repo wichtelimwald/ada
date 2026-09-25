@@ -27,6 +27,15 @@ _MERIDIEM_TIME_RE = re.compile(
     r"(?<![\w:.])(?:0?[1-9]|1[0-2])(?:[:.]\d{2})?\s*[ap]\.?\s*m\.?(?!\w)",
     re.IGNORECASE,
 )
+_DAY_PERIOD_TIME_RE = re.compile(
+    # Day-period words make a 1-12 hour expression semantically 12-hour input.
+    # Reject the request's time evidence rather than corroborating a different
+    # 24-hour interpretation (for example, 4:00 nachmittags -> 04:00).
+    r"(?<![\w:.])(?:0?[1-9]|1[0-2])(?:[:.]\d{2})?(?:\s+Uhr)?\s+"
+    r"(?:morgens|vormittags|mittags|nachmittags|abends|nachts|früh|"
+    r"in\s+the\s+(?:morning|afternoon|evening)|at\s+night)\b",
+    re.IGNORECASE,
+)
 _MONTHS_DE = (
     "januar", "februar", "märz", "april", "mai", "juni", "juli", "august",
     "september", "oktober", "november", "dezember",
@@ -143,7 +152,10 @@ def _could_be_partial_date(token: str) -> bool:
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
     # This slice accepts 24-hour input only. Reject mixed/AM-PM requests as
     # a whole rather than guessing the scope of a shared suffix (4-5 pm).
-    if _MERIDIEM_TIME_RE.search(source_text):
+    if (
+        _MERIDIEM_TIME_RE.search(source_text)
+        or _DAY_PERIOD_TIME_RE.search(source_text)
+    ):
         return False
     hour, minute = (int(part) for part in value.strip().split(":"))
     date_spans = [match.span() for match in _NUMERIC_DATE_RE.finditer(source_text)]
@@ -195,7 +207,9 @@ def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
         dotted += r"(?![\w:]|\.\d)"
     forms.append(dotted)
     if minute == 0:
-        forms.append(rf"(?<![\w:./])0?{hour}\s+Uhr(?!\w)")
+        forms.append(
+            rf"(?<![\w:./])0?{hour}\s+Uhr(?!\w)(?!\s+\d{{1,2}}\b)"
+        )
     return any(re.search(form, without_dates, re.IGNORECASE) for form in forms)
 
 
