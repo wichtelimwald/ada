@@ -104,6 +104,7 @@
 - untrusted content/model output cannot directly persist personality changes,
 - every model-originated Memory write/promotion passes an Ada-owned deterministic validation boundary for source/trust, privacy scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction semantics,
 - protected Memory domains must not all be exposed by default to one long-lived Ada principal; the host-side Memory Broker must enforce request-scoped domain access independently from model output,
+- source/document roots are independently configurable per protection domain and may use different storage providers/volumes; broker scope must cover source access as well as Memory/retrieval access so one configured source provider does not widen another domain,
 - broker requests must bind to trusted actor/audience/authorization context and fail closed if the requested Memory scope cannot be deterministically justified,
 - keep the first macOS chat CLI native alongside a loopback-bound Ollama and
   run development and tests in the default bridged Dev Container; review any
