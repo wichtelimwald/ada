@@ -4,6 +4,11 @@
 > **Researched:** 2026-09-23
 > **Scope:** ways Ada could read school planning and information data from WebUntis without committing the product runtime to one Untis interface
 
+**Product boundary:** Direct school-system integration is explicitly outside the
+confirmed MVP. The MVP can still receive forwarded school information through
+its ordinary intake path. The interfaces below are research for a later
+capability decision, not the next Ada implementation.
+
 ## Executive summary
 
 WebUntis currently exposes several materially different integration surfaces:
@@ -13,11 +18,11 @@ WebUntis currently exposes several materially different integration surfaces:
 3. **The legacy WebUntis JSON-RPC API** still works according to current Untis support documentation and has mature open-source clients. It is the most practical route for a personal, read-only prototype when iCal is insufficient. However, Untis has already restricted it for accounts with 2FA enabled, and maintainers of a major community client report an expected future sunset. No official shutdown date was found.
 4. **Undocumented browser REST endpoints** expose richer data used by the WebUntis web application and several open-source clients. They can provide details absent from JSON-RPC, but they are not a stable public contract and may change without notice. Ada should treat them as research-only fallback evidence, not as a preferred integration surface.
 
-For Ada, the main architectural conclusion is therefore **not** to make WebUntis itself a domain boundary. The first implementation should remain read-only, capability-driven and replaceable. Before adding any dependency, a real authorized account should be tested locally to establish what the specific school and account type expose.
+For Ada, the main architectural conclusion is therefore **not** to make WebUntis itself a domain boundary. Any later implementation should remain read-only, capability-driven and replaceable. Before adding any dependency, a real authorized account should be tested locally to establish what the specific school and account type expose.
 
 ### Current recommendation
 
-For the first Ada prototype:
+For any later authorized school-information prototype:
 
 1. Check whether the account exposes a private **iCal timetable URL** and whether that already satisfies the initial use case.
 2. If richer timetable/change data are required, evaluate **python-webuntis** locally as a replaceable JSON-RPC research adapter. It fits Ada's Python-first direction, is actively maintained as of July 2026, has one runtime dependency, and uses a permissive BSD-3-Clause license.
@@ -49,6 +54,8 @@ The exact product scope is still a product decision. Research should not silentl
 
 - Start **read-only**. Do not add write actions merely because an API supports them.
 - Treat passwords, TOTP/QR secrets, OAuth client secrets, JWTs, session cookies and private iCal URLs as credentials.
+- JSON-RPC and QR/TOTP access use full account credentials even when Ada only reads data. A private iCal URL is a bearer secret. Never disable 2FA to accommodate Ada.
+- Decide secret storage, access, rotation, revocation and HTTP-log redaction before integrating any direct school-system path. Never place a feed URL or school credential in normal Memory, prompts, DBOS workflow arguments, fixtures, issues, or error messages.
 - Never commit, log or place real school credentials, child identifiers or returned school data in fixtures/issues/research artifacts.
 - Do not bypass WebUntis account security controls such as 2FA restrictions.
 - Minimize local retention of child-related educational data.
@@ -448,7 +455,7 @@ Its Dart/Flutter architecture is not a natural dependency for Python-first Ada, 
 
 The safest conclusion from the interface diversity is that Ada should own the semantics of school information and keep provider protocols replaceable.
 
-For the **smallest timetable-focused MVP**, a narrow interface is preferable to prematurely defining every possible school feature:
+For a **later timetable-focused integration**, a narrow interface is preferable to prematurely defining every possible school feature:
 
 ```text
 SchoolScheduleSource
@@ -569,7 +576,7 @@ Revisit the integration decision if any of the following occurs:
 
 - Untis confirms Platform Application eligibility for Ada;
 - the school enables/withdraws a required WebUntis module;
-- iCal proves sufficient or insufficient for the agreed MVP;
+- iCal proves sufficient or insufficient for an agreed later school-information requirement;
 - JSON-RPC authentication stops working or Untis publishes an official deprecation date;
 - a supported Platform API adds homework or message-inbox retrieval;
 - a serious maintained Python client for the modern Platform API appears;

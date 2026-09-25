@@ -18,16 +18,10 @@ Code, comments, documentation, issues, commits, pull requests, and GitHub review
 
 ## Product and architecture decisions
 
-The project is currently in discovery. Do not assume:
-
-- target UI framework,
-- target platform strategy,
-- memory implementation,
-- agent/orchestration framework,
-- computer-control framework,
-- STT/TTS stack,
-- local model runtime,
-- cloud provider.
+Accepted technology choices live in `docs/decisions/`; open capability work
+lives in `docs/todo.md`. Do not duplicate a changing technology-status list
+here, and do not treat a researched candidate as adopted unless an accepted ADR
+or other canonical decision says so.
 
 For significant choices:
 

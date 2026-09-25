@@ -2,22 +2,15 @@
 
 Ada is a local-first, privacy-first personal AI assistant project.
 
-## Current stage
+## Project state and decisions
 
-**Product discovery and architecture exploration.** No implementation stack is selected.
+Do not treat this file as a project-status snapshot. Before material work, read
+`AGENTS.md`, `docs/handover.md`, the task-relevant ADRs, and the current PR/Git
+state. Accepted architecture lives in `docs/decisions/`; unresolved capability
+work lives in `docs/todo.md`.
 
-Do not infer or silently select:
-
-- UI framework or cross-platform strategy,
-- memory backend,
-- agent/orchestration framework,
-- computer-control framework,
-- speech-to-text or text-to-speech stack,
-- local inference runtime or model,
-- cloud model/provider,
-- repository-intelligence tooling.
-
-These decisions must follow documented requirements, current research, a decision matrix, and an ADR where significant.
+Do not infer a technology choice merely because it appears in research. Follow
+accepted ADRs and keep unresolved choices explicit.
 
 ## Language and collaboration
 

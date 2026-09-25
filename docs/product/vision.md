@@ -47,14 +47,18 @@ Proceed through narrow end-to-end slices rather than selecting a comprehensive s
 
 ## Still deliberately open
 
-- programming language and execution architecture,
+Foundational runtime, topology, Guard, durable-execution, local-model and
+context-aware interpretation decisions are recorded in ADR-0002 through
+ADR-0007. The following remain deliberately open or only partially decided:
+
 - local interaction/UI implementation,
-- model/runtime and optional remote assistance,
-- memory representation and retrieval implementation,
-- email/calendar integration mechanism,
-- permission/policy implementation and action records,
+- authoritative Memory implementation,
+- production email/calendar provider integration,
+- optional remote-model assistance,
 - remote-data boundary implementation,
-- orchestration approach,
-- packaging/update strategy,
+- packaging/update and broader deployment strategy,
 - speech/perception architecture,
-- detailed personal-context selection, calendar ownership, cancellation scopes, forgetting semantics, and offline integration behavior.
+- general computer control,
+- detailed personal-context selection, calendar ownership, cancellation scopes,
+  forgetting semantics, and offline integration behavior.
+

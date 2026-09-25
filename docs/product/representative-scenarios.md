@@ -181,4 +181,4 @@ These scenarios are the initial architecture/test anchors.
 
 A component or framework is useful only if it helps implement these behaviors without weakening Ada's boundaries.
 
-The first implementation slice covered **S1 + the conflict-detection part of S2**. The next interaction slice targets **S6** before connecting local chat to real providers, email, private-family views, contradiction handling, or long-term memory.
+The first synthetic vertical slice exercises a prebuilt S1 proposal through Guard, DBOS and one provider effect, plus basic S2 interval/travel checks. It does not extract forwarded source text, determine relevant participants, or complete S1/S2 end to end; an unrelated household event can currently be reported as a conflict. The local-chat slice exercises part of S6 without executing actions. Connecting intake, participant-aware conflict detection, real providers, email, private-family views, contradiction handling, and long-term Memory remains future work.
