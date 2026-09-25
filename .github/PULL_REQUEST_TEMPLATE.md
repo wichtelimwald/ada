@@ -28,6 +28,7 @@
 - [ ] No secrets or personal data were added
 - [ ] Relevant verification is recorded, or explicitly N/A with reason
 - [ ] No GitHub Actions were introduced without explicit approval
+- [ ] Continuity check completed: changed project state is recorded in its canonical source; `docs/handover.md` changed only if the continuation process/source map changed
 
 ## Review findings
 
