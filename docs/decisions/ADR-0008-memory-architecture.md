@@ -102,7 +102,11 @@ memory/
 The names and exact ownership model remain open. The important property is that gaining read access to one private Memory domain must not automatically reveal another person's private Memory.
 
 The **host-side Memory Broker** owns or mediates access to the underlying
-vaults and any protection-domain-specific derived retrieval state. The Ada
+vaults, each domain's independently configured source/document provider, and
+any protection-domain-specific derived retrieval state. A protection domain's
+Memory vault and source root/provider may live in different physical or cloud
+locations; the broker preserves the same request-scoped authorization boundary
+across both. The Ada
 runtime requests only the protection domain(s) required for the current
 authenticated/authorized task; the broker must not expose all household
 vaults to one long-lived Ada runtime principal. The broker is an Ada-owned
@@ -527,9 +531,9 @@ The URI/reference format must remain provider-independent at the Memory layer. i
 Document/source handling rules:
 
 - **original/raw source material is outside the Memory lifecycle**. Memory does not modify, compact, age, forget, move, or delete the original;
-- each user/audience may have a configured stable source/document root or provider (for example a user-controlled iCloud directory). This is operational configuration, not a model-learned path or authority;
+- each protection domain may have its **own independently configured** stable source/document root or provider (for example one user's iCloud directory, a separate shared-family location, or an external/encrypted volume). Ada has no required central `sources/` tree. The domain-to-provider/root mapping is operational/security configuration, not a model-learned path or authority;
 - when Ada receives a document or other source artifact, it first keeps an existing durable source reference when one exists; otherwise the ingestion path stores the original in the configured source/document root before deriving Memory;
-- a simple default organization such as `<source-root>/<YYYY>/<MM>/...` is preferred for directly received files so humans can browse originals without Ada; exact naming/collision rules remain implementation details;
+- within each configured source root, a simple default organization such as `<YYYY>/<MM>/...` is preferred for directly received files so humans can browse originals without Ada; exact naming/collision rules remain implementation details;
 - Ada may retain a provider-independent source reference plus an extract/summary/derived knowledge when that is useful; non-durable extracts/summaries live in `learning/` until promoted or marked durable;
 - if a task requires the original document, Ada resolves/accesses it through the applicable source/document provider boundary and permissions;
 - a missing/unavailable source must be distinguishable from a deleted/forgotten Memory extract;
@@ -1523,7 +1527,7 @@ ADR-0008 accepts the following MVP architecture:
 - an inspectable change-history/versioning mechanism that records observed out-of-band edits is an architectural requirement for manual-edit provenance; Git-style per-domain history is only the leading adapter candidate, not the requirement itself;
 - automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
 - the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
-- original/raw source artifacts live outside the Memory lifecycle in a configured per-user/audience source/document store or provider reference; existing stable sources are referenced in place, while directly received files without a durable source are first stored in that configured root (human-browsable organization such as year/month preferred) before Memory extraction; Memory aging/forgetting never mutates or deletes the original;
+- original/raw source artifacts live outside the Memory lifecycle in **independently configured source/document roots/providers per protection domain**; Ada requires no central source tree. Existing stable sources are referenced in place, while directly received files without a durable source are first stored in the configured root for that domain (human-browsable organization such as year/month preferred) before Memory extraction; Memory aging/forgetting never mutates or deletes the original;
 - facts owned by another authoritative system (for example calendar/contact/source-document facts) remain source-owned by default; Memory stores a reference, derived abstraction, or explicitly requested independent copy rather than creating a competing source of truth;
 - ReMe, LangMem, Hindsight, Letta/MemFS, vector stores, graph stores and similar frameworks are **not required MVP layers**. They may be added only behind Ada-owned boundaries when representative evidence justifies their runtime, privacy and maintenance cost;
 - `Memory != Permission`, `Memory != Action Truth`, and `Authoritative Memory != Derived Index` remain architecture invariants.
