@@ -66,6 +66,19 @@ class FileMemoryTests(unittest.TestCase):
                 (Path(temp) / "learning" / "reply-style.md").exists()
             )
 
+            path = Path(temp) / "memory" / "reply-style.md"
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "Prefer concise answers.",
+                    "Prefer detailed answers.",
+                ),
+                encoding="utf-8",
+            )
+            edited = store.load_memory_entry("reply-style")
+            self.assertIsNotNone(edited)
+            assert edited is not None
+            self.assertEqual(edited.content, "Prefer detailed answers.")
+
     def test_observation_stays_in_learning_until_explicit_promotion(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
@@ -108,6 +121,23 @@ class FileMemoryTests(unittest.TestCase):
             self.assertEqual(
                 retained.supports_memory_id,
                 "detail-pattern",
+            )
+
+    def test_observed_fact_stays_in_learning(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+
+            observed = store.record_learning(
+                entry_id="practice-address",
+                kind=MemoryKind.FACT,
+                evidence_origin=EvidenceOrigin.OBSERVED_FACT,
+                content="A synthetic practice address was seen in a test source.",
+            )
+
+            self.assertEqual(observed.lifecycle, MemoryLifecycle.OBSERVED)
+            self.assertIsNone(store.load_memory_entry("practice-address"))
+            self.assertTrue(
+                (Path(temp) / "learning" / "practice-address.md").exists()
             )
 
     def test_hypothesis_is_provisional(self) -> None:
