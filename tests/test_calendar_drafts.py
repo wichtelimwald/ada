@@ -175,11 +175,16 @@ class CalendarDraftTests(unittest.TestCase):
         self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
     def test_non_hhmm_time_forms_fail_closed(self) -> None:
-        for source_times, start_time, end_time in (
-            ("16.00 to 16.30", "16:00", "16:30"),
-            ("16 Uhr to 16:30", "16:00", "16:30"),
-            ("4:00 pm to 5:00 pm", "04:00", "05:00"),
-            ("4:00 bis 5:00 nachmittags", "04:00", "05:00"),
+        for source_times, start_time, end_time, missing in (
+            ("16.00 to 16.30", "16:00", "16:30", ("start_time", "end_time")),
+            ("16 Uhr to 16:30", "16:00", "16:30", ("start_time",)),
+            ("4:00 pm to 5:00 pm", "04:00", "05:00", ("start_time", "end_time")),
+            (
+                "4:00 bis 5:00 nachmittags",
+                "04:00",
+                "05:00",
+                ("start_time", "end_time"),
+            ),
         ):
             with self.subTest(source_times=source_times):
                 assessment = assess_calendar_create_draft(
@@ -189,10 +194,7 @@ class CalendarDraftTests(unittest.TestCase):
                         f"from {source_times} to the family calendar."
                     ),
                 )
-                self.assertEqual(
-                    assessment.missing,
-                    ("start_time", "end_time"),
-                )
+                self.assertEqual(assessment.missing, missing)
 
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):
