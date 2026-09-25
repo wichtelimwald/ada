@@ -156,16 +156,13 @@ available to the model, but is not authoritative evidence for this check.
 Multi-turn draft clarification is not implemented; durations are not converted
 into end times, and no default calendar is assumed.
 
-Use 24-hour `HH:MM` for calendar times. If a message contains an AM/PM time
-expression (including mixed formats or shared suffixes such as `4:00-5:00 pm`)
-or a 1-12 hour with a day-period qualifier such as `nachmittags` or
-`in the afternoon`, Ada asks for both times again in 24-hour form instead of
-guessing. Place the date
-before the times to avoid ambiguity with the German preposition `am` after a
-morning time. Dotted values such as `09.10` can
-also mean a partial date, so they need `Uhr` or an unambiguous time in the same
-range. For example, `09.10 Uhr`, `09.10-10:30`, and `16.30-17.00` are recognized;
-`21.09.` alone does not supply a time.
+Use 24-hour `HH:MM` for calendar times in this temporary guard. Only
+explicit `HH:MM` source text is corroborated here; dotted times, AM/PM,
+day-period wording and other natural-language temporal forms remain unresolved,
+so Ada asks for the complete event again instead of guessing. Natural-language
+time interpretation belongs to the accepted context-aware interpretation
+architecture in [ADR-0007](docs/decisions/ADR-0007-context-aware-interpretation.md),
+not to a growing regex grammar in the calendar guard.
 
 Runtime container sanity check:
 
