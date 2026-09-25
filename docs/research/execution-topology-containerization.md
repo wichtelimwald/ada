@@ -4,6 +4,13 @@
 **Date checked:** 2026-09-19  
 **Depends on:** ADR-0002 and `docs/architecture/modular-core-boundaries.md`
 
+**Update (2026-09-24):** This is historical topology research. Its
+`host.docker.internal` Ollama path assumes the host service is reachable beyond
+loopback and is not the first macOS chat configuration. ADR-0003 and ADR-0006
+now specify native `ada chat` with loopback-bound Ollama and the bridged Dev
+Container for development and tests. Containerized local chat needs a separate
+restricted connection and review.
+
 ## 1. User need
 
 Ada needs an execution architecture that:

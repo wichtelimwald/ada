@@ -280,7 +280,12 @@ If `cedarpy` becomes unsuitable while Cedar remains the desired policy model, pr
 2. a minimal Ada-owned PyO3 bridge to the official Rust engine;
 3. another reviewed Cedar SDK/binding if the ecosystem changes.
 
-The AdaGuard / AuthorizationRequest / GuardDecision contract must remain unchanged.
+The AdaGuard / AuthorizationRequest / GuardDecision contract must remain
+stable when changing the Cedar integration. `AuthorizationRequest` now
+requires callers to provide instruction provenance and channel explicitly;
+there are no implicit `direct` or `local-chat` defaults. This deliberate
+contract tightening applies to every backend: unknown provenance is denied,
+and no backend may infer a trusted source from a missing field.
 
 ## Upstream strategy
 

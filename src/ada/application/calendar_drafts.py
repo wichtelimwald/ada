@@ -9,6 +9,13 @@ from ada.core.actions import CreateCalendarEventDraft
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+_UNSUPPORTED_12_HOUR_TIME_RE = re.compile(
+    r"(?<![\w:.])(?:0?[1-9]|1[0-2])(?:[:.][0-5]\d)?(?:\s+Uhr)?\s*"
+    r"(?:[ap]\.?\s*m\.?(?!\w)|morgens\b|vormittags\b|mittags\b|"
+    r"nachmittags\b|abends\b|nachts\b|früh\b|"
+    r"in\s+the\s+(?:morning|afternoon|evening)\b|at\s+night\b)",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +94,22 @@ def _valid_time(value: str | None) -> bool:
     return bool(value and _TIME_RE.fullmatch(value.strip()))
 
 
+def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
+    """Corroborate only explicit 24-hour HH:MM source text.
+
+    Natural-language temporal interpretation belongs to ADR-0007. Ambiguous
+    or unsupported forms stay unresolved so Ada can ask the user to restate
+    them rather than growing a second parser in this guard.
+    """
+
+    if _UNSUPPORTED_12_HOUR_TIME_RE.search(source_text):
+        return False
+
+    hour, minute = (int(part) for part in value.strip().split(":"))
+    pattern = rf"(?<![\w:.])0?{hour}:{minute:02d}(?![\w:]|\.\d)"
+    return bool(re.search(pattern, source_text))
+
+
 def assess_calendar_create_draft(
     draft: CreateCalendarEventDraft,
     *,
@@ -112,9 +135,13 @@ def assess_calendar_create_draft(
     start_valid = _valid_time(draft.start_time)
     end_valid = _valid_time(draft.end_time)
 
-    if not start_valid:
+    if not start_valid or not _source_explicitly_supports_time(
+        draft.start_time or "", source_text
+    ):
         missing.append("start_time")
-    if not end_valid:
+    if not end_valid or not _source_explicitly_supports_time(
+        draft.end_time or "", source_text
+    ):
         missing.append("end_time")
     elif start_valid:
         assert draft.start_time is not None
@@ -164,7 +191,7 @@ _DE_LABELS = {
     "year": "Jahr",
     "date": "Datum",
     "start_time": "Startzeit",
-    "end_time": "gültige Endzeit oder Dauer",
+    "end_time": "gültige Endzeit",
     "calendar": "Zielkalender",
     "calendar_id": "Zielkalender",
 }
@@ -175,7 +202,7 @@ _EN_LABELS = {
     "year": "year",
     "date": "date",
     "start_time": "start time",
-    "end_time": "valid end time or duration",
+    "end_time": "valid end time",
     "calendar": "target calendar",
     "calendar_id": "target calendar",
 }
@@ -217,9 +244,14 @@ def render_calendar_draft_response(
     if german:
         return (
             "Ich habe noch nichts in den Kalender eingetragen. "
-            f"Mir fehlt noch: {joined}."
+            f"Mir fehlt noch: {joined}. "
+            "Bitte sende den vollständigen Termin mit Titel, Datum mit Jahr, "
+            "Start- und Endzeit (24-Stunden-Format HH:MM) sowie Zielkalender "
+            "in einer Nachricht."
         )
     return (
         "I have not changed the calendar. "
-        f"I still need: {joined}."
+        f"I still need: {joined}. "
+        "Please send the complete event with title, date including year, "
+        "start and end times (24-hour HH:MM), and target calendar in one message."
     )
