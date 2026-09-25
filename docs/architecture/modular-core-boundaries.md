@@ -2,7 +2,7 @@
 
 **Status:** Architecture baseline following accepted ADR-0002.
 
-This document translates ADR-0002 into implementation boundaries without selecting a programming language, UI framework, memory backend, calendar provider, scheduler implementation, or packaging strategy.
+This document translates the accepted architecture into implementation boundaries without selecting a UI framework, production calendar provider, scheduler implementation, packaging strategy, or concrete Memory versioning/retrieval implementation. ADR-0008 has selected the authoritative Memory shape: file-native, Markdown-first, human-controlled, with inspectable learning evidence and rebuildable derived retrieval.
 
 The goal is not to create interfaces for every possible future feature. Ada defines a port only when it protects a trust boundary or keeps a decision-relevant dependency replaceable.
 
@@ -87,9 +87,17 @@ and terminal/exception states such as:
 
 An ambiguous provider outcome must be reconciled before retry.
 
-### Authoritative memory
+### Authoritative Memory and learning evidence
 
-Long-lived user memory remains external, readable/editable without the agent runtime, and independent from conversation history, checkpoints, indexes, and action records.
+Long-lived user Memory is file-native, Markdown-first, external to the agent
+runtime, and readable/editable without Ada. Established Memory, inspectable
+learning evidence, version history, derived RAG/search indexes, permissions and
+action records remain distinct concerns.
+
+Automatic learning must preserve the difference between explicit statements,
+observed facts, behavioral observations, hypotheses and established Memory.
+Model-originated writes/promotions cross an Ada-owned deterministic validation
+boundary before authoritative persistence.
 
 ## 4. Ports required for the first vertical slice
 
@@ -166,7 +174,7 @@ Responsibility:
 - preserve existing personality across Ada upgrades/reinstalls;
 - support attributable personality changes without granting authority.
 
-This is deliberately a **narrow semantic slice of Memory**, introduced because local chat now needs a concrete personality lifecycle. It does not select the general Memory backend or retrieval/index architecture.
+This is deliberately a **narrow semantic slice of Memory**, introduced because local chat needs a concrete personality lifecycle. ADR-0008 now defines the general authoritative-Memory and derived-retrieval architecture; this port remains narrow until concrete Memory scenarios justify broader contracts.
 
 ## 5. Boundaries intentionally deferred
 
@@ -176,7 +184,7 @@ Deferred ports include:
 
 - MessageChannelPort for email and later channels;
 - SchedulerPort for requested/background work;
-- general authoritative MemoryPort and retrieval/index contracts;
+- broad authoritative Memory and retrieval/index ports beyond the accepted ADR-0008 boundaries; design their concrete APIs from implementation scenarios;
 - UI/application transport;
 - remote/cloud model broker;
 - speech/perception;
