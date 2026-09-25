@@ -34,7 +34,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [ ] Ears — wake word / speech input.
 - [ ] Voice — speech output.
 - [x] Brain — initial agent-runtime/orchestration foundation ([ADR-0002](decisions/ADR-0002-agent-runtime-foundation.md)).
-- [x] Memory — file-native, Markdown-first authoritative Memory with protected private/shared domains and rebuildable derived retrieval accepted by [ADR-0008](decisions/ADR-0008-memory-architecture.md).
+- [x] Memory — file-native, Markdown-first authoritative Memory requiring enforceable private/shared protection domains, inspectable learning evidence/promotion, and rebuildable derived retrieval accepted by [ADR-0008](decisions/ADR-0008-memory-architecture.md).
 - [ ] Hands — computer control / action runtime.
 - [x] Guard — permission/policy architecture ([ADR-0004](decisions/ADR-0004-guard-permission-architecture.md)).
 - [ ] Eyes — screen/camera, only if required.
@@ -48,11 +48,17 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [x] Add local validation commands.
 - [x] Re-validate real local multi-turn chat on target hardware; final qwen3.5:9b run passed 50 tests and the local-chat acceptance flow, enabling ADR-0006 acceptance.
 - [ ] Implement ADR-0008's accepted file-native Memory baseline and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
-- [ ] From the first Memory slice, preserve the learning semantics `explicit statement/source -> observation -> hypothesis -> established Memory` with inspectable provenance/maturity; autonomous promotion/aging may be incremental, but the storage/API model must not collapse these states.
-- [ ] Before real household Memory, demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes; folders under one readable OS principal are insufficient.
+- [ ] From the first Memory slice, preserve separate dimensions for durable Memory kind (`preference` / `fact` / `routine` / `episode`), evidence origin (`explicit_statement` / `observed_fact` / `behavioral_observation` / `hypothesis`), and lifecycle/maturity; promotion into established Memory is explicit and inspectable.
+
+**Gates before real household Memory (ADR-0008):**
+
+- [ ] Close the protection-domain access-topology follow-up delegated by ADR-0003: define which principals are isolated and how Ada receives only the domain(s) needed for the current authorized request; one long-lived Ada principal with every vault readable is not implicitly accepted.
+- [ ] Demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes; folders under one readable OS principal are insufficient.
+- [ ] Route every model-originated Memory write/promotion through a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling.
 - [ ] Implement safe Memory write/versioning behavior: out-of-band edit capture, path-restricted history commits, same-file concurrency detection/reconciliation, lock/crash recovery, and prompt capture of Ada writes so later manual reverts remain detectable.
 - [ ] Implement deterministic current/superseded/unresolved retrieval and stale-source handling; direct substring search must not promote superseded text as current truth.
 - [ ] Ensure operational forgetting removes content from current authoritative retrieval and every reconstructible derived index; historical purge/backup retention remains a separate explicit operation.
+- [ ] Define and validate the minimum provenance/source-reference and external-document lifecycle needed by the implemented MVP scenarios without creating duplicate hidden truth.
 - [ ] Measure representative Memory retrieval quality/scale and run a focused local-RAG/retrieval reuse comparison (SQLite FTS5 control plus credible modular/embedded candidates such as LlamaIndex Core, Haystack, LanceDB, or an equivalent maintained option) before writing custom retrieval infrastructure or adding FTS/vector/graph/ReMe/LangMem/Hindsight; any adopted dependency must pass its own license/security/platform review.
 - [ ] Treat any RAG/FTS/vector/graph layer as a rebuildable scoped cache: retrieve candidate references, re-read current authoritative Markdown, validate lifecycle/scope, then assemble model context; stale cached chunks must never become authoritative context.
 - [ ] Connect local-chat typed action proposals to the existing AdaGuard + durable-action path; do not expose direct privileged model tools.
