@@ -9,6 +9,7 @@ from ada.core.authorization import (
     AuthorizationRequest,
     GuardDecision,
     GuardEffect,
+    InstructionProvenance,
 )
 from ada.ports.guard import AdaGuard
 
@@ -87,6 +88,7 @@ class CedarGuard(AdaGuard):
             or not request.action
             or not request.resource
             or not request.channel
+            or not isinstance(request.provenance, InstructionProvenance)
         ):
             return self._deny("invalid_request")
 

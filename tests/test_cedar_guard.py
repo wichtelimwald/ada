@@ -37,6 +37,22 @@ def request(**changes: object) -> AuthorizationRequest:
     return AuthorizationRequest(**values)
 
 
+class RequiredContextTests(unittest.TestCase):
+    def test_provenance_must_be_supplied(self) -> None:
+        with self.assertRaises(TypeError):
+            AuthorizationRequest(  # type: ignore[call-arg]
+                actor="guardian-a", action="calendar.create",
+                resource="calendar:family", channel="local-chat",
+            )
+
+    def test_channel_must_be_supplied(self) -> None:
+        with self.assertRaises(TypeError):
+            AuthorizationRequest(  # type: ignore[call-arg]
+                actor="guardian-a", action="calendar.create",
+                resource="calendar:family", provenance=InstructionProvenance.DIRECT,
+            )
+
+
 CALENDAR_GRANT = """
 @id("grant-school-calendar")
 permit (
@@ -270,6 +286,14 @@ class CedarGuardConformanceTests(unittest.TestCase):
 
     def test_invalid_request_fails_closed(self) -> None:
         decision = self.guard(CALENDAR_GRANT).authorize(request(actor=""))
+
+        self.assertEqual(decision.effect, GuardEffect.DENY)
+        self.assertEqual(decision.reason_code, "invalid_request")
+
+    def test_unknown_provenance_fails_closed(self) -> None:
+        decision = self.guard(CALENDAR_GRANT).authorize(
+            request(provenance="direct from model")
+        )
 
         self.assertEqual(decision.effect, GuardEffect.DENY)
         self.assertEqual(decision.reason_code, "invalid_request")

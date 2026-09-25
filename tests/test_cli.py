@@ -183,9 +183,56 @@ class CliTests(unittest.TestCase):
         self.assertEqual(result, 0)
         joined = "\n".join(output)
         self.assertIn("noch nichts in den Kalender eingetragen", joined)
-        self.assertIn("Endzeit oder Dauer", joined)
+        self.assertIn("gültige Endzeit", joined)
         self.assertNotIn("Termin wurde eingetragen", joined)
         self.assertNotIn("appointment was created", joined)
+
+    def test_calendar_followup_requests_a_complete_single_message(self) -> None:
+        for language, first, followup, complete, hint, understood in (
+            (
+                "de",
+                "Zahnarzt am 21.09.2026 um 16:00 im Familienkalender.",
+                "Bis 16:30.",
+                "Zahnarzt am 21.09.2026 von 16:00 bis 16:30 im Familienkalender.",
+                "in einer Nachricht",
+                "als Entwurf verstanden",
+            ),
+            (
+                "en",
+                "Dentist on 2026-09-21 at 16:00 in the family calendar.",
+                "Until 16:30.",
+                "Dentist on 2026-09-21 from 16:00 to 16:30 in the family calendar.",
+                "in one message",
+                "request as a draft",
+            ),
+        ):
+            with self.subTest(language=language):
+                draft = CreateCalendarEventDraft(
+                    title="Dentist", date="2026-09-21",
+                    start_time="16:00", end_time="16:30", calendar_id="family",
+                    location=None, language=language, unresolved=(),
+                )
+
+                class AccumulatedDraftRuntime:
+                    def run(self, request: AgentRequest) -> AgentResponse:
+                        # Simulate the model carrying details from earlier turns.
+                        return AgentResponse(text="", drafts=(draft,))
+
+                inputs = iter((first, followup, complete, "/quit"))
+                output: list[str] = []
+                result = _chat_loop(
+                    AccumulatedDraftRuntime(),
+                    read=lambda prompt: next(inputs),
+                    write=output.append,
+                )
+                self.assertEqual(result, 0)
+                self.assertEqual(len(output), 4)
+                for clarification in output[1:3]:
+                    self.assertIn(hint, clarification)
+                    self.assertIn("HH:MM", clarification)
+                    self.assertNotIn(understood, clarification)
+                self.assertIn(understood, output[3])
+                self.assertNotIn(hint, output[3])
 
     def test_chat_marks_false_completion_as_conversation_only(self) -> None:
         inputs = iter((
