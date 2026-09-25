@@ -150,8 +150,8 @@ def _could_be_partial_date(token: str) -> bool:
 
 
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
-    # This slice accepts 24-hour input only. Reject mixed/AM-PM requests as
-    # a whole rather than guessing the scope of a shared suffix (4-5 pm).
+    # This slice accepts 24-hour input only. Reject 12-hour/meridiem or
+    # day-period requests as a whole rather than guessing suffix scope.
     if (
         _MERIDIEM_TIME_RE.search(source_text)
         or _DAY_PERIOD_TIME_RE.search(source_text)
