@@ -86,9 +86,9 @@ single canonical representation rather than a duplicate of the note body.
 
 YAML metadata must not be treated as an alternate authorization system. Authority remains owned by AdaGuard.
 
-### Storage topology to characterize
+### Confirmed storage and access topology
 
-The current preferred topology to evaluate is **multiple human-readable Memory vaults rather than one monolithic plaintext vault**:
+The accepted topology uses **multiple human-readable Memory vaults rather than one monolithic plaintext vault**, with a **host-side Memory Broker** mediating Ada's runtime access to those protection domains:
 
 ```text
 memory/
@@ -101,13 +101,24 @@ memory/
 
 The names and exact ownership model remain open. The important property is that gaining read access to one private Memory domain must not automatically reveal another person's private Memory.
 
-Questions still to decide:
+The **host-side Memory Broker** owns or mediates access to the underlying
+vaults and any protection-domain-specific derived retrieval state. The Ada
+runtime requests only the protection domain(s) required for the current
+authenticated/authorized task; the broker must not expose all household
+vaults to one long-lived Ada runtime principal. The broker is an Ada-owned
+security boundary, not a model tool and not an authorization engine:
+AdaGuard/actor-audience context determines what may be requested, while the
+broker enforces the resulting scoped storage access.
 
-- one vault/repository per person plus separate shared vaults, versus another equivalent protected topology;
-- OS permissions versus per-vault encryption versus both;
-- how Ada receives temporary access to the minimum vaults required for a task;
+Still to decide at implementation level:
+
+- exact vault/repository granularity per person/shared audience;
+- OS permissions versus per-vault encryption/keys versus both;
+- broker IPC/API and how request identity/scope is bound so caller-controlled
+  parameters cannot widen access;
 - how derived indexes/graphs are partitioned so they cannot recombine private scopes into one readable database;
 - whether indexes are one-per-vault, encrypted per scope, or held only ephemerally;
+- how authorized household members edit their own vaults without routing ordinary human editing through Ada;
 - how shared minimized derivatives reference a private source without exposing that source.
 
 This also means a single global Obsidian vault is only acceptable where all users of that vault are authorized to read all contained material. Separate private vaults may still each be opened independently in Obsidian.
@@ -1453,6 +1464,7 @@ ADR-0008 accepts the following MVP architecture:
 - claim/source/lifecycle information that matters to the user stays inspectable with the human-readable Memory and must not be duplicated into a second drifting claim truth store;
 - ordinary new personal knowledge is private by default, and private/shared scopes map to **enforceable protection domains**, not merely folders or model-interpreted tags;
 - authoritative Memory, version history/backup/sync, derived retrieval indexes, permissions, and action truth remain distinct mechanisms;
+- runtime access to protected Memory domains is mediated by an Ada-owned **host-side Memory Broker**; the long-lived Ada runtime/model does not receive standing access to all household vaults;
 - normal retrieval starts with current authoritative files and the simplest sufficient local search; derived indexes/graphs/vector layers are optional, rebuildable, scope-preserving accelerators rather than independent truth sources;
 - operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
 - corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
@@ -1470,17 +1482,15 @@ ADR-0008 accepts the following MVP architecture:
 
 Git-style per-protection-domain history is the leading MVP **versioning adapter candidate**, not an authentication or security boundary. Its exact capture/concurrency/recovery mechanism must be validated before product use.
 
-A separate **architecture follow-up remains mandatory before real household
-Memory**: the protection-domain access topology delegated by ADR-0003. Ada
-must define which principals are isolated (at minimum household members from
-one another, and the runtime/model from domains not needed for the current
-authorized request) and how the runtime receives only the required domain
-access. A single mount exposing every private/shared vault to one long-lived
-Ada principal is **not implicitly accepted**. Candidate shapes include a
-host-side Memory broker, per-domain/per-request workers, or equivalent scoped
-credential/key release. The mechanism may vary, but authorized users must
-still be able to access/edit their own authoritative Memory in plain
-human-readable form.
+The protection-domain access topology delegated by ADR-0003 is now decided:
+Ada uses a **host-side Memory Broker** as the storage-access boundary for the
+MVP. The broker mediates vault access and exposes only the domain(s) required
+for the current authenticated/authorized task; the Ada runtime/model must not
+receive a standing mount or credential set for all private/shared household
+Memory. Exact IPC, ACL/encryption/key mechanics and broker process structure
+remain implementation details. Authorized users must still be able to
+access/edit their own authoritative Memory directly in plain human-readable
+form without depending on Ada.
 
 
 This acceptance chooses the architecture boundary and the smallest baseline. It does **not** claim that the Memory service, protection domains, versioning adapter, retrieval quality, learning lifecycle, or historical purge operations are already implemented or production-ready.
@@ -1566,7 +1576,7 @@ The architecture above is accepted independently from any one Memory framework o
 
 1. validate the file-native control against representative retrieval/edit/forget scenarios on the target platform and measure retrieval quality/scale before adding a derived search framework; before custom retrieval infrastructure, run a focused reuse comparison of credible local RAG/retrieval components (at minimum the SQLite FTS5 baseline and suitable modular/embedded candidates such as LlamaIndex Core, Haystack, LanceDB, or an equivalent maintained option) behind an Ada-owned retrieval port;
 2. implement safe out-of-band edit capture and Ada writes, including path-restricted history capture, same-file concurrency detection/reconciliation, Git/file lock handling, crash recovery, and explicit stale-source handling;
-3. close the protection-domain access-topology architecture follow-up delegated by ADR-0003, then demonstrate enforceable per-person/shared domains and scope-partitioned retrieval/indexes; different folders under one readable OS principal are insufficient and a single long-lived Ada principal with all domains exposed is not implicitly accepted;
+3. implement and validate the accepted host-side Memory Broker topology plus enforceable per-person/shared domains and scope-partitioned retrieval/indexes; bind each broker request to trusted actor/audience/authorization context, fail closed on scope ambiguity, and prove that the Ada runtime cannot read domains outside the current authorized request;
 4. make current/superseded/unresolved retrieval semantics deterministic enough that obsolete or contradictory text is not promoted as current truth; fail closed when lifecycle/currentness is ambiguous rather than asking the model to infer it;
 5. ensure forgetting removes content from current authoritative retrieval and every reconstructible derived index, while keeping historical purge/backup retention as a separately explicit operation;
 6. define and validate the minimum provenance/source-reference and external-document lifecycle needed by implemented MVP scenarios without creating duplicate hidden truth;
