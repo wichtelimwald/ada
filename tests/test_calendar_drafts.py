@@ -432,6 +432,31 @@ class CalendarDraftTests(unittest.TestCase):
                 )
                 self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
+    def test_day_period_does_not_hide_explicit_24_hour_times(self) -> None:
+        for language, times in (
+            ("de", "16:00 bis 17:00 nachmittags"),
+            ("de", "16 Uhr bis 17 Uhr abends"),
+            ("en", "16:00 to 17:00 in the afternoon"),
+        ):
+            with self.subTest(times=times):
+                source = (
+                    f"Zahnarzt am 21.09.2026 von {times} im Familienkalender."
+                    if language == "de"
+                    else (
+                        "Dentist on 2026-09-21 in the family calendar "
+                        f"from {times}."
+                    )
+                )
+                assessment = assess_calendar_create_draft(
+                    _draft(
+                        start_time="16:00",
+                        end_time="17:00",
+                        language=language,
+                    ),
+                    source_text=source,
+                )
+                self.assertEqual(assessment.missing, ())
+
     def test_whole_hour_requires_a_separate_time_token(self) -> None:
         for source_time in (
             "A16 Uhr", "16:16 Uhr", "26.16 Uhr", "A16Uhr", "16 Uhr 30",
