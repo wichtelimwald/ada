@@ -9,6 +9,8 @@ import sys
 from collections.abc import Callable
 
 from ada import __version__
+from ada.adapters.file_memory import FileMemoryError, FileMemoryStore
+from ada.bootstrap.personality import bootstrap_personality_memory
 from ada.application.calendar_drafts import render_calendar_draft_response
 from ada.application.local_chat_safety import render_conversation_only_reply
 from ada.core.actions import CreateCalendarEventDraft
@@ -82,7 +84,12 @@ def _chat_loop(
             )
 
 
-def _chat(\n    *,\n    model: str,\n    ollama_url: str,\n    memory_root: str | None = None,\n) -> int:
+def _chat(
+    *,
+    model: str,
+    ollama_url: str,
+    memory_root: str | None = None,
+) -> int:
     from ada.adapters.local_ollama import (
         LocalModelConfigurationError,
         LocalModelUnavailableError,
