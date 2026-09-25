@@ -50,6 +50,8 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [ ] Define/select the authoritative Memory backend and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
 - [ ] Connect local-chat typed action proposals to the existing AdaGuard + durable-action path; do not expose direct privileged model tools.
 - [ ] Guard robustness follow-up: reject invalid `AuthenticationAssurance` types as `invalid_request` rather than raising during context construction.
+- [ ] Implement ADR-0007 context-aware interpretation behind Ada-owned types/ports: trusted `InterpretationContext`, raw temporal expressions, and explicit/context-derived/defaulted derivation evidence.
+- [ ] Close ADR-0007 resolver adoption gates before adding a production temporal dependency: safe/reproducible Quickadd JSON artifact and license provenance (or an alternative resolver), full dependency lock, target container/Linux validation, source-span attribution, determinism, thread safety, footprint, and independent review.
 - [ ] Add Dependabot configuration only after package ecosystems actually exist.
 - [ ] Revisit ProjectAtlas vs Graphify only when repository size/complexity justifies repository indexing.
 
