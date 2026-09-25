@@ -119,12 +119,19 @@ def _valid_time(value: str | None) -> bool:
     return bool(value and _TIME_RE.fullmatch(value.strip()))
 
 
+def _could_be_day_first_partial_date(token: str) -> bool:
+    if ":" in token:
+        return False
+    day, month = (int(part) for part in token.split("."))
+    return 1 <= day <= 31 and 1 <= month <= 12
+
+
 def _could_be_partial_date(token: str) -> bool:
     if ":" in token:
         return False
     first, second = (int(part) for part in token.split("."))
     return (
-        (1 <= first <= 31 and 1 <= second <= 12)
+        _could_be_day_first_partial_date(token)
         or (1 <= first <= 12 and 1 <= second <= 31)
     )
 
@@ -152,11 +159,14 @@ def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
             return match.group(0)
         has_time_marker = re.match(r"\s+Uhr\b", source_text[match.end():], re.IGNORECASE)
         if (
-            _could_be_partial_date(start)
-            and _could_be_partial_date(end)
+            _could_be_day_first_partial_date(start)
+            and _could_be_day_first_partial_date(end)
             and not has_time_marker
         ):
-            # A range such as 09.10-10.11 could mean two calendar dates.
+            # Preserve the existing compact DD.MM date-range ambiguity rule.
+            # Month-first ambiguity is fail-closed for standalone/date-prefixed
+            # tokens, but must not erase clear range evidence such as
+            # 09.10-10.30, which is intentionally supported as a time range.
             return " "
         # Protect an explicit time range before masking three-part dates;
         # otherwise 16.30-17.00 is partly consumed as a date token.

@@ -259,6 +259,16 @@ class CalendarDraftTests(unittest.TestCase):
                 )
                 self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
 
+    def test_month_first_partial_date_standalone_does_not_corroborate_time(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(start_time="09:21", end_time="10:00"),
+            source_text=(
+                "Add a dentist appointment on 09.21 ending at 10:00 "
+                "in the family calendar."
+            ),
+        )
+        self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
+
     def test_unambiguous_standalone_dotted_time_still_supports_draft(self) -> None:
         assessment = assess_calendar_create_draft(
             _draft(start_time="16:30", end_time="17:00"),
