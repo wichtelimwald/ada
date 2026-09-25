@@ -14,7 +14,7 @@ Ada is a modern assistant inspired by Ada Lovelace, especially the combination o
 
 The **distribution seed** is a real package asset at `src/ada/bootstrap/default_personality.toml`, so it can be replaced by a fork/distribution without changing Ada's trust architecture.
 
-The intended lifecycle is: **empty Memory -> seed once -> active personality lives in user-controlled Memory**. From then on, personality may gradually learn and evolve while remaining inspectable, editable, reversible, and separate from permissions/privacy/action truth.
+The intended lifecycle is: **empty Memory -> seed once -> active personality lives in user-controlled Memory**. From then on, personality may gradually learn and evolve while remaining inspectable, editable, and—once safe versioning/edit capture is implemented—reversible, while staying separate from permissions/privacy/action truth.
 
 See [personality model and lifecycle](docs/product/personality.md).
 
