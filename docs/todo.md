@@ -52,8 +52,9 @@ Create separate evidence-based evaluations only for capabilities required by the
 
 **Gates before real household Memory (ADR-0008):**
 
-- [ ] Close the protection-domain access-topology follow-up delegated by ADR-0003: define which principals are isolated and how Ada receives only the domain(s) needed for the current authorized request; one long-lived Ada principal with every vault readable is not implicitly accepted.
-- [ ] Demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes; folders under one readable OS principal are insufficient.
+- [x] Select the protection-domain access topology delegated by ADR-0003: host-side Memory Broker with request-scoped access; one long-lived Ada principal with every vault readable is not accepted.
+- [ ] Implement and validate the host-side Memory Broker, including trusted actor/audience/authorization binding, fail-closed request scope, and proof that Ada cannot read unrelated protection domains.
+- [ ] Demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes behind the broker; folders under one readable OS principal are insufficient.
 - [ ] Route every model-originated Memory write/promotion through a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling.
 - [ ] Implement safe Memory write/versioning behavior: out-of-band edit capture, path-restricted history commits, same-file concurrency detection/reconciliation, lock/crash recovery, and prompt capture of Ada writes so later manual reverts remain detectable.
 - [ ] Implement deterministic current/superseded/unresolved retrieval and stale-source handling; direct substring search must not promote superseded text as current truth.
