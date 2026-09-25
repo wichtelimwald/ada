@@ -47,17 +47,21 @@ class FileMemoryStore:
             return None
         metadata, _body = self._read_markdown(path)
         try:
+            schema_version = int(metadata["schema_version"])
+            if schema_version != 1:
+                raise ValueError("unsupported personality Memory schema")
             return PersonalityProfile(
-                schema_version=int(metadata["schema_version"]),
+                schema_version=schema_version,
                 profile_id=str(metadata["profile_id"]),
                 display_name=str(metadata["display_name"]),
                 inspiration=str(metadata["inspiration"]).strip(),
                 background_story=str(metadata["background_story"]).strip(),
-                traits=tuple(str(item) for item in metadata["traits"]),
-                interaction_style=tuple(
-                    str(item) for item in metadata["interaction_style"]
+                traits=self._string_tuple(metadata, "traits"),
+                interaction_style=self._string_tuple(
+                    metadata,
+                    "interaction_style",
                 ),
-                boundaries=tuple(str(item) for item in metadata["boundaries"]),
+                boundaries=self._string_tuple(metadata, "boundaries"),
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise FileMemoryError(
@@ -268,12 +272,14 @@ class FileMemoryStore:
     def _read_entry(self, path: Path) -> MemoryEntry:
         metadata, body = self._read_markdown(path)
         try:
+            if int(metadata["schema_version"]) != 1:
+                raise ValueError("unsupported Memory entry schema")
             entry = MemoryEntry(
                 entry_id=str(metadata["entry_id"]),
                 kind=MemoryKind(str(metadata["kind"])),
                 evidence_origin=EvidenceOrigin(str(metadata["evidence_origin"])),
                 lifecycle=MemoryLifecycle(str(metadata["lifecycle"])),
-                content=body.strip(),
+                content=self._validate_content(body),
                 confirmation_basis=(
                     ConfirmationBasis(str(metadata["confirmation_basis"]))
                     if "confirmation_basis" in metadata
@@ -367,6 +373,18 @@ class FileMemoryStore:
                 FileMemoryStore._toml_value(item) for item in value
             ) + "]"
         raise TypeError(f"unsupported TOML metadata value: {type(value).__name__}")
+
+    @staticmethod
+    def _string_tuple(
+        metadata: dict[str, Any],
+        key: str,
+    ) -> tuple[str, ...]:
+        value = metadata[key]
+        if not isinstance(value, list) or not all(
+            isinstance(item, str) for item in value
+        ):
+            raise TypeError(f"{key} must be an array of strings")
+        return tuple(value)
 
     @staticmethod
     def _validate_entry_id(entry_id: str) -> None:
