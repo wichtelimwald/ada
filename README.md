@@ -152,7 +152,7 @@ ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
 Development-only file-native Memory can be exercised explicitly:
 
 ```bash
-ada chat --memory-root ./tmp/ada-memory
+ada chat --memory-root /tmp/ada-memory-dev
 ```
 
 Do not use that unprotected root for real household data. Broker-mediated protection domains, encryption, and safe Git/versioning are separate MVP gates.
