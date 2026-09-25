@@ -22,6 +22,7 @@ class ArchitectureBoundaryTests(unittest.TestCase):
                 "ada.core.authorization",
                 "ada.core.action_outcomes",
                 "ada.core.personality",
+                "ada.core.memory",
                 "ada.ports.agent_runtime",
                 "ada.ports.calendar",
                 "ada.ports.travel_time",
