@@ -202,12 +202,12 @@ class FileMemoryStore:
         self._validate_entry_id(entry_id)
         changed = False
         memory_path = self.memory_dir / f"{entry_id}.md"
+        evidence = self.load_learning_entry(entry_id, include_inactive=True)
+
         if memory_path.exists():
             self._reject_symlink(memory_path)
             memory_path.unlink()
             changed = True
-
-        evidence = self.load_learning_entry(entry_id, include_inactive=True)
         if evidence is not None and evidence.lifecycle is not MemoryLifecycle.FORGOTTEN:
             forgotten = MemoryEntry(
                 entry_id=evidence.entry_id,
@@ -268,7 +268,7 @@ class FileMemoryStore:
     def _read_entry(self, path: Path) -> MemoryEntry:
         metadata, body = self._read_markdown(path)
         try:
-            return MemoryEntry(
+            entry = MemoryEntry(
                 entry_id=str(metadata["entry_id"]),
                 kind=MemoryKind(str(metadata["kind"])),
                 evidence_origin=EvidenceOrigin(str(metadata["evidence_origin"])),
@@ -287,6 +287,12 @@ class FileMemoryStore:
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise FileMemoryError(f"invalid Memory entry metadata in {path}") from exc
+
+        if entry.entry_id != path.stem:
+            raise FileMemoryError(
+                f"Memory entry id {entry.entry_id!r} does not match file {path.name!r}"
+            )
+        return entry
 
     def _read_markdown(self, path: Path) -> tuple[dict[str, Any], str]:
         self._reject_symlink(path)
