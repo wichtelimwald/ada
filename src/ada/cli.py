@@ -82,7 +82,7 @@ def _chat_loop(
             )
 
 
-def _chat(*, model: str, ollama_url: str) -> int:
+def _chat(\n    *,\n    model: str,\n    ollama_url: str,\n    memory_root: str | None = None,\n) -> int:
     from ada.adapters.local_ollama import (
         LocalModelConfigurationError,
         LocalModelUnavailableError,
@@ -93,9 +93,23 @@ def _chat(*, model: str, ollama_url: str) -> int:
 
     config = LocalOllamaConfig(model=model, base_url=ollama_url)
     try:
+        personality = None
+        if memory_root is not None:
+            from ada.adapters.file_memory import FileMemoryError, FileMemoryStore
+            from ada.bootstrap.personality import bootstrap_personality_memory
+
+            memory = FileMemoryStore(memory_root)
+            personality = bootstrap_personality_memory(memory)
+
         check_local_ollama_ready(config)
-        runtime = build_local_ollama_runtime(config)
+        runtime = build_local_ollama_runtime(
+            config,
+            personality=personality,
+        )
     except (LocalModelConfigurationError, LocalModelUnavailableError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except FileMemoryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -146,6 +160,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         help="Loopback Ollama OpenAI-compatible /v1 endpoint.",
     )
+    chat.add_argument(
+        "--memory-root",
+        default=os.getenv("ADA_MEMORY_ROOT"),
+        help=(
+            "Explicit development Memory root. Omit until a protected Memory "
+            "domain is intentionally configured."
+        ),
+    )
     return parser
 
 
@@ -160,6 +182,7 @@ def main() -> None:
             _chat(
                 model=args.model,
                 ollama_url=args.ollama_url,
+                memory_root=args.memory_root,
             )
         )
 
