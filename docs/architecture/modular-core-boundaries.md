@@ -176,6 +176,26 @@ Responsibility:
 
 This is deliberately a **narrow semantic slice of Memory**, introduced because local chat needs a concrete personality lifecycle. ADR-0008 now defines the general authoritative-Memory and derived-retrieval architecture; this port remains narrow until concrete Memory scenarios justify broader contracts.
 
+### MemoryBroker boundary
+
+ADR-0008 selects a **host-side Memory Broker** as the MVP storage-access
+boundary for protected Memory domains.
+
+Responsibility:
+
+- mediate access to authoritative vaults and protection-domain-specific derived retrieval state;
+- accept only trusted Ada-owned actor/audience/authorization context, never raw model claims of scope;
+- expose only the domain(s) required for the current authorized task;
+- fail closed on missing/ambiguous scope;
+- keep filesystem paths, keys/credentials and unrelated vault contents outside the model/runtime boundary;
+- preserve direct human access to each user's own Markdown Memory without requiring Ada.
+
+The broker is not an authorization engine: AdaGuard and application context
+decide what access is permitted; the broker enforces the resulting scoped
+storage capability. Exact local IPC/API, process shape, ACL/encryption/key
+mechanics and caching strategy are deferred to the implementation slice.
+
+
 ## 5. Boundaries intentionally deferred
 
 Do not define broad abstractions before the relevant slice needs them.
@@ -184,7 +204,7 @@ Deferred ports include:
 
 - MessageChannelPort for email and later channels;
 - SchedulerPort for requested/background work;
-- broad authoritative Memory and retrieval/index ports beyond the accepted ADR-0008 boundaries; design their concrete APIs from implementation scenarios;
+- broad authoritative Memory/retrieval contracts beyond the accepted ADR-0008 boundaries and the selected MemoryBroker boundary; design concrete APIs from implementation scenarios;
 - UI/application transport;
 - remote/cloud model broker;
 - speech/perception;
@@ -248,7 +268,7 @@ This document does not resolve:
 - programming language/package layout;
 - UI technology;
 - production calendar/email providers;
-- memory representation/backend;
+- concrete Memory versioning, broker transport, protection mechanism, and optional derived retrieval implementation;
 - scheduler implementation;
 - packaging, signing, startup, background service, or updates;
 - quantitative CPU/RAM/storage/energy budgets;
