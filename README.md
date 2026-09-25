@@ -42,9 +42,9 @@ Ada's architecture is deliberately designed so that the AI model is **not** the 
 - **Technical success is not the same as real-world success.** A completed phone call does not automatically mean an appointment was booked; Ada should record only what can actually be verified.
 - **Memory remains user-controlled.** The authoritative long-term memory is designed to stay outside framework/runtime internals and remain inspectable and editable by the user.
 
-The proposed [Memory architecture](docs/decisions/ADR-0008-memory-architecture.md) treats direct Markdown edits as authoritative file content. Captured file history is sufficient provenance for those manual edits; Ada should not require duplicate claim metadata in YAML or infer who edited a file. The versioning mechanism and Memory backend are still under evaluation.
+The accepted [Memory architecture](docs/decisions/ADR-0008-memory-architecture.md) is file-native and Markdown-first: current human-editable files are authoritative, private/shared Memory must map to enforceable protection domains, and derived indexes are rebuildable accelerators rather than independent truth. Claim/source/lifecycle information must remain inspectable without a second drifting claim store, and Memory never grants permission or substitutes for action truth.
 
-The maintainer-confirmed **proposed MVP path** starts with Markdown, simple current-file search and per-domain Git history once actual edit capture is verified. ReMe and LangMem are optional candidates that must earn their added runtime and maintenance cost. A [small synthetic control run](research/memory/control/README.md) confirms current-file search and Git diff detection, but automatic edit capture, exclusion of forgotten content from future derived indexes, enforceable private vaults, and representative recall remain open. The proposal is not an accepted backend or an implemented Memory service.
+The MVP baseline starts with current-file reads and the simplest sufficient local search. Git-style per-protection-domain history is the leading versioning-adapter candidate once safe edit capture/concurrency/recovery are implemented; Git identity is not authentication. ReMe, LangMem, Hindsight and similar frameworks are optional derived components that must earn their added runtime and maintenance cost. A [synthetic control](research/memory/control/README.md) demonstrates useful baseline behavior and failure modes, but enforceable vault isolation, safe concurrent writes, section-aware current/superseded retrieval, representative recall, and operational forgetting still require implementation validation. The architecture is accepted; the production Memory service is not yet implemented.
 
 Some of these protections are already implemented; others are architecture rules being implemented incrementally. The project documents accepted decisions separately from work that is still under evaluation.
 
@@ -134,7 +134,7 @@ model requests. This first chat path runs with the macOS user's permissions;
 it is not isolated by a runtime container. Containerized local chat needs a
 separately reviewed, restricted Ollama connection before it is supported.
 
-Until the authoritative Memory backend is selected, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
+Until the accepted authoritative Memory architecture is implemented and wired, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
 
 Inside the chat:
 
