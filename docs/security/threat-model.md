@@ -36,7 +36,9 @@
 - external content ↔ model context,
 - Ada durable-action semantics ↔ DBOS system database / recovery engine,
 - DBOS workflow steps ↔ external providers with their own idempotency/reconciliation semantics,
-- Ada agent-runtime adapter ↔ separately running loopback Ollama/model process.
+- Ada agent-runtime adapter ↔ separately running loopback Ollama/model process,
+- Ada runtime ↔ host-side Memory Broker,
+- host-side Memory Broker ↔ per-domain Memory vaults and independently configured source/document providers,
 - native macOS local-chat process ↔ host resources accessible to the logged-in
   user; a bridged Dev Container does not isolate this separate native process.
 
@@ -97,11 +99,16 @@
 - production-provider review of sensitive action-payload storage before real personal data is connected,
 - first local-model profile restricted in code to loopback HTTP(S) endpoints,
 - local model output remains proposal/data and never becomes authorization,
-- local-chat history remains process-local runtime context until the authoritative Memory design is accepted,
+- local-chat history remains process-local runtime context until the accepted Memory architecture is implemented behind a reviewed deterministic write path and host-side Memory Broker,
 - model/runtime artifact provenance and pinning reviewed before Ada distributes or auto-provisions model artifacts,
 - personality bootstrap seed copied only into empty authoritative Memory; existing Memory wins,
 - persistent personality changes must be inspectable, reversible, attributable, and isolated from permissions/privacy/action-truth rules,
-- untrusted content/model output cannot directly persist personality changes.
+- untrusted content/model output cannot directly persist personality changes,
+- every model-originated Memory write/promotion passes an Ada-owned deterministic validation boundary for source/trust, privacy scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction semantics,
+- protected Memory domains must not all be exposed by default to one long-lived Ada principal; the host-side Memory Broker must enforce request-scoped domain access independently from model output,
+- source/document roots are independently configurable per protection domain and may use different storage providers/volumes; broker scope must cover source access as well as Memory/retrieval access so one configured source provider does not widen another domain,
+- broker requests must bind to trusted actor/audience/authorization context and fail closed if the requested Memory scope cannot be deterministically justified,
+- the Memory Broker is intended to constrain model/prompt-injection and accidental over-broad application access, not a fully compromised Ada runtime that can forge trusted request context; the broker itself is trusted with every domain/provider it serves,
 - keep the first macOS chat CLI native alongside a loopback-bound Ollama and
   run development and tests in the default bridged Dev Container; review any
   future container-to-host Ollama connection before enabling it.

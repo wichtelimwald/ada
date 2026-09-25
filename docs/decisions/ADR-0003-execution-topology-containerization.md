@@ -202,7 +202,7 @@ Therefore:
 - Ada does not mount the user's entire home directory;
 - the first vertical slice uses no authoritative Memory mount.
 
-The later Memory ADR will decide whether Ada uses a narrow external bind mount or a stronger host-side Memory broker/API.
+ADR-0008 now selects a **host-side Memory Broker** for the MVP runtime access topology. Ada's runtime requests only the protection domain(s) required for the current authenticated/authorized task; the broker mediates filesystem/key/index access and must not expose every private/shared vault to one long-lived Ada principal. Exact local IPC, ACL/encryption/key mechanics, and broker process structure remain implementation details.
 
 ## Ollama / local model runtime
 

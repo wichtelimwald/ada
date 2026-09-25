@@ -34,7 +34,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [ ] Ears — wake word / speech input.
 - [ ] Voice — speech output.
 - [x] Brain — initial agent-runtime/orchestration foundation ([ADR-0002](decisions/ADR-0002-agent-runtime-foundation.md)).
-- [ ] Memory — **next architecture priority**. Architecture evaluation in [ADR-0008](decisions/ADR-0008-memory-architecture.md): evaluate human-readable stores, agent memory, dedicated local stores, and credible hybrid alternatives. Must support personality bootstrap/growth, correction, provenance, export/delete, and remain external to runtime persistence.
+- [x] Memory — file-native, Markdown-first authoritative Memory requiring enforceable private/shared protection domains, inspectable learning evidence/promotion, and rebuildable derived retrieval accepted by [ADR-0008](decisions/ADR-0008-memory-architecture.md).
 - [ ] Hands — computer control / action runtime.
 - [x] Guard — permission/policy architecture ([ADR-0004](decisions/ADR-0004-guard-permission-architecture.md)).
 - [ ] Eyes — screen/camera, only if required.
@@ -47,7 +47,25 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [x] Add package/dependency management appropriate to the selected stack.
 - [x] Add local validation commands.
 - [x] Re-validate real local multi-turn chat on target hardware; final qwen3.5:9b run passed 50 tests and the local-chat acceptance flow, enabling ADR-0006 acceptance.
-- [ ] Define/select the authoritative Memory backend and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
+- [ ] Implement ADR-0008's accepted file-native Memory baseline and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
+- [ ] From the first Memory slice, preserve separate dimensions for durable Memory kind (`preference` / `fact` / `routine` / `episode`), evidence origin (`explicit_statement` / `observed_fact` / `behavioral_observation` / `hypothesis`), and lifecycle/maturity; promotion into established Memory is explicit and inspectable.
+- [ ] Implement directory/lifecycle semantics: `learning/` is the only Memory area with automatic expiry/compaction/removal and contains observed facts, behavioral observations, hypotheses and non-durable extracts/summaries; `memory/` is never automatically removed/forgotten, but `confirmed/observed_pattern` entries may transition non-destructively to `stale`; explicit-user-confirmed knowledge never stales merely through time.
+
+**Gates before real household Memory (ADR-0008):**
+
+- [x] Select the protection-domain access topology delegated by ADR-0003: host-side Memory Broker with request-scoped access; one long-lived Ada principal with every vault readable is not accepted.
+- [ ] Implement and validate the host-side Memory Broker, including trusted actor/audience/authorization binding and fail-closed request scope; prove that normal/model-driven/accidental application paths cannot read unrelated domains, and document/test the accepted residual risk that a fully compromised Ada runtime can forge trusted broker context while the broker itself is trusted across the domains it serves.
+- [ ] Demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes behind the broker; folders under one readable OS principal are insufficient.
+- [ ] Route every model-originated Memory write/promotion through a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling.
+- [ ] Implement safe established-Memory write/versioning behavior: out-of-band edit capture, path-restricted history commits, same-file concurrency detection/reconciliation, lock/crash recovery, and prompt capture of Ada writes so later manual reverts remain detectable.
+- [ ] Ensure normal Memory retrieval/learning uses only current state and never consults Git history, snapshots, or backups as active Memory/evidence; historical retention/purge remains a separate operations/privacy policy.
+- [ ] Implement deterministic current/superseded/unresolved retrieval and stale-source handling; direct substring search must not promote superseded text as current truth.
+- [ ] Ensure operational forgetting removes content from current authoritative retrieval and every reconstructible derived index, and removes/neutralizes pre-forget `learning/` evidence so forgotten knowledge cannot be silently re-promoted; historical purge/backup retention remains a separate explicit operation.
+- [ ] Define and validate the minimum provenance/source-reference and external-document lifecycle needed by the implemented MVP scenarios without creating duplicate hidden truth.
+- [ ] Enforce source ownership: calendar/contact/document facts remain owned by their authoritative source by default; Memory persists references, derived abstractions, or explicitly requested independent copies rather than duplicate current truth.
+- [ ] Implement the source/document store boundary with **independently configurable roots/providers per protection domain** (e.g. one user's iCloud, a separate family-share, or an external/encrypted volume); no central Ada `sources/` root is required. Reference existing durable originals in place. Persist a directly received file only when the user asks or retained durable Memory/evidence needs a resolvable original; otherwise keep it session-only. With no configured destination, durable persistence fails closed. Memory never modifies/deletes originals.
+- [ ] Measure representative Memory retrieval quality/scale and run a focused local-RAG/retrieval reuse comparison (SQLite FTS5 control plus credible modular/embedded candidates such as LlamaIndex Core, Haystack, LanceDB, or an equivalent maintained option) before writing custom retrieval infrastructure or adding FTS/vector/graph/ReMe/LangMem/Hindsight; any adopted dependency must pass its own license/security/platform review.
+- [ ] Treat any RAG/FTS/vector/graph layer as a rebuildable scoped cache: retrieve candidate references, re-read the current authoritative owner (Memory Markdown or source provider via the broker), validate lifecycle/maturity/evidence origin/scope, label hypotheses/observations provisional, and treat unavailable-source cached values only as last-known/unverified.
 - [ ] Connect local-chat typed action proposals to the existing AdaGuard + durable-action path; do not expose direct privileged model tools.
 - [ ] Guard robustness follow-up: reject invalid `AuthenticationAssurance` types as `invalid_request` rather than raising during context construction.
 - [ ] Implement ADR-0007 context-aware interpretation behind Ada-owned types/ports: trusted `InterpretationContext`, raw temporal expressions, and explicit/context-derived/defaulted derivation evidence.

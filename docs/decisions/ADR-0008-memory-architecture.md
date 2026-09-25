@@ -1,11 +1,12 @@
 # ADR-0008: Authoritative Memory and retrieval architecture
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-21
+- **Accepted:** 2026-09-25
 
 ## Context
 
-Ada's first MVP requires persistent personal and household memory, but the Memory architecture is intentionally still open.
+Ada's first MVP requires persistent personal and household memory. This ADR records the accepted architecture boundary; implementation details and optional derived components remain separately gated.
 
 The confirmed product baseline requires Memory to be:
 
@@ -85,9 +86,9 @@ single canonical representation rather than a duplicate of the note body.
 
 YAML metadata must not be treated as an alternate authorization system. Authority remains owned by AdaGuard.
 
-### Storage topology to characterize
+### Confirmed storage and access topology
 
-The current preferred topology to evaluate is **multiple human-readable Memory vaults rather than one monolithic plaintext vault**:
+The accepted topology uses **multiple human-readable Memory vaults rather than one monolithic plaintext vault**, with a **host-side Memory Broker** mediating Ada's runtime access to those protection domains:
 
 ```text
 memory/
@@ -100,13 +101,36 @@ memory/
 
 The names and exact ownership model remain open. The important property is that gaining read access to one private Memory domain must not automatically reveal another person's private Memory.
 
-Questions still to decide:
+The **host-side Memory Broker** owns or mediates access to the underlying
+vaults, each domain's independently configured source/document provider, and
+any protection-domain-specific derived retrieval state. A protection domain's
+Memory vault and source root/provider may live in different physical or cloud
+locations; the broker preserves the same request-scoped authorization boundary
+across both.
 
-- one vault/repository per person plus separate shared vaults, versus another equivalent protected topology;
-- OS permissions versus per-vault encryption versus both;
-- how Ada receives temporary access to the minimum vaults required for a task;
+The broker primarily constrains **model output, prompt injection, accidental
+over-broad application code paths, and ambient runtime access** by withholding
+unneeded paths/keys/domains. It is not a security boundary against a fully
+compromised Ada runtime that can forge the trusted actor/audience/authorization
+context presented to the broker. The host-side broker itself is trusted with
+every protection domain/provider it serves. This residual risk is accepted for
+the MVP topology and must be explicit in the threat model. The Ada
+runtime requests only the protection domain(s) required for the current
+authenticated/authorized task; the broker must not expose all household
+vaults to one long-lived Ada runtime principal. The broker is an Ada-owned
+security boundary, not a model tool and not an authorization engine:
+AdaGuard/actor-audience context determines what may be requested, while the
+broker enforces the resulting scoped storage access.
+
+Still to decide at implementation level:
+
+- exact vault/repository granularity per person/shared audience;
+- OS permissions versus per-vault encryption/keys versus both;
+- broker IPC/API and how request identity/scope is bound so caller-controlled
+  parameters cannot widen access;
 - how derived indexes/graphs are partitioned so they cannot recombine private scopes into one readable database;
 - whether indexes are one-per-vault, encrypted per scope, or held only ephemerally;
+- how authorized household members edit their own vaults without routing ordinary human editing through Ada;
 - how shared minimized derivatives reference a private source without exposing that source.
 
 This also means a single global Obsidian vault is only acceptable where all users of that vault are authorized to read all contained material. Separate private vaults may still each be opened independently in Obsidian.
@@ -133,7 +157,7 @@ Where coordination requires broader visibility, Ada should prefer a deliberately
 
 ### Confirmed learning direction: evidence-based and class-dependent
 
-Memory ingestion should not use one universal rule. Different classes of knowledge need different learning paths.
+Memory ingestion should not use one universal rule. Different classes of knowledge need different learning paths. **This learning distinction is part of the accepted architecture from the first implementation slice**, even if autonomous promotion/aging rules are implemented incrementally. The initial representation must not collapse explicit user statements, observations, hypotheses, and established Memory into one indistinguishable fact type.
 
 Ada should support a small learning lifecycle:
 
@@ -175,7 +199,7 @@ For a confirmed memory, Ada should also preserve **how it became confirmed**. In
 - `observed_pattern` — promoted after repeated, sufficiently consistent observed outcomes without an explicit user confirmation;
 - `explicit_user` — explicitly confirmed/stated by the relevant user.
 
-This avoids conflating maturity with provenance. In a future inspectable learning-journal entry, a confirmed observation would
+This avoids conflating maturity with provenance. Confirmation basis records the evidence path used **at promotion/confirmation time** rather than adding a fourth independent knowledge axis. In a future inspectable learning-journal entry, a confirmed observation would
 have an `observed_pattern` basis while a directly confirmed statement would
 have an `explicit_user` basis. This is a semantic distinction, **not** a
 requirement for a second structured truth store alongside human-edited
@@ -187,16 +211,16 @@ A memory confirmed through observation remains weaker evidence than an explicit 
 
 #### Aging and staleness
 
-Ada may automatically move a **pattern-based** memory from `confirmed` to `stale` when its supporting observations have not been refreshed for a sufficiently long time.
+Ada may automatically move only **observation-derived** knowledge from `confirmed` to `stale` when its supporting observations have not been refreshed for a sufficiently long time.
 
 This is allowed only when:
 
 - the confirmation basis is observational (for example `observed_pattern`);
 - the transition is non-destructive and inspectable;
-- the original observations/provenance remain available according to retention policy;
+- the compact retained rationale/provenance remains available according to retention policy;
 - the rule for staleness is deterministic and category-specific rather than an LLM guess.
 
-Explicitly confirmed durable facts must not become stale merely because time passed. A future memory type may still define an explicit validity window where time is semantically relevant.
+**Explicitly stated/confirmed facts and preferences do not age or become forgotten automatically.** They remain current until an explicit correction/supersession, an explicit user forget/delete request, or a semantically explicit validity boundary says otherwise. Mere passage of time is never enough to stale or remove explicit knowledge.
 
 Useful metadata to characterize includes:
 
@@ -240,13 +264,9 @@ Wednesday -> superseded
 Thursday  -> confirmed / explicit_user
 ```
 
-Initial evidence precedence for conflict handling is:
+Initial conflict handling gives explicit-user confirmation/correction greater evidentiary weight than observation-derived confirmation. Maturity (`confirmed`, `provisional`, `observed`) is evaluated separately; it is not part of the same precedence scale.
 
-```text
-explicit_user > observed_pattern > provisional > observed
-```
-
-This precedence is **not** a blanket last-write-wins rule.
+This is **not** a blanket last-write-wins rule.
 
 Rules:
 
@@ -259,9 +279,112 @@ Rules:
 
 Exact field names remain open, but both maturity and confirmation basis must remain visible in human-readable Memory.
 
+#### Confirmed knowledge/evidence roles and promotion boundary
+
+Ada must not encode "what the knowledge is", "how Ada learned it", and
+"how mature/trusted it is" as one overloaded field. These are separate axes.
+
+**Durable Memory kind** describes the content that Ada may eventually use as
+established Memory, for example:
+
+- `preference` — an explicit or deliberately promoted user preference;
+- `fact` — a relatively objective durable fact;
+- `routine` — an established recurring pattern;
+- `episode` — a compact summary of a materially useful interaction/event.
+
+This set may grow scenario-by-scenario; it is not a fixed ontology.
+
+**Evidence origin** describes how the candidate knowledge arose:
+
+- `explicit_statement` — directly stated/confirmed by an authorized user;
+- `observed_fact` — a comparatively low-interpretation fact extracted from
+  an event/document/system observation, such as an appointment time or a
+  practice address. When another configured system remains authoritative for
+  that fact (for example a calendar event or contact record), the observation
+  normally points back to that source rather than creating a duplicate
+  authoritative Memory fact;
+- `behavioral_observation` — observed interaction/behavior that requires more
+  interpretation, such as repeatedly asking for more detail or reacting
+  positively to nerdy humor;
+- `hypothesis` — an interpretation synthesized from one or more observations.
+
+**Lifecycle/maturity** remains a separate axis
+(`observed`, `provisional`, `confirmed`, `stale`, `contradicted`,
+`superseded`, `forgotten`).
+
+This means, for example, a `preference` may originate from an
+`explicit_statement` or may be promoted from repeated
+`behavioral_observation`; an `observed_fact` may later become an
+established `fact` after validation. These paths do not have the same
+evidentiary weight merely because they end in the same Memory kind.
+
+**Promotion/assimilation is an explicit architecture boundary:**
+
+```text
+source/event/outcome
+  -> evidence (explicit statement | observed fact | behavioral observation)
+  -> optional hypothesis
+  -> Ada-owned validation
+       - source/trust classification
+       - privacy scope
+       - learning class / sensitivity
+       - provenance/lifecycle
+       - contradiction/correction checks
+  -> established authoritative Memory, or remain evidence/provisional
+```
+
+A model may propose a hypothesis or promotion, but it cannot silently
+self-promote model output into established Memory. Promotion may be automatic
+only where an explicit deterministic Ada rule for that learning class permits
+it; otherwise it requires confirmation. Evidence that has not been promoted
+may still be retained in the inspectable learning area under its protection
+domain and may support later plausibility checks.
+
+**Source-owned facts stay source-owned.** If a configured external system is
+already the authoritative source for a fact, Ada Memory should reference that
+source instead of persisting an independent duplicate as established Memory.
+Examples include calendar event time/date, a contact record, or a document
+whose original remains available. Promotion into established Memory is
+appropriate when Ada needs a durable abstraction/derived insight or the user
+deliberately asks Ada to retain the fact independently. Creating an independent
+copy merely because a source may disappear requires either a deterministic
+source-lifecycle rule (for example a provider known to be ephemeral) or user
+confirmation. Any such independent copy keeps the source reference and an
+`as_of`/observation date so later divergence can be surfaced rather than
+silently competing with a still-available source. This prevents stale parallel truth while
+still allowing Memory to retain useful context such as "this doctor is my
+dentist", "weekday appointments usually need transport", or a source reference
+to the original event/document.
+
+The default file organization should therefore keep established Memory and
+learning evidence logically separate inside the same protection domain, for
+example:
+
+```text
+<protection-domain>/
+├── memory/       # established/current authoritative Memory; no automatic expiry/removal
+└── learning/     # observations, observed facts, hypotheses, temporary extracts/summaries
+```
+
+The exact directory names/file granularity remain implementation choices.
+Both areas must remain human-readable; the learning area is not a hidden
+secondary truth store.
+
+**The `learning/` area is the only Memory area subject to automatic expiry,
+compaction, or removal.** `observed_fact`, `behavioral_observation`,
+`hypothesis`, and non-durable derived extracts/summaries live there until
+they are promoted, rejected, superseded, or compacted. Promotion/durable
+retention moves or rewrites the resulting established knowledge into
+`memory/`. Established `memory/` content never expires, compacts, disappears,
+or becomes forgotten automatically. A `confirmed/observed_pattern` entry in
+`memory/` may, however, undergo the deterministic non-destructive lifecycle
+transition `confirmed -> stale` defined above when its observational evidence
+ages. Explicitly stated/confirmed knowledge never becomes stale merely through
+time.
+
 #### Confirmed initial learning classes
 
-The maintainer confirmed four default learning classes. More specific classes may be added later, but they must map back to one of these behaviors rather than silently inventing a new trust level.
+The maintainer confirmed four default **learning-policy classes**. They are a policy classification over evidence origin **and sensitivity/consequence**, not a separate orthogonal knowledge axis. They decide how evidence may be retained/promoted, while Memory kind, evidence origin, and lifecycle keep their meanings above. More specific classes may be added later, but they must map back to one of these behaviors rather than silently inventing a new trust level.
 
 | Class | Default behavior | Examples / notes |
 | --- | --- | --- |
@@ -276,6 +399,7 @@ Cross-cutting rules still apply:
 - untrusted/quoted content is source evidence only and cannot directly become class-A trusted Memory;
 - an observation may be retained in the learning journal without promoting it to authoritative Memory;
 - classification itself must be explainable and correctable; material ambiguity should choose the more conservative class.
+- a low-risk `observed_fact` from a trusted/source-owned system does not automatically become class A merely because it is reliable; it remains source-owned evidence unless a deterministic promotion rule or user confirmation establishes an independent durable Memory fact.
 
 #### Feedback signals
 
@@ -345,7 +469,10 @@ Rules:
 - extracted facts/preferences may still live as separate ordinary Memory entries;
 - the episode may reference the original conversation where that reference remains available;
 - if the original transcript is deleted, the summary may remain according to normal Memory rules;
-- later retrieval may use episodic summaries to answer references such as "we talked about this the other day" without loading full historical conversations.
+- later retrieval may use episodic summaries to answer references such as "we talked about this the other day" without loading full historical conversations;
+- materially special conversations, workshops, trips, celebrations, major decisions, or other meaningful events may be marked as **durable episodes** for long-term continuity;
+- a user may explicitly mark an episode as durable; Ada may propose durable retention when a clear rule identifies an unusually important episode, but it must not silently make indefinite retention decisions from model judgment alone;
+- durable means exempt from ordinary automatic aging/compaction, **not** undeletable: an explicit later forget/delete request still wins.
 
 #### Referenced documents and external source material
 
@@ -412,13 +539,18 @@ source:
 
 The URI/reference format must remain provider-independent at the Memory layer. iCloud may be one concrete storage provider, but Ada should not encode iCloud-specific semantics into the canonical Memory model.
 
-Document handling rules:
+Document/source handling rules:
 
-- the original document may remain outside Git and outside the Memory vault;
-- Ada may retain only a summary/reference when that is sufficient;
-- if a task requires the original document, Ada must resolve/access it through the applicable file/provider boundary and permissions;
-- a missing/unavailable source must be distinguishable from a deleted/forgotten memory;
-- Memory deletion does not automatically delete an externally stored document unless an explicit document-management action is separately authorized;
+- **original/raw source material is outside the Memory lifecycle**. Memory does not modify, compact, age, forget, move, or delete the original;
+- each protection domain may have its **own independently configured** stable source/document root or provider (for example one user's iCloud directory, a separate shared-family location, or an external/encrypted volume). Ada has no required central `sources/` tree. The domain-to-provider/root mapping is operational/security configuration, not a model-learned path or authority;
+- when Ada receives a document or other source artifact, it first keeps an existing durable source reference when one exists. If no durable source exists, Ada persists the original into the configured domain source root **only when the user requests retention or Ada is retaining durable Memory/evidence that must remain resolvable**; one-off/session-only analysis does not silently create a permanent original;
+- within each configured source root, a simple default organization such as `<YYYY>/<MM>/...` is preferred for directly received files so humans can browse originals without Ada; exact naming/collision rules remain implementation details;
+- if no source root/provider is configured for the domain, Ada must fail closed for persistence: the file may be used session-locally, but no durable extraction/reference may be created until the user chooses/configures a destination;
+- Ada may retain a provider-independent source reference plus an extract/summary/derived knowledge when that is useful; non-durable extracts/summaries live in `learning/` until promoted or marked durable;
+- if a task requires the original document, Ada resolves/accesses it through the applicable source/document provider boundary and permissions;
+- a missing/unavailable source must be distinguishable from a deleted/forgotten Memory extract;
+- forgetting/deleting a Memory extract or summary never deletes or mutates the original source; if Ada itself previously persisted that original, the forget/delete result must make clear where the original remains. Any future file/document-management capability is a separate explicitly authorized action path and is not triggered by Memory retention;
+- extracts/summaries/derived knowledge may age or be compacted **while they remain in `learning/`** when they are observation-derived/non-explicit, unless explicitly marked durable; once promoted into `memory/`, they follow the established-Memory lifecycle rules above;
 - document summaries inherit the same privacy/scope rules as other Memory;
 - raw document content must not be copied into a broader scope merely for retrieval convenience.
 
@@ -432,17 +564,31 @@ Initial principles:
 
 - prefer compact durable facts/preferences/routines over raw interaction history;
 - retain selective episodic summaries when the conversation as a whole is likely to provide useful future continuity;
+- allow explicitly retained **durable episodes** for special conversations, workshops, trips, celebrations, major decisions, and meaningful events; Ada may propose this status but model judgment alone cannot silently create indefinite retention;
+- durable episodes are exempt from ordinary automatic aging/compaction but remain subject to explicit user correction/forget/delete;
 - retain document summaries/references when future tasks need the source context without copying the source document into Memory;
-- observations used for learning may be temporary and should be compacted, expired, or discarded when no longer useful;
+- **only learning evidence is normally ephemeral**: behavioral observations, observed facts used only as evidence, and hypotheses may be compacted, expired, or discarded after promotion, rejection, supersession, or loss of usefulness;
+- **explicitly stated/confirmed facts and preferences have no automatic aging or forgetting policy**; they persist until explicitly corrected/superseded or the user explicitly asks to forget/delete them;
+- after a promotion, prefer a compact human-readable promotion/evidence rationale over retaining an unbounded list of raw observations;
+- source-owned evidence should normally retain a reference rather than a raw duplicate of the source;
+- sensitive observations should have the shortest retention compatible with the applicable learning rule and should not be retained merely because they might become useful later;
 - repeated equivalent memories should converge rather than accumulate indefinitely;
 - low-value incidental details should normally remain session context only;
 - sensitive information has a higher bar for durable retention than ordinary low-risk preferences;
-- durable Memory should be periodically gardened so the human-readable corpus remains understandable rather than becoming an append-only transcript;
-- retention policy may differ by memory class, maturity state, and privacy sensitivity.
+- durable Memory may be reorganized/gardened for clarity, but gardening must not silently age out or remove established knowledge/preferences or durable episodes;
+- automatic expiry/compaction/removal is confined to `learning/`; established `memory/` content is not automatically removed. Observation-derived evidence/hypotheses and non-durable extracts/summaries remain in `learning/` until promoted, rejected, superseded, or compacted. Promoted `confirmed/observed_pattern` knowledge may later be marked `stale` non-destructively; explicit knowledge may not.
 
 The target is **useful continuity, not exhaustive surveillance**.
 
 Exact retention windows and compaction thresholds remain open and should be characterized from representative usage rather than fixed prematurely.
+
+**Current state governs Ada behavior.** Ada's normal retrieval, learning,
+promotion, staleness and forgetting semantics operate on the current
+protection-domain state only. Version history, snapshots and backups are
+separate storage/recovery concerns and must never be consulted as ordinary
+Memory or learning evidence. Whether historical copies of `learning/` exist,
+and how long they are retained or purged, is an operations/privacy policy
+decision rather than a requirement of this ADR.
 
 #### Global and per-interlocutor adaptation
 
@@ -488,8 +634,10 @@ Requirements:
 - it belongs to the same human-controlled Memory domain, not a hidden runtime database;
 - it follows the same hard directory privacy boundaries;
 - it stores minimized observations rather than raw conversations by default;
-- entries may expire or be compacted once promoted, rejected, superseded, or no longer useful;
-- rebuilding retrieval indexes must not change learning maturity;
+- entries are normally ephemeral relative to established Memory and may expire or be compacted once promoted, rejected, superseded, or no longer useful;
+- promotion should preserve a compact inspectable rationale/evidence summary when useful without retaining every raw observation indefinitely;
+- durable episodic Memory is a separate retention decision from keeping learning-journal evidence;
+- rebuilding retrieval indexes must not change learning maturity or retention state;
 - users can inspect/correct/remove learning observations.
 
 The exact representation remains open; Markdown/YAML or another human-readable append-friendly form should be characterized.
@@ -599,7 +747,18 @@ In particular:
 
 ## Architectural split
 
-Ada should evaluate Memory as two distinct layers.
+Ada's accepted Memory architecture has three distinct concerns. They may share
+files or process boundaries where that stays simple, but their semantics must
+not collapse:
+
+1. authoritative human-controlled Memory;
+2. inspectable learning evidence/state that can propose changes to Memory;
+3. a rebuildable RAG-style retrieval/index layer.
+
+Automatic learning is therefore designed in from the start even when the first
+implementation supports only a subset of promotion/aging behavior. Retrieval
+optimization is likewise replaceable and must never become an alternate truth
+store.
 
 ### 1. Authoritative human-controlled Memory
 
@@ -626,6 +785,13 @@ This source/document layer is **not itself Memory** and is not automatically Git
 
 Ada's Memory model owns the reference, summary, provenance, and extracted durable knowledge; the source store owns the original bytes and its storage lifecycle.
 
+The same rule applies beyond documents: where a configured system such as a
+calendar or contacts provider is the authoritative owner of a fact, Ada
+normally stores only the source reference and any genuinely derived durable
+knowledge. It must not create an independent Memory copy merely for retrieval
+convenience. The RAG/cache layer may index source-owned facts for lookup, but
+it remains reconstructible and does not change ownership.
+
 A future document-storage abstraction should provide at least:
 
 - stable reference/identity where possible;
@@ -634,9 +800,34 @@ A future document-storage abstraction should provide at least:
 - optional fingerprint/version observation;
 - no assumption that the source is always local or always online.
 
-### 2. Derived retrieval/index layer
+### 2. Inspectable learning evidence/state
+
+Automatic learning consumes source events, observations and outcomes, but it
+must not write model guesses directly into established Memory.
+
+The architecture must preserve at least the semantic distinction between:
+
+- explicit user/source statements;
+- observations;
+- provisional hypotheses;
+- confirmed/established Memory;
+- contradicted, superseded, stale, or forgotten state.
+
+Learning evidence and state must remain human-inspectable, scoped to the same
+or narrower protection domain as the source, attributable enough to explain
+promotion/correction, and unable to grant permission. Exact files/fields,
+promotion thresholds, aging rules and compaction are implementation details,
+but the distinction itself is architectural.
+
+A first implementation may deliberately defer automatic promotion while still
+persisting/representing the above semantics correctly. Later learning logic
+must fit this boundary rather than requiring a second opaque truth store.
+
+### 3. Derived RAG retrieval/index layer
 
 This layer exists only to make authoritative Memory efficiently retrievable.
+It is conceptually an automatically maintained **cache/index** over the
+human-readable source of truth, not Memory authority in its own right.
 
 It may contain:
 
@@ -650,15 +841,38 @@ It may contain:
 
 Rules:
 
-- it is reconstructible from authoritative Memory;
+- it is reconstructible from authoritative Memory and, where needed, inspectable learning state;
 - it is never an independent truth source;
 - deleting/rebuilding it must not lose authoritative Memory;
 - stale index state must be detectable and repairable;
 - it must preserve enough scope metadata that retrieval cannot widen audience/access boundaries;
+- forgotten or superseded content must not be returned as current context;
 - remote embedding/index services are not part of the default local path;
 - inferred graph edges remain derived evidence and never become authoritative Memory merely because an indexer generated them.
 
-This split allows Ada to reuse mature retrieval technology without giving an opaque agent-memory database ownership of user truth.
+The preferred retrieval flow is:
+
+```text
+query
+  -> determine permitted protection domains
+  -> derived retriever/index returns candidate references
+  -> re-read the current authoritative owner for each candidate
+       (Memory Markdown, or source-owned calendar/contact/document provider via the broker)
+  -> validate scope + lifecycle/maturity + evidence origin
+  -> label observations/hypotheses as provisional rather than established
+  -> assemble the minimum relevant model context
+```
+
+For very small vaults the retriever can simply be direct file/FTS search. For
+larger vaults it may use chunks, embeddings, hybrid search, graphs, or another
+RAG implementation behind an Ada-owned retrieval port. The final context must
+remain grounded in the current authoritative owner rather than trusting a stale
+cached chunk merely because an index returned it. If a source-owned item cannot
+be re-read (for example while offline), a cached value may be exposed only as
+`last-known` / unverified context, never as current authoritative fact.
+
+This split allows Ada to reuse mature RAG/retrieval technology without giving
+an opaque agent-memory database ownership of user truth.
 
 ## Hard gates before scoring
 
@@ -970,9 +1184,9 @@ Detailed source findings are tracked in:
 
 ## Candidate architectures
 
-No candidate is selected by this draft.
+The accepted MVP architecture selects candidate A as the baseline. The remaining candidates are retained as research/reference options or optional derived components and are not required by the MVP.
 
-### A. Ada-owned file-native Memory + optional derived index — control option
+### A. Ada-owned file-native Memory + optional derived index — accepted baseline
 
 Concept:
 
@@ -1012,7 +1226,7 @@ Risks / work:
 - correction, contradiction, concurrent edit, and index reconciliation semantics are Ada-owned work;
 - semantic retrieval quality must be characterized rather than assumed.
 
-This is the control option. It is not preferred merely because it is custom.
+This is the accepted baseline architecture. It is selected because it satisfies the human-control and trust-boundary requirements with the smallest mandatory runtime surface. Optional derived components must demonstrate measured value before they are added.
 
 ### B. sqlite-memory
 
@@ -1173,7 +1387,7 @@ Gardening must not silently perform destructive cleanup. Proposed merges, deleti
 
 ## Required representative Memory scenarios
 
-Before selecting a backend, characterize at least:
+Use these scenarios to validate implementations of the accepted architecture. The first real-household Memory slice must at minimum close scenarios 1–5, 7–8, 10, 17–18, 20–21, and 25–27; learning/gardening/episodic scenarios are gated when those features are enabled:
 
 1. **Personality bootstrap** — empty Memory seeds once; existing edited personality wins.
 2. **Outside edit** — user edits a Memory file while Ada is stopped; next start respects it and rebuilds stale derived state.
@@ -1226,9 +1440,9 @@ After hard gates, candidate scoring should consider:
 - replaceability and data portability;
 - ongoing maintenance effort.
 
-Weights are deliberately not assigned by this draft.
+Weights were deliberately not assigned in this earlier broad criteria list; the completed historical matrix below used its own frozen weights.
 
-## Open research before a decision
+## Implementation and optional research after the architecture decision
 
 1. Define the smallest Ada-owned general Memory semantic model from the scenarios above without turning the vault into a rigid ontology.
 2. Characterize **Markdown-first notes with optional non-duplicated YAML properties**; capture manual edits in file history and use separate structured files only where justified by a concrete data type.
@@ -1244,7 +1458,7 @@ Weights are deliberately not assigned by this draft.
 10. Define the Memory-gardening proposal/approval boundary.
 11. Characterize learning promotion rules for explicit facts, preferences, routines, sensitive facts, and shared knowledge, including precedence between observed-pattern and explicit-user confirmation.
 12. Define the inspectable learning-journal representation, retention/compaction rules, and how application outcomes feed learning without duplicating the action ledger.
-13. Define deterministic, category-specific staleness rules for observed patterns and which memory types, if any, have explicit validity windows.
+13. Define deterministic, category-specific non-destructive `confirmed/observed_pattern -> stale` rules and which memory types, if any, have explicit validity windows; explicit-user-confirmed knowledge never becomes stale merely through time.
 14. Characterize explicit correction detection and contradiction-resolution rules without relying on model-only last-write-wins behavior.
 15. Define the minimal provenance schema and cross-scope provenance redaction/reference semantics.
 16. Compare protected storage topologies: per-person private vaults plus shared vaults versus equivalent designs, including OS ACL and encryption options.
@@ -1254,8 +1468,8 @@ Weights are deliberately not assigned by this draft.
 20. Define retention/compaction policy by memory class and maturity state so durable Memory stays useful rather than exhaustive.
 21. Define the boundary between global Ada personality evolution and per-interlocutor interaction-profile learning.
 22. Define when a conversation merits an episodic summary and the minimum summary schema for decisions, rationale, and open loops.
-23. Define a provider-independent document-reference abstraction for local files, iCloud, and future stores, including fingerprint/change detection.
-24. Decide whether Ada eventually needs a managed document store in addition to references to user-controlled external storage.
+23. Implement the accepted provider-independent source/document-reference abstraction for configured per-user/audience roots/providers (local filesystem, iCloud, and future stores), including fingerprint/change detection and human-browsable direct-import organization.
+24. Do **not** introduce a separate Ada-managed document database/store for the MVP. Existing durable originals remain in place; directly handed-in originals are persisted into the configured protection-domain source root/provider **only under the retention conditions above**. Revisit only if concrete lifecycle/search/sync needs cannot be met by this model.
 25. Characterize Letta MemFS as the closest git-Markdown architecture reference and determine whether any implementation can be reused without adopting the Letta runtime.
 26. Characterize Hindsight as a derived learning/retrieval engine, especially banks, evidence-backed observations, knowledge pages, and rebuildability from Ada-owned Memory.
 27. Characterize LangMem for storage-agnostic extraction/consolidation logic.
@@ -1283,7 +1497,7 @@ Repeated semantic characterization found a material boundary condition, but not 
 - that later Auto Dream run extracted three plausible units but integrated 0/3 because generated agent receipts failed validation;
 - two explicit contradictory pickup claims remained separate rather than last-write-wins, but ReMe still created no deterministic contradiction relation/state.
 
-Therefore ReMe can remain a candidate **file-native substrate**, but its model-generated consolidation cannot by itself be authoritative Ada truth. The missing canonical fact/lifecycle/provenance semantics must be supplied outside ReMe.
+Therefore ReMe remained useful research evidence, but under the accepted architecture it may only be considered as an optional derived reader/indexer; its model-generated consolidation cannot be authoritative Ada truth. The missing canonical fact/lifecycle/provenance semantics must be supplied outside ReMe.
 
 That did **not** establish ReMe as an Ada truth engine. The subsequently
 added Markdown/Git/direct-search control is the simplest staged MVP
@@ -1298,9 +1512,9 @@ The first shared-fixture comparison provides additional evidence:
 
 These results strengthen the need to evaluate **semantic correctness and provenance integrity separately** from storage/runtime success.
 
-This moves the remaining ReMe decision work away from basic runtime feasibility and toward:
+This historical characterization moved the remaining ReMe-specific research away from basic runtime feasibility and toward:
 
-- compare ReMe, LangMem, Hindsight, Letta/MemFS, and the strongest evidence-backed composite options with the weighted decision matrix;
+- comparing ReMe, LangMem, Hindsight, Letta/MemFS, and evidence-backed composite options in the now-historical weighted decision round;
 - external document reference/lifecycle fit;
 - exact transitive license/security audit;
 - maintenance/AgentScope dependency cost;
@@ -1308,21 +1522,56 @@ This moves the remaining ReMe decision work away from basic runtime feasibility 
 
 ## Decision status
 
-No Memory backend is adopted by this draft.
+The normative architecture consists of this Decision section, the
+**Security and semantic invariants**, the **Hard gates**, and body sections
+explicitly marked **Confirmed** (including private-by-default placement,
+knowledge/evidence roles and promotion, learning-policy classes,
+contradiction/correction precedence, manual-edit provenance, and the
+forgetting/history split). Sections marked "to characterize", "Questions still
+to decide", candidate/reference surveys, historical matrices and executable
+evidence are context or follow-up work, not silently adopted components.
 
-**Maintainer-confirmed proposed MVP path (2026-09-23):** keep each current
-memory and its source information together in human-editable Markdown, with
-simple current-file reads and search as the first retrieval path. A manual
-edit to the file becomes the current authoritative content. Use Git history
-per protected domain as the candidate change record once capture of real
-out-of-band edits, concurrency, recovery and retention are designed and
-verified. Git commit identity alone does not authenticate who edited a note.
-Do not introduce separate claim YAML, ReMe or LangMem as a required MVP layer.
-This is an explicit direction for the next implementation and comparison,
-not acceptance of the architecture or a claim that the control has passed
-the open privacy, search-quality, edit-capture and forgetting gates below.
+ADR-0008 accepts the following MVP architecture:
 
-The executable four-candidate characterization is complete. A **draft weighted decision matrix** now lives at:
+- authoritative Memory is **file-native, Markdown-first, human-readable and directly editable** outside Ada;
+- a manual edit to the current authoritative file becomes the current content Ada must respect;
+- claim/source/lifecycle information that matters to the user stays inspectable with the human-readable Memory and must not be duplicated into a second drifting claim truth store;
+- ordinary new personal knowledge is private by default, and private/shared scopes map to **enforceable protection domains**, not merely folders or model-interpreted tags;
+- authoritative Memory, version history/backup/sync, derived retrieval indexes, permissions, and action truth remain distinct mechanisms;
+- runtime access to protected Memory domains is mediated by an Ada-owned **host-side Memory Broker**; the long-lived Ada runtime/model does not receive standing access to all household vaults;
+- normal retrieval starts with current authoritative files and the simplest sufficient local search; derived indexes/graphs/vector layers are optional, rebuildable, scope-preserving accelerators rather than independent truth sources;
+- operational forgetting removes content from Ada's current readable state and derived retrieval, and removes or neutralizes the current `learning/` evidence it was promoted from so pre-forget evidence cannot silently re-promote it; historical purge/backup retention is a separate lifecycle/operations concern;
+- corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
+- evidence origin, durable Memory kind, and lifecycle/maturity are separate dimensions; established Memory is logically separated from inspectable learning evidence, with an explicit Ada-owned promotion/assimilation boundary;
+- `learning/` is the sole Memory area with automatic expiry/compaction/removal and contains observed facts, behavioral observations, hypotheses and non-durable derived extracts/summaries; established `memory/` content never disappears or becomes forgotten automatically, while `confirmed/observed_pattern` entries may transition non-destructively to `stale` under deterministic category-specific rules; explicitly stated/confirmed facts/preferences never become stale merely through time;
+- the confirmed learning-policy classes A–D are normative: low-risk explicit knowledge may be remembered privately with provenance, inferred patterns observe first, sensitive/consequential knowledge requires confirmation or a future explicit rule, and secrets/credentials are never ordinary automatically learned Memory;
+- evidence precedence is normative and not last-write-wins: explicit user confirmation/correction outranks observational patterns, while ambiguous conflicting explicit claims remain unresolved;
+- every model-originated Memory write or promotion passes a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling before it becomes authoritative;
+- untrusted/quoted/model-generated content cannot directly rewrite trusted established Memory; it can only enter the evidence/proposal path under the applicable conservative learning rule;
+- an inspectable change-history/versioning mechanism that records observed out-of-band edits to established `memory/` is an architectural requirement for manual-edit provenance; Git-style per-domain history is only the leading adapter candidate, not the requirement itself. History/backup retention is separate from current Memory semantics, and Ada must not use historical `learning/` states for normal retrieval or re-learning;
+- automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
+- the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
+- original/raw source artifacts live outside the Memory lifecycle in **independently configured source/document roots/providers per protection domain**; Ada requires no central source tree. Existing stable sources are referenced in place. A directly received file without a durable source is persisted only when the user requests retention or retained durable Memory/evidence requires a resolvable source; otherwise it remains session-only. If no domain source root/provider is configured, durable persistence fails closed. Memory forgetting never mutates or deletes the original;
+- facts owned by another authoritative system (for example calendar/contact/source-document facts) remain source-owned by default; Memory stores a reference, derived abstraction, or explicitly requested independent copy rather than creating a competing source of truth;
+- ReMe, LangMem, Hindsight, Letta/MemFS, vector stores, graph stores and similar frameworks are **not required MVP layers**. They may be added only behind Ada-owned boundaries when representative evidence justifies their runtime, privacy and maintenance cost;
+- `Memory != Permission`, `Memory != Action Truth`, and `Authoritative Memory != Derived Index` remain architecture invariants.
+
+Git-style per-protection-domain history is the leading MVP **versioning adapter candidate**, not an authentication or security boundary. Its exact capture/concurrency/recovery mechanism must be validated before product use.
+
+The protection-domain access topology delegated by ADR-0003 is now decided:
+Ada uses a **host-side Memory Broker** as the storage-access boundary for the
+MVP. The broker mediates vault access and exposes only the domain(s) required
+for the current authenticated/authorized task; the Ada runtime/model must not
+receive a standing mount or credential set for all private/shared household
+Memory. Exact IPC, ACL/encryption/key mechanics and broker process structure
+remain implementation details. Authorized users must still be able to
+access/edit their own authoritative Memory directly in plain human-readable
+form without depending on Ada.
+
+
+This acceptance chooses the architecture boundary and the smallest baseline. It does **not** claim that the Memory service, protection domains, versioning adapter, retrieval quality, learning lifecycle, or historical purge operations are already implemented or production-ready.
+
+The executable four-candidate characterization is complete. The **historical weighted decision matrix** lives at:
 
 `research/memory/comparison/decision-matrix.md`
 
@@ -1338,7 +1587,7 @@ LangMem and Hindsight are not decision-eligible standalone authoritative archite
 
 Among the **scored** options, the current matrix points to ReMe as the file-native reader/indexer with LangMem as an optional semantic-change proposal helper. The simpler Markdown + captured history + basic-search control is unscored. A backend decision must compare it before requiring either added component. Hindsight remains an optional later derived-learning/retrieval layer if representative real-world retrieval tests justify its operational cost.
 
-This remains decision evidence, not an Accepted ADR.
+This historical scoring remains decision evidence; it does not override the accepted simpler baseline or require a scored framework dependency.
 
 A dependency-free [Markdown/Git/direct-search control](../../research/memory/control/README.md)
 now exercises the same synthetic preference, correction, contradiction, and
@@ -1357,7 +1606,7 @@ safe in practice, including edit capture, concurrency handling, scoped commits,
 source retirement, section-aware retrieval, isolation, and purge semantics.
 The control is not zero-cost merely because it has no runtime dependency.
 
-For this proposed MVP, add ReMe only when representative retrieval/indexing
+For this accepted MVP architecture, add ReMe only when representative retrieval/indexing
 evidence justifies its AgentScope dependency; add LangMem only when a bounded
 semantic proposal helper demonstrably outperforms the simplest safe Ada-owned
 validation path. Revisit the direction if the control fails required scenarios.
@@ -1397,21 +1646,21 @@ AgentScope tree and `orjson` to LangMem's LangSmith tree. The installed macOS
 redistribution obligations remain open. See the fit review for paths and
 artifact evidence. No license distribution clearance is claimed.
 
-Before this ADR can move to Accepted:
+## Production and implementation gates after architecture acceptance
 
-1. review disputed scores from the historical round only if that round is reused as decision evidence; if the maintainer changes criteria/weights for a future decision, record a new comparison rather than editing the completed run;
-2. evaluate the control against representative retrieval/edit/forget scenarios
-   on the target platform, without inventing scores for missing evidence;
-3. define how out-of-band edits are captured, how old source references are
-   retired, and how normal retrieval/indexes exclude forgotten content while
-   history and backup purge remain separate operations;
-4. demonstrate enforceable per-person protection domains and scoped indexes,
-   not only different folders or read-only MCP tool names;
-5. complete license/security review for the selected dependency path and
-   intended release scope; a published image requires separate artifact review;
-6. define the smallest deterministic validation boundary around semantic
-   proposals and close external document-reference/lifecycle fit;
-7. obtain independent review and explicit maintainer acceptance.
+The architecture above is accepted independently from any one Memory framework or versioning implementation. Before Ada stores real household Memory or claims a production-ready Memory service, the implementation must still close the following gates:
+
+1. validate the file-native control against representative retrieval/edit/forget scenarios on the target platform and measure retrieval quality/scale before adding a derived search framework; before custom retrieval infrastructure, run a focused reuse comparison of credible local RAG/retrieval components (at minimum the SQLite FTS5 baseline and suitable modular/embedded candidates such as LlamaIndex Core, Haystack, LanceDB, or an equivalent maintained option) behind an Ada-owned retrieval port;
+2. implement safe out-of-band edit capture and Ada writes, including path-restricted history capture, same-file concurrency detection/reconciliation, Git/file lock handling, crash recovery, and explicit stale-source handling;
+3. implement and validate the accepted host-side Memory Broker topology plus enforceable per-person/shared domains and scope-partitioned retrieval/indexes; bind each broker request to trusted actor/audience/authorization context, fail closed on scope ambiguity, and prove that normal/model-driven/accidental application paths cannot read domains outside the current authorized request; document that a fully compromised Ada runtime can forge that context and that the broker is trusted across every domain it serves;
+4. make current/superseded/unresolved retrieval semantics deterministic enough that obsolete or contradictory text is not promoted as current truth; fail closed when lifecycle/currentness is ambiguous rather than asking the model to infer it;
+5. ensure forgetting removes content from current authoritative retrieval and every reconstructible derived index **and removes or neutralizes the `learning/` evidence that supported the forgotten knowledge so it cannot be silently re-promoted from pre-forget evidence**; historical purge/backup retention remains a separately explicit operation;
+6. define and validate the minimum provenance/source-reference and external-document lifecycle needed by implemented MVP scenarios without creating duplicate hidden truth;
+7. route every model-originated Memory write/promotion through the deterministic Ada-owned validation boundary (source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, contradiction/correction) before authoritative persistence;
+8. ensure normal retrieval/learning operates only on current state and never rehydrates forgotten/expired knowledge from Git history, snapshots or backups; historical retention/purge remains a separate operations/privacy policy;
+9. if a dependency-backed derived layer is selected, complete its license/security/dependency review and target-platform validation before adoption; release artifacts require their own distribution review.
+
+Historical candidate scores may be revisited only if they are reused as decision evidence. A failure of Git, direct search, ReMe, LangMem, Hindsight, or another concrete implementation should trigger replacement behind these accepted boundaries rather than reopening the human-controlled source-of-truth architecture by default.
 
 Where an explicit correction requires explaining the old statement without
 consulting Git history, an illustrative **single Markdown note** can place
@@ -1451,4 +1700,4 @@ cannot revoke content already read, synced, copied, backed up, or retained in
 shared history. Ada must present that limitation explicitly. Historical purge
 and reader revocation are separate policies/operations; they are not a
 precondition that permanently forbids scope narrowing. No narrower household
-scope is accepted implicitly by this proposed ADR.
+scope is accepted implicitly by this ADR.

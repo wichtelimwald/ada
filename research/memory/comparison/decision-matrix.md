@@ -1,10 +1,10 @@
 # Ada Memory architecture decision matrix
 
-- **Status:** Draft for maintainer review
+- **Status:** Historical research evidence (2026-09-23); not the selected architecture after ADR-0008 acceptance
 - **Date:** 2026-09-23
 - **Evidence base:** completed executable comparison of ReMe 0.4.1.12, LangMem 0.0.30, Hindsight 0.10.1, Letta Code/MemFS 0.32.15
 - **Model baseline:** local `qwen3.5:9b`
-- **Purpose:** first agree criteria and weights; only then score viable Memory architecture roles
+- **Purpose:** record the frozen 2026-09-23 candidate-comparison round; ADR-0008 later accepted the simpler file-native baseline without adopting the highest-scored dependency-backed option
 
 This matrix is deliberately separate from ADR acceptance. The weights and scores record a completed research round, not an accepted backend or final product weighting. The Markdown/Git/direct-search control was not scored.
 
@@ -137,7 +137,7 @@ either component is necessary for Ada's MVP. Compare the control against the
 same hard gates and criteria on representative queries before choosing a
 backend; do not assign hypothetical points to the unmeasured dimensions.
 
-### First-release decision gate
+### Historical first-release decision gate
 
 For the initial **source plus self-build Dockerfile** release plan, distinguish
 the Memory ADR choice from production deployment readiness. No option has yet
@@ -149,12 +149,15 @@ dependencies and their transitive license review. Top-level permissive
 licenses do not clear an Ada-built image. Draft PR #27 addresses the already
 adopted baseline's distribution wording separately.
 
-**Recommendation for the next decision:** keep Markdown with one canonical
+**Historical recommendation from this round:** keep Markdown with one canonical
 place for each claim/source and the small direct-search control as the MVP
-starting option. Test actual edit capture, operational forgetting and protected
-per-domain storage before accepting it. Require representative recall results
-to justify adding ReMe's indexer or LangMem's semantic proposal helper.
-This is a recommendation, not a scored selection or accepted ADR.
+starting option. At the time, this text proposed testing edit capture,
+operational forgetting and protected per-domain storage before ADR acceptance.
+ADR-0008 later separated architecture acceptance from production-readiness:
+those items remain mandatory implementation/access-topology gates before real
+household Memory, while representative recall is still required to justify
+adding ReMe's indexer or LangMem's semantic proposal helper. This paragraph is
+retained as research history, not as the current acceptance gate.
 
 The frozen matrix supports three scored ReMe-containing options:
 
@@ -303,7 +306,7 @@ For the MVP, the extra database/service/embedding subsystem is difficult to just
 
 ## Minimal-custom control
 
-A minimal Ada implementation remains the **control/fallback**, not a scored preferred option.
+In this historical scoring round, a minimal Ada implementation was the **control/fallback** and was intentionally not given speculative numeric scores. ADR-0008 later accepted the file-native minimal baseline on architectural grounds while keeping its operational work explicit.
 
 It would be unfair to give an unimplemented custom solution high numeric scores merely because it could theoretically match every requirement.
 
@@ -316,11 +319,11 @@ Custom work should only be justified for the smallest deterministic seams that n
 
 This is very different from writing a complete Ada Memory engine.
 
-## Next step
+## Historical next step from this research round
 
-The scoring step is complete.
+The scoring step was completed before ADR-0008 accepted the simpler file-native baseline. The following checklist is retained as historical decision evidence; it no longer blocks the accepted architecture:
 
-Before converting the matrix result into an ADR decision:
+Before this research result could have been used to select a dependency-backed architecture:
 
 1. review any **disputed individual scores** against the recorded evidence; do not change the frozen weights after seeing the result;
 2. run a small score-sensitivity check around genuinely disputed cells;
@@ -329,7 +332,7 @@ Before converting the matrix result into an ADR decision:
 5. close external document-reference/lifecycle fit;
 6. obtain independent review.
 
-## Remaining gates before ADR acceptance
+## Follow-ups if this historical dependency-backed path is reused
 
 1. Maintainer review of disputed scores with the frozen weights. Any changed criteria/weights require a separately recorded new comparison, including the unscored control; do not overwrite this research round.
 2. Exact transitive license/security review of the selected dependency path, if a dependency-backed design is selected; for example ReMe -> AgentScope and LangMem/LangChain dependencies.
@@ -338,5 +341,5 @@ Before converting the matrix result into an ADR decision:
    - provenance/scope validation;
    - authoritative write.
 4. External document-reference/lifecycle characterization.
-5. Independent review of the decision evidence.
-6. Explicit maintainer acceptance of ADR-0008.
+5. Independent review of any dependency-backed decision evidence before adoption.
+6. Recompare the dependency-backed option against the accepted file-native baseline rather than treating this historical score as current selection.

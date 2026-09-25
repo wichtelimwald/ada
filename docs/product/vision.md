@@ -47,12 +47,13 @@ Proceed through narrow end-to-end slices rather than selecting a comprehensive s
 
 ## Still deliberately open
 
-Foundational runtime, topology, Guard, durable-execution, local-model and
-context-aware interpretation decisions are recorded in ADR-0002 through
-ADR-0007. The following remain deliberately open or only partially decided:
+Foundational runtime, topology, Guard, durable-execution, local-model,
+context-aware interpretation, and authoritative Memory architecture decisions
+are recorded in ADR-0002 through ADR-0008. The following remain deliberately
+open or only partially decided:
 
 - local interaction/UI implementation,
-- authoritative Memory implementation,
+- authoritative Memory implementation, including the accepted host-side Memory Broker and its protection-domain enforcement,
 - production email/calendar provider integration,
 - optional remote-model assistance,
 - remote-data boundary implementation,
@@ -60,5 +61,5 @@ ADR-0007. The following remain deliberately open or only partially decided:
 - speech/perception architecture,
 - general computer control,
 - detailed personal-context selection, calendar ownership, cancellation scopes,
-  forgetting semantics, and offline integration behavior.
+  historical purge/retention and detailed forgetting implementation, and offline integration behavior.
 
