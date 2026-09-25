@@ -316,11 +316,11 @@ Custom work should only be justified for the smallest deterministic seams that n
 
 This is very different from writing a complete Ada Memory engine.
 
-## Next step
+## Historical next step from this research round
 
-The scoring step is complete.
+The scoring step was completed before ADR-0008 accepted the simpler file-native baseline. The following checklist is retained as historical decision evidence; it no longer blocks the accepted architecture:
 
-Before converting the matrix result into an ADR decision:
+Before this research result could have been used to select a dependency-backed architecture:
 
 1. review any **disputed individual scores** against the recorded evidence; do not change the frozen weights after seeing the result;
 2. run a small score-sensitivity check around genuinely disputed cells;
@@ -329,7 +329,7 @@ Before converting the matrix result into an ADR decision:
 5. close external document-reference/lifecycle fit;
 6. obtain independent review.
 
-## Remaining gates before ADR acceptance
+## Follow-ups if this historical dependency-backed path is reused
 
 1. Maintainer review of disputed scores with the frozen weights. Any changed criteria/weights require a separately recorded new comparison, including the unscored control; do not overwrite this research round.
 2. Exact transitive license/security review of the selected dependency path, if a dependency-backed design is selected; for example ReMe -> AgentScope and LangMem/LangChain dependencies.
@@ -338,5 +338,5 @@ Before converting the matrix result into an ADR decision:
    - provenance/scope validation;
    - authoritative write.
 4. External document-reference/lifecycle characterization.
-5. Independent review of the decision evidence.
-6. Explicit maintainer acceptance of ADR-0008.
+5. Independent review of any dependency-backed decision evidence before adoption.
+6. Recompare the dependency-backed option against the accepted file-native baseline rather than treating this historical score as current selection.
