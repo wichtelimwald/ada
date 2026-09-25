@@ -97,11 +97,13 @@
 - production-provider review of sensitive action-payload storage before real personal data is connected,
 - first local-model profile restricted in code to loopback HTTP(S) endpoints,
 - local model output remains proposal/data and never becomes authorization,
-- local-chat history remains process-local runtime context until the authoritative Memory design is accepted,
+- local-chat history remains process-local runtime context until the accepted Memory architecture is implemented behind a reviewed, deterministic Memory write path and protected-domain access topology,
 - model/runtime artifact provenance and pinning reviewed before Ada distributes or auto-provisions model artifacts,
 - personality bootstrap seed copied only into empty authoritative Memory; existing Memory wins,
 - persistent personality changes must be inspectable, reversible, attributable, and isolated from permissions/privacy/action-truth rules,
-- untrusted content/model output cannot directly persist personality changes.
+- untrusted content/model output cannot directly persist personality changes,
+- every model-originated Memory write/promotion passes an Ada-owned deterministic validation boundary for source/trust, privacy scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction semantics,
+- protected Memory domains must not all be exposed by default to one long-lived Ada principal; real household Memory requires a reviewed scoped-access topology.
 - keep the first macOS chat CLI native alongside a loopback-bound Ollama and
   run development and tests in the default bridged Dev Container; review any
   future container-to-host Ollama connection before enabling it.
