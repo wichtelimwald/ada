@@ -1,10 +1,10 @@
 # Ada Memory architecture decision matrix
 
-- **Status:** Draft for maintainer review
+- **Status:** Historical research evidence (2026-09-23); not the selected architecture after ADR-0008 acceptance
 - **Date:** 2026-09-23
 - **Evidence base:** completed executable comparison of ReMe 0.4.1.12, LangMem 0.0.30, Hindsight 0.10.1, Letta Code/MemFS 0.32.15
 - **Model baseline:** local `qwen3.5:9b`
-- **Purpose:** first agree criteria and weights; only then score viable Memory architecture roles
+- **Purpose:** record the frozen 2026-09-23 candidate-comparison round; ADR-0008 later accepted the simpler file-native baseline without adopting the highest-scored dependency-backed option
 
 This matrix is deliberately separate from ADR acceptance. The weights and scores record a completed research round, not an accepted backend or final product weighting. The Markdown/Git/direct-search control was not scored.
 
@@ -137,7 +137,7 @@ either component is necessary for Ada's MVP. Compare the control against the
 same hard gates and criteria on representative queries before choosing a
 backend; do not assign hypothetical points to the unmeasured dimensions.
 
-### First-release decision gate
+### Historical first-release decision gate
 
 For the initial **source plus self-build Dockerfile** release plan, distinguish
 the Memory ADR choice from production deployment readiness. No option has yet
@@ -149,12 +149,15 @@ dependencies and their transitive license review. Top-level permissive
 licenses do not clear an Ada-built image. Draft PR #27 addresses the already
 adopted baseline's distribution wording separately.
 
-**Recommendation for the next decision:** keep Markdown with one canonical
+**Historical recommendation from this round:** keep Markdown with one canonical
 place for each claim/source and the small direct-search control as the MVP
-starting option. Test actual edit capture, operational forgetting and protected
-per-domain storage before accepting it. Require representative recall results
-to justify adding ReMe's indexer or LangMem's semantic proposal helper.
-This is a recommendation, not a scored selection or accepted ADR.
+starting option. At the time, this text proposed testing edit capture,
+operational forgetting and protected per-domain storage before ADR acceptance.
+ADR-0008 later separated architecture acceptance from production-readiness:
+those items remain mandatory implementation/access-topology gates before real
+household Memory, while representative recall is still required to justify
+adding ReMe's indexer or LangMem's semantic proposal helper. This paragraph is
+retained as research history, not as the current acceptance gate.
 
 The frozen matrix supports three scored ReMe-containing options:
 
@@ -303,7 +306,7 @@ For the MVP, the extra database/service/embedding subsystem is difficult to just
 
 ## Minimal-custom control
 
-A minimal Ada implementation remains the **control/fallback**, not a scored preferred option.
+In this historical scoring round, a minimal Ada implementation was the **control/fallback** and was intentionally not given speculative numeric scores. ADR-0008 later accepted the file-native minimal baseline on architectural grounds while keeping its operational work explicit.
 
 It would be unfair to give an unimplemented custom solution high numeric scores merely because it could theoretically match every requirement.
 
