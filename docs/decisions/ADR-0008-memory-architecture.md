@@ -292,7 +292,10 @@ This set may grow scenario-by-scenario; it is not a fixed ontology.
   carried by an explicitly trusted structured source;
 - `observed_fact` — a comparatively low-interpretation fact extracted from
   an event/document/system observation, such as an appointment time or a
-  practice address;
+  practice address. When another configured system remains authoritative for
+  that fact (for example a calendar event or contact record), the observation
+  normally points back to that source rather than creating a duplicate
+  authoritative Memory fact;
 - `behavioral_observation` — observed interaction/behavior that requires more
   interpretation, such as repeatedly asking for more detail or reacting
   positively to nerdy humor;
@@ -329,6 +332,18 @@ only where an explicit deterministic Ada rule for that learning class permits
 it; otherwise it requires confirmation. Evidence that has not been promoted
 may still be retained in the inspectable learning area under its protection
 domain and may support later plausibility checks.
+
+**Source-owned facts stay source-owned.** If a configured external system is
+already the authoritative source for a fact, Ada Memory should reference that
+source instead of persisting an independent duplicate as established Memory.
+Examples include calendar event time/date, a contact record, or a document
+whose original remains available. Promotion into established Memory is
+appropriate only when Ada needs a durable abstraction/derived insight, the
+source is not expected to remain available, or the user deliberately asks Ada
+to retain the fact independently. This prevents stale parallel truth while
+still allowing Memory to retain useful context such as "this doctor is my
+dentist", "weekday appointments usually need transport", or a source reference
+to the original event/document.
 
 The default file organization should therefore keep established Memory and
 learning evidence logically separate inside the same protection domain, for
@@ -721,6 +736,13 @@ Authoritative Memory may reference source documents that remain outside the Memo
 This source/document layer is **not itself Memory** and is not automatically Git-versioned with Memory. It may live in a user-controlled local filesystem, iCloud, another configured file provider, or a future Ada-managed document store.
 
 Ada's Memory model owns the reference, summary, provenance, and extracted durable knowledge; the source store owns the original bytes and its storage lifecycle.
+
+The same rule applies beyond documents: where a configured system such as a
+calendar or contacts provider is the authoritative owner of a fact, Ada
+normally stores only the source reference and any genuinely derived durable
+knowledge. It must not create an independent Memory copy merely for retrieval
+convenience. The RAG/cache layer may index source-owned facts for lookup, but
+it remains reconstructible and does not change ownership.
 
 A future document-storage abstraction should provide at least:
 
@@ -1477,6 +1499,7 @@ ADR-0008 accepts the following MVP architecture:
 - automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
 - the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
 - source documents may remain in external user-controlled stores and be referenced by Memory rather than being silently copied into the Memory vault;
+- facts owned by another authoritative system (for example calendar/contact/source-document facts) remain source-owned by default; Memory stores a reference, derived abstraction, or explicitly requested independent copy rather than creating a competing source of truth;
 - ReMe, LangMem, Hindsight, Letta/MemFS, vector stores, graph stores and similar frameworks are **not required MVP layers**. They may be added only behind Ada-owned boundaries when representative evidence justifies their runtime, privacy and maintenance cost;
 - `Memory != Permission`, `Memory != Action Truth`, and `Authoritative Memory != Derived Index` remain architecture invariants.
 
