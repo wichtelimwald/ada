@@ -582,15 +582,13 @@ The target is **useful continuity, not exhaustive surveillance**.
 
 Exact retention windows and compaction thresholds remain open and should be characterized from representative usage rather than fixed prematurely.
 
-**Learning history is intentionally not equivalent to established-Memory history.**
-The long-lived change-history requirement exists for authoritative `memory/`
-and its out-of-band human edits; it does not require indefinite historical
-retention of Ada-generated behavioral observations. By default, `learning/`
-must be excluded from long-lived Git-style history and from unbounded backup
-retention, or use a separately bounded retention policy that expires the
-historical copies together with the current evidence. The exact bounded period
-is implementation policy, but indefinite historical retention of expired
-learning evidence is not the accepted default.
+**Current state governs Ada behavior.** Ada's normal retrieval, learning,
+promotion, staleness and forgetting semantics operate on the current
+protection-domain state only. Version history, snapshots and backups are
+separate storage/recovery concerns and must never be consulted as ordinary
+Memory or learning evidence. Whether historical copies of `learning/` exist,
+and how long they are retained or purged, is an operations/privacy policy
+decision rather than a requirement of this ADR.
 
 #### Global and per-interlocutor adaptation
 
@@ -1550,7 +1548,7 @@ ADR-0008 accepts the following MVP architecture:
 - evidence precedence is normative and not last-write-wins: explicit user confirmation/correction outranks observational patterns, while ambiguous conflicting explicit claims remain unresolved;
 - every model-originated Memory write or promotion passes a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling before it becomes authoritative;
 - untrusted/quoted/model-generated content cannot directly rewrite trusted established Memory; it can only enter the evidence/proposal path under the applicable conservative learning rule;
-- an inspectable change-history/versioning mechanism that records observed out-of-band edits to established `memory/` is an architectural requirement for manual-edit provenance; Git-style per-domain history is only the leading adapter candidate, not the requirement itself. `learning/` is excluded from indefinite history by default and requires bounded history/backup retention if historical copies are kept;
+- an inspectable change-history/versioning mechanism that records observed out-of-band edits to established `memory/` is an architectural requirement for manual-edit provenance; Git-style per-domain history is only the leading adapter candidate, not the requirement itself. History/backup retention is separate from current Memory semantics, and Ada must not use historical `learning/` states for normal retrieval or re-learning;
 - automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
 - the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
 - original/raw source artifacts live outside the Memory lifecycle in **independently configured source/document roots/providers per protection domain**; Ada requires no central source tree. Existing stable sources are referenced in place. A directly received file without a durable source is persisted only when the user requests retention or retained durable Memory/evidence requires a resolvable source; otherwise it remains session-only. If no domain source root/provider is configured, durable persistence fails closed. Memory forgetting never mutates or deletes the original;
@@ -1659,7 +1657,7 @@ The architecture above is accepted independently from any one Memory framework o
 5. ensure forgetting removes content from current authoritative retrieval and every reconstructible derived index **and removes or neutralizes the `learning/` evidence that supported the forgotten knowledge so it cannot be silently re-promoted from pre-forget evidence**; historical purge/backup retention remains a separately explicit operation;
 6. define and validate the minimum provenance/source-reference and external-document lifecycle needed by implemented MVP scenarios without creating duplicate hidden truth;
 7. route every model-originated Memory write/promotion through the deterministic Ada-owned validation boundary (source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, contradiction/correction) before authoritative persistence;
-8. define and implement bounded history/backup retention for `learning/` (or exclude it from long-lived history entirely) so expired behavioral evidence is not retained indefinitely;
+8. ensure normal retrieval/learning operates only on current state and never rehydrates forgotten/expired knowledge from Git history, snapshots or backups; historical retention/purge remains a separate operations/privacy policy;
 9. if a dependency-backed derived layer is selected, complete its license/security/dependency review and target-platform validation before adoption; release artifacts require their own distribution review.
 
 Historical candidate scores may be revisited only if they are reused as decision evidence. A failure of Git, direct search, ReMe, LangMem, Hindsight, or another concrete implementation should trigger replacement behind these accepted boundaries rather than reopening the human-controlled source-of-truth architecture by default.
