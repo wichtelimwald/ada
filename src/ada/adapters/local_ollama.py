@@ -121,10 +121,11 @@ def build_local_ollama_runtime(
 ) -> PydanticAIRuntime:
     """Construct the first local-only PydanticAI/Ollama chat runtime.
 
-    Until the authoritative Memory adapter exists, callers may omit personality
-    and use the distribution bootstrap seed. Once Memory is implemented, the
-    application layer must resolve/bootstrap the profile from Memory and pass it
-    here explicitly.
+    Callers may still omit personality for the unprotected development fallback
+    and use the distribution bootstrap seed. When a file-native development
+    Memory root is explicitly configured, the application layer bootstraps/loads
+    the profile there and passes it here. Protected household Memory remains
+    gated on the Memory Broker and protection-domain work.
     """
 
     validate_local_ollama_base_url(config.base_url)
