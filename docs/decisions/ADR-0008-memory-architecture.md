@@ -351,13 +351,22 @@ example:
 
 ```text
 <protection-domain>/
-├── memory/       # established/current authoritative Memory
-└── learning/     # observations, observed facts, hypotheses, evidence
+├── memory/       # established/current authoritative Memory; no automatic aging
+└── learning/     # observations, observed facts, hypotheses, temporary extracts/summaries
 ```
 
 The exact directory names/file granularity remain implementation choices.
 Both areas must remain human-readable; the learning area is not a hidden
 secondary truth store.
+
+**The `learning/` area is the only Memory area subject to automatic
+aging/expiry/compaction.** `observed_fact`, `behavioral_observation`,
+`hypothesis`, and non-durable derived extracts/summaries live there until
+they are promoted, rejected, superseded, or compacted. Promotion/durable
+retention moves or rewrites the resulting established knowledge into
+`memory/`. Established `memory/` content is never aged or forgotten
+automatically; it changes only through explicit correction/supersession,
+explicit user forget/delete, or an explicit semantic validity boundary.
 
 #### Confirmed initial learning classes
 
@@ -518,8 +527,10 @@ The URI/reference format must remain provider-independent at the Memory layer. i
 Document/source handling rules:
 
 - **original/raw source material is outside the Memory lifecycle**. Memory does not modify, compact, age, forget, move, or delete the original;
-- when Ada receives a document or other source artifact, the system must deliberately place it in or reference it from a configured source/document store; the authoritative Memory vault is not the default original-file store;
-- Ada may retain a provider-independent source reference plus an extract/summary/derived knowledge when that is useful;
+- each user/audience may have a configured stable source/document root or provider (for example a user-controlled iCloud directory). This is operational configuration, not a model-learned path or authority;
+- when Ada receives a document or other source artifact, it first keeps an existing durable source reference when one exists; otherwise the ingestion path stores the original in the configured source/document root before deriving Memory;
+- a simple default organization such as `<source-root>/<YYYY>/<MM>/...` is preferred for directly received files so humans can browse originals without Ada; exact naming/collision rules remain implementation details;
+- Ada may retain a provider-independent source reference plus an extract/summary/derived knowledge when that is useful; non-durable extracts/summaries live in `learning/` until promoted or marked durable;
 - if a task requires the original document, Ada resolves/accesses it through the applicable source/document provider boundary and permissions;
 - a missing/unavailable source must be distinguishable from a deleted/forgotten Memory extract;
 - forgetting/deleting a Memory extract or summary never deletes or mutates the original source; any future file/document-management capability is a separate explicitly authorized action path and is not triggered by Memory retention;
@@ -549,7 +560,7 @@ Initial principles:
 - low-value incidental details should normally remain session context only;
 - sensitive information has a higher bar for durable retention than ordinary low-risk preferences;
 - durable Memory may be reorganized/gardened for clarity, but gardening must not silently age out explicit knowledge/preferences or explicitly durable episodes;
-- retention policy for automatic expiry/compaction applies to evidence/hypotheses and derived summaries, not to explicit confirmed knowledge unless a semantic validity window was explicitly part of that knowledge.
+- automatic expiry/compaction is confined to `learning/`; established `memory/` content does not age automatically. Observation-derived evidence/hypotheses and non-durable extracts/summaries remain in `learning/` until promoted, rejected, superseded, or compacted.
 
 The target is **useful continuity, not exhaustive surveillance**.
 
@@ -1504,7 +1515,7 @@ ADR-0008 accepts the following MVP architecture:
 - operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
 - corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
 - evidence origin, durable Memory kind, and lifecycle/maturity are separate dimensions; established Memory is logically separated from inspectable learning evidence, with an explicit Ada-owned promotion/assimilation boundary;
-- only observation-derived learning evidence/hypotheses and non-durable derived summaries are subject to automatic aging/compaction; explicitly stated/confirmed facts and preferences do **not** age or get forgotten automatically, while special episodic memories may be explicitly retained as durable; all remain subject to explicit user correction/forget/delete;
+- `learning/` is the sole Memory area with automatic aging/expiry/compaction and contains observed facts, behavioral observations, hypotheses and non-durable derived extracts/summaries; established `memory/` content, including explicit facts/preferences and promoted/durable episodes, never ages or disappears automatically and changes only through explicit lifecycle semantics;
 - the confirmed learning-policy classes A–D are normative: low-risk explicit knowledge may be remembered privately with provenance, inferred patterns observe first, sensitive/consequential knowledge requires confirmation or a future explicit rule, and secrets/credentials are never ordinary automatically learned Memory;
 - evidence precedence is normative and not last-write-wins: explicit user confirmation/correction outranks observational patterns, while ambiguous conflicting explicit claims remain unresolved;
 - every model-originated Memory write or promotion passes a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling before it becomes authoritative;
@@ -1512,7 +1523,7 @@ ADR-0008 accepts the following MVP architecture:
 - an inspectable change-history/versioning mechanism that records observed out-of-band edits is an architectural requirement for manual-edit provenance; Git-style per-domain history is only the leading adapter candidate, not the requirement itself;
 - automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
 - the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
-- original/raw source artifacts live outside the Memory lifecycle in a configured source/document store or provider reference; Memory may hold references, extracts, summaries and derived knowledge, but Memory aging/forgetting never mutates or deletes the original;
+- original/raw source artifacts live outside the Memory lifecycle in a configured per-user/audience source/document store or provider reference; existing stable sources are referenced in place, while directly received files without a durable source are first stored in that configured root (human-browsable organization such as year/month preferred) before Memory extraction; Memory aging/forgetting never mutates or deletes the original;
 - facts owned by another authoritative system (for example calendar/contact/source-document facts) remain source-owned by default; Memory stores a reference, derived abstraction, or explicitly requested independent copy rather than creating a competing source of truth;
 - ReMe, LangMem, Hindsight, Letta/MemFS, vector stores, graph stores and similar frameworks are **not required MVP layers**. They may be added only behind Ada-owned boundaries when representative evidence justifies their runtime, privacy and maintenance cost;
 - `Memory != Permission`, `Memory != Action Truth`, and `Authoritative Memory != Derived Index` remain architecture invariants.
