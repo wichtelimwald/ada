@@ -208,11 +208,24 @@ The later Memory ADR will decide whether Ada uses a narrow external bind mount o
 
 For the initial macOS target, Ollama remains outside the Ada container.
 
-Ada reaches it through a configurable endpoint; Docker Desktop's `host.docker.internal` path is one implementation detail for local macOS development/runtime.
+The first loopback-only local-chat CLI on macOS is a narrow **native bootstrap
+exception** to the container-first runtime direction. Ollama and `ada chat`
+both run on the Mac; the default bridged Dev Container remains for development
+and tests. The CLI's readiness and model-request transports both bypass
+ambient proxy settings. Running the CLI natively grants its process the
+macOS user's permissions; this path does not provide container isolation.
 
-No domain code may depend on that hostname.
+Docker Desktop bridge networking does not give the development container
+access to the Mac's loopback-only Ollama service. A tested host-network
+development profile was rejected for the MVP because processes in it could
+also reach other host-local services. Do not expose Ollama on all host
+interfaces to work around this. If running chat in a container becomes a
+requirement, revisit a restricted host-side Ollama gateway with explicit
+access controls and target-Mac verification before adding that path.
 
-Later Linux/server deployments may use another host endpoint or a separate container/network topology without changing the agent-runtime port.
+No domain code may depend on a particular endpoint hostname. Later Linux or
+server deployments may use a different topology without changing the
+agent-runtime port.
 
 ## Consequences
 

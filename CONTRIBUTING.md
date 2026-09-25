@@ -18,16 +18,10 @@ Code, comments, documentation, issues, commits, pull requests, and GitHub review
 
 ## Product and architecture decisions
 
-ADR-0002 through ADR-0006 define the initial Python, container, PydanticAI, Cedar, DBOS, and Ollama foundation. Do not assume choices that remain open:
-
-- target UI framework,
-- additional target platform strategies,
-- memory implementation,
-- additional agent/orchestration frameworks,
-- computer-control framework,
-- STT/TTS stack,
-- additional local model runtimes or model artifacts,
-- cloud provider.
+Accepted technology choices live in `docs/decisions/`; open capability work
+lives in `docs/todo.md`. Do not duplicate a changing technology-status list
+here, and do not treat a researched candidate as adopted unless an accepted ADR
+or other canonical decision says so.
 
 For significant choices:
 

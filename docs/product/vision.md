@@ -47,14 +47,17 @@ Proceed through narrow end-to-end slices rather than selecting a comprehensive s
 
 ## Still deliberately open
 
-- packaging and deployment beyond the accepted Python/container baseline,
+Foundational runtime, topology, Guard, durable-execution, local-model and
+context-aware interpretation decisions are recorded in ADR-0002 through
+ADR-0007. The following remain deliberately open or only partially decided:
+
 - local interaction/UI implementation,
-- optional remote-model assistance and changes to the accepted local Ollama baseline,
-- memory representation and retrieval implementation,
-- email/calendar integration mechanism,
-- production policy storage and provider integration beyond the accepted Cedar/DBOS boundaries,
-- remote-data boundary implementation,
-- orchestration beyond the accepted PydanticAI and DBOS roles,
-- packaging/update strategy,
+- authoritative Memory implementation,
+- production email/calendar provider integration,
+- optional remote-model assistance,
+- packaging/update and broader deployment strategy,
 - speech/perception architecture,
-- detailed personal-context selection, calendar ownership, cancellation scopes, forgetting semantics, and offline integration behavior.
+- general computer control,
+- detailed personal-context selection, calendar ownership, cancellation scopes,
+  forgetting semantics, and offline integration behavior.
+

@@ -44,6 +44,7 @@ For Ada development:
 ## Adopted dependencies
 
 - **PydanticAI 2.46.0** — MIT License. Used behind Ada's replaceable agent-runtime adapter.
+- **httpx2 2.13.1** — BSD-3-Clause. Already in PydanticAI's dependency graph; pinned directly for Ada's proxy-independent local Ollama transport. Its [focused dependency review](docs/research/httpx2-direct-transport-review.md) records provenance, maintenance, privacy, security advisories, the installed wheel license, and transitive scope. Redistributing Ada-built images/installers still requires the separate release-artifact review below.
 - **cedarpy 4.12.0** — Apache License 2.0. Community-maintained Python/PyO3 binding used only behind AdaGuard.
 - **Cedar Policy engine 4.12.0** — Apache License 2.0. Embedded by cedarpy as the authorization engine selected by ADR-0004.
 
@@ -56,7 +57,7 @@ Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; t
 The adopted top-level dependencies do not have an entirely permissive
 transitive graph. In one **combined Ada + research candidates** installation
 on macOS, the declared Ada requirements led to these reconstructed baseline
-paths (see the independent resolution evidence below):
+paths (the independently installed Ada-only graph remains to be checked):
 
 | Path from Ada | Installed Mac example | Distribution review |
 | --- | --- | --- |
@@ -66,13 +67,8 @@ paths (see the independent resolution evidence below):
 These paths explain why direct MIT/Apache-2.0 licenses alone did not close the
 earlier license gate. Installed Mac file names and package metadata do not
 establish compliance for a Linux image, and the combined environment is not
-proof of the exact Ada-only release graph. An external 2026-09-23 review
-reports an Ada-only binary-wheel resolution for Linux CPython 3.14 on x86_64
-and aarch64: 37 packages, including `psycopg-binary` and `certifi`. The raw
-resolver reports and exact wheel inventories have not been archived in this
-repository; reproduce and retain them before treating the release graph as
-verified. No incompatibility with Ada-owned MIT code has been established
-from this evidence; distribution compliance remains
+an independent Ada-only resolution. No incompatibility with Ada-owned MIT
+code has been established from this evidence; distribution compliance remains
 unverified. See [Psycopg's binary-install documentation](https://www.psycopg.org/psycopg3/docs/basic/install.html),
 the [LGPLv3 terms](https://www.gnu.org/licenses/lgpl-3.0.html), and the
 [MPL 2.0 distribution FAQ](https://www.mozilla.org/en-US/MPL/2.0/FAQ/).

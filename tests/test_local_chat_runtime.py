@@ -1,19 +1,26 @@
 from __future__ import annotations
 
+import asyncio
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
+import os
+from threading import Thread
 import unittest
 from typing import Any, Sequence
 from unittest.mock import patch
 
 import pydantic_ai
+import httpx2
 from pydantic_ai import Agent, NativeOutput
 from pydantic_ai.messages import ModelMessage, ModelResponse, TextPart
 from pydantic_ai.models.function import AgentInfo, FunctionModel
 
 from ada.adapters.local_ollama import (
     LocalModelConfigurationError,
+    LocalModelUnavailableError,
     LocalOllamaConfig,
     build_local_ollama_runtime,
+    check_local_ollama_ready,
     validate_local_ollama_base_url,
 )
 from ada.adapters.pydantic_ai import PydanticAIRuntime
@@ -192,8 +199,9 @@ class LocalChatRuntimeTests(unittest.TestCase):
         captured: dict[str, Any] = {}
 
         class FakeProvider:
-            def __init__(self, *, base_url: str) -> None:
+            def __init__(self, *, base_url: str, http_client: httpx2.AsyncClient) -> None:
                 captured["base_url"] = base_url
+                captured["http_client"] = http_client
 
         class FakeModel:
             def __init__(self, name: str, *, provider: Any, settings: Any) -> None:
@@ -243,6 +251,161 @@ class LocalChatRuntimeTests(unittest.TestCase):
         )
         self.assertIn("Do not invent material details", captured["instructions"])
         self.assertIn("Never claim that a calendar event was created", captured["instructions"])
+        self.assertEqual(captured["http_client"].timeout.read, 600.0)
+        runtime.close()
+        self.assertTrue(captured["http_client"].is_closed)
+        runtime.close()
+
+    def test_local_runtime_closes_client_when_construction_fails(self) -> None:
+        real_client = httpx2.AsyncClient
+
+        for failing_stage in ("OllamaProvider", "OllamaModel", "Agent"):
+            with self.subTest(stage=failing_stage):
+                clients: list[httpx2.AsyncClient] = []
+
+                def make_client(**kwargs: Any) -> httpx2.AsyncClient:
+                    client = real_client(**kwargs)
+                    clients.append(client)
+                    return client
+
+                def reject(*args: Any, **kwargs: Any) -> None:
+                    raise ValueError("invalid model configuration")
+
+                def constructor(stage: str) -> Any:
+                    if stage == failing_stage:
+                        return reject
+                    return lambda *args, **kwargs: object()
+
+                with (
+                    patch("ada.adapters.local_ollama.httpx2.AsyncClient", side_effect=make_client),
+                    patch("ada.adapters.local_ollama.OllamaProvider", constructor("OllamaProvider")),
+                    patch("ada.adapters.local_ollama.OllamaModel", constructor("OllamaModel")),
+                    patch("ada.adapters.local_ollama.Agent", constructor("Agent")),
+                    patch.object(pydantic_ai, "BANNER_ENABLED"),
+                ):
+                    with self.assertRaisesRegex(ValueError, "invalid model configuration"):
+                        build_local_ollama_runtime()
+
+                self.assertEqual(len(clients), 1)
+                self.assertTrue(clients[0].is_closed)
+
+    def test_local_chat_transport_ignores_proxy_settings(self) -> None:
+        hits: list[str] = []
+
+        def make_server(name: str) -> ThreadingHTTPServer:
+            class Handler(BaseHTTPRequestHandler):
+                protocol_version = "HTTP/1.1"
+
+                def do_GET(self) -> None:
+                    hits.append(f"{name}:GET")
+                    body = b'{"models": [{"name": "qwen3.5:9b"}]}'
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def do_POST(self) -> None:
+                    hits.append(f"{name}:POST:{self.path}")
+                    self.rfile.read(int(self.headers["Content-Length"]))
+                    body = json.dumps({
+                        "id": "chatcmpl-local-test",
+                        "object": "chat.completion",
+                        "created": 1,
+                        "model": "qwen3.5:9b",
+                        "choices": [{
+                            "index": 0,
+                            "message": {"role": "assistant", "content": json.dumps({
+                                "result": {
+                                    "kind": "AgentTextReply",
+                                    "data": {"text": "Local only", "response_type": "chat.reply"},
+                                }
+                            })},
+                            "finish_reason": "stop",
+                        }],
+                        "usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                    }).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+
+                def log_message(self, *args: object) -> None:
+                    pass
+
+            server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+            Thread(target=server.serve_forever, daemon=True).start()
+            return server
+
+        proxy, ollama = make_server("proxy"), make_server("ollama")
+        url = f"http://localhost:{ollama.server_port}/v1"
+        try:
+            with patch.dict(os.environ, {
+                "http_proxy": f"http://127.0.0.1:{proxy.server_port}",
+                "HTTP_PROXY": f"http://127.0.0.1:{proxy.server_port}",
+                "ALL_PROXY": f"http://127.0.0.1:{proxy.server_port}",
+                "NO_PROXY": "",
+                "no_proxy": "",
+            }):
+                check_local_ollama_ready(LocalOllamaConfig(base_url=url))
+
+                runtime = build_local_ollama_runtime(LocalOllamaConfig(base_url=url))
+                with asyncio.Runner() as runner:
+                    runner.get_loop()
+                    try:
+                        reply = runtime.run(AgentRequest(text="Hello"))
+                        self.assertEqual(reply.text, "Local only")
+                    finally:
+                        runner.run(runtime.aclose())
+
+            self.assertEqual(hits, ["ollama:GET", f"ollama:POST:/v1/chat/completions"])
+        finally:
+            proxy.shutdown()
+            ollama.shutdown()
+            proxy.server_close()
+            ollama.server_close()
+
+    def test_readiness_does_not_follow_redirect_to_other_endpoint(self) -> None:
+        hits: list[str] = []
+
+        class Destination(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                hits.append("destination")
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{"models": [{"name": "qwen3.5:9b"}]}')
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        destination = ThreadingHTTPServer(("127.0.0.1", 0), Destination)
+
+        class Redirect(BaseHTTPRequestHandler):
+            def do_GET(self) -> None:
+                self.send_response(302)
+                self.send_header(
+                    "Location", f"http://127.0.0.1:{destination.server_port}/api/tags"
+                )
+                self.end_headers()
+
+            def log_message(self, *args: object) -> None:
+                pass
+
+        redirect = ThreadingHTTPServer(("127.0.0.1", 0), Redirect)
+        for server in (destination, redirect):
+            Thread(target=server.serve_forever, daemon=True).start()
+        try:
+            with self.assertRaises(LocalModelUnavailableError):
+                check_local_ollama_ready(
+                    LocalOllamaConfig(base_url=f"http://127.0.0.1:{redirect.server_port}/v1")
+                )
+            self.assertEqual(hits, [])
+        finally:
+            redirect.shutdown()
+            destination.shutdown()
+            redirect.server_close()
+            destination.server_close()
 
     def test_local_ollama_profile_rejects_non_loopback_endpoints(self) -> None:
         for url in (

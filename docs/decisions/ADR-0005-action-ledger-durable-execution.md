@@ -213,10 +213,8 @@ If later deployment requirements make another DBOS-supported system database pre
   a combined Ada/Memory research installation on macOS resolved `psycopg`
   and `psycopg-binary` 3.3.6 (LGPL-3.0-only). The installed binary wheel
   contains bundled native libraries with their own license obligations.
-  An independent Linux CPython 3.14 binary-wheel resolution reported 37
-  packages including psycopg-binary for x86_64 and aarch64 on 2026-09-23.
-  Its raw report is not archived here; reproduce and retain it, and review
-  each intended release-platform artifact separately. See the [Psycopg installation options](https://www.psycopg.org/psycopg3/docs/basic/install.html)
+  An Ada-only install and each intended release-platform artifact still need
+  separate verification. See the [Psycopg installation options](https://www.psycopg.org/psycopg3/docs/basic/install.html)
   and [LGPLv3 terms](https://www.gnu.org/licenses/lgpl-3.0.html).
 - Temporal: MIT — license gate passes, but operational complexity is higher.
 - Restate Python SDK: MIT.

@@ -9,8 +9,7 @@
   "workspaceFolder": "/workspace",
   "remoteUser": "ada",
   "containerEnv": {
-    "PYDANTIC_AI_NO_BANNER": "1",
-    "OLLAMA_BASE_URL": "http://host.docker.internal:11434/v1"
+    "PYDANTIC_AI_NO_BANNER": "1"
   },
   "runArgs": [
     "--cap-drop=ALL",

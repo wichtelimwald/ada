@@ -63,6 +63,9 @@ Use **self-hosted Ollama** as Ada's initial local model-serving baseline.
 This means:
 
 - Ada connects only to a loopback Ollama endpoint in the first local-chat profile;
+- both readiness and model requests ignore environment/system proxy settings;
+- on macOS, the first chat CLI runs natively alongside Ollama while development
+  and tests use the default bridged Dev Container (see ADR-0003);
 - Ollama remains outside Ada's domain model and behind the PydanticAI runtime adapter;
 - qwen3.5:9b is the current **target-hardware baseline model**, selected after a direct A/B test against qwen3:8b;
 - the model name and endpoint are configuration, not hard architectural dependencies;
@@ -102,7 +105,8 @@ Personality instructions are operator-authored model instructions. They are not 
 
 - fastest path from the existing foundation to a genuinely interactive local Ada;
 - reuses a model/runtime combination proven on target hardware, with qwen3.5:9b selected after a direct qwen3:8b comparison;
-- no new Python dependency is required because the existing PydanticAI OpenAI extra supports Ollama;
+- the PydanticAI OpenAI extra supports Ollama; Ada pins its existing transitive
+  `httpx2` transport directly to configure proxy-independent local requests;
 - simple Mac/Linux path;
 - external model-process lifecycle stays out of Ada core.
 
@@ -132,6 +136,8 @@ Re-open this decision if:
 - packaging requires embedding the model runtime instead of relying on an external local service;
 - llama.cpp materially lowers lifetime operational cost;
 - Linux/server deployment becomes incompatible with the chosen setup;
+- containerized local chat becomes a requirement, requiring an explicitly
+  reviewed and tested restricted Ollama connection;
 - a different model runtime provides clearly better privacy, lifecycle, or target-hardware performance without increasing maintenance burden.
 
 ## Acceptance validation

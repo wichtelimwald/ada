@@ -37,11 +37,11 @@ class AuthorizationRequest:
     actor: str
     action: str
     resource: str
+    provenance: InstructionProvenance
+    channel: str
     data_subjects: tuple[str, ...] = ()
     audience: str | None = None
     purpose: str | None = None
-    provenance: InstructionProvenance = InstructionProvenance.DIRECT
-    channel: str = "local-chat"
     assurance: AuthenticationAssurance = AuthenticationAssurance.UNVERIFIED
     acting_for: str | None = None
 

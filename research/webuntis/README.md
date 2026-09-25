@@ -4,10 +4,10 @@
 > **Researched:** 2026-09-23
 > **Scope:** ways Ada could read school planning and information data from WebUntis without committing the product runtime to one Untis interface
 
-**Product boundary:** Direct school-system integration is deferred beyond
-the confirmed MVP (see `docs/product/vision.md`). The MVP accepts forwarded
-school information through its ordinary intake path. The steps below are
-research hypotheses for a later decision, not the next Ada implementation.
+**Product boundary:** Direct school-system integration is explicitly outside the
+confirmed MVP. The MVP can still receive forwarded school information through
+its ordinary intake path. The interfaces below are research for a later
+capability decision, not the next Ada implementation.
 
 ## Executive summary
 
@@ -24,16 +24,10 @@ For Ada, the main architectural conclusion is therefore **not** to make WebUntis
 
 For any later authorized school-information prototype:
 
-1. Check whether the existing calendar provider can subscribe to a private
-   **iCal timetable URL** and expose its events via the planned calendar read
-   path, without Ada ever handling the URL. Validate this with a synthetic
-   feed and the actual provider's access controls before choosing it.
-2. If a subscription is unavailable, check whether the account exposes a
-   private iCal URL and whether a direct read-only feed already satisfies the
-   use case.
-3. If richer timetable/change data are required, evaluate **python-webuntis** locally as a replaceable JSON-RPC research adapter. It fits Ada's Python-first direction, is actively maintained as of July 2026, has one runtime dependency, and uses a permissive BSD-3-Clause license.
-4. In parallel, ask Untis whether a public, self-hosted, non-commercial open-source project such as Ada can obtain a **Platform Application**, and what school-side activation and contractual requirements would apply.
-5. Use undocumented browser REST endpoints only if a concrete required capability is unavailable through supported routes and the stability/security trade-off is explicitly accepted.
+1. Check whether the account exposes a private **iCal timetable URL** and whether that already satisfies the initial use case.
+2. If richer timetable/change data are required, evaluate **python-webuntis** locally as a replaceable JSON-RPC research adapter. It fits Ada's Python-first direction, is actively maintained as of July 2026, has one runtime dependency, and uses a permissive BSD-3-Clause license.
+3. In parallel, ask Untis whether a public, self-hosted, non-commercial open-source project such as Ada can obtain a **Platform Application**, and what school-side activation and contractual requirements would apply.
+4. Use undocumented browser REST endpoints only if a concrete required capability is unavailable through supported routes and the stability/security trade-off is explicitly accepted.
 
 No WebUntis runtime dependency is accepted by this research. An ADR is required before a non-trivial provider choice becomes product architecture.
 
@@ -60,13 +54,8 @@ The exact product scope is still a product decision. Research should not silentl
 
 - Start **read-only**. Do not add write actions merely because an API supports them.
 - Treat passwords, TOTP/QR secrets, OAuth client secrets, JWTs, session cookies and private iCal URLs as credentials.
-- JSON-RPC and QR/TOTP access use full account credentials even when Ada makes
-  only read requests. The iCal feed is read-only by interface, but its URL is
-  a bearer secret. Never disable 2FA to accommodate Ada.
-- Decide secret storage, access, rotation and revocation before integrating
-  any of these paths. Never put a feed URL or account credential in a DBOS
-  workflow argument, normal Memory, prompt, URL-bearing HTTP log, or error
-  message. Disable or redact HTTP request logging that records full URLs.
+- JSON-RPC and QR/TOTP access use full account credentials even when Ada only reads data. A private iCal URL is a bearer secret. Never disable 2FA to accommodate Ada.
+- Decide secret storage, access, rotation, revocation and HTTP-log redaction before integrating any direct school-system path. Never place a feed URL or school credential in normal Memory, prompts, DBOS workflow arguments, fixtures, issues, or error messages.
 - Never commit, log or place real school credentials, child identifiers or returned school data in fixtures/issues/research artifacts.
 - Do not bypass WebUntis account security controls such as 2FA restrictions.
 - Minimize local retention of child-related educational data.
@@ -513,15 +502,6 @@ The provider choice must not leak authentication mechanisms or Untis response DT
 
 ## 9. Minimal validation plan
 
-### Stage -1 — calendar-provider subscription, no Ada secret
-
-Where supported, subscribe to a **synthetic** iCal feed through the existing
-calendar provider, then verify Ada can read subscribed events through its
-future calendar read interface. Validate cancellation/update behavior,
-provider-side access controls and privacy. The real feed URL must stay in
-the calendar provider's secret store and never enter Ada. This option is
-conditional on provider support and user authorization.
-
 ### Stage 0 — account capability check, no code
 
 Using the real authorized WebUntis account, inspect:
@@ -544,11 +524,7 @@ Do not capture secrets or personal data in GitHub.
 
 If iCal is available:
 
-- fetch it locally with its URL supplied only through a short-lived secret
-  channel (an environment variable is visible to the process and some
-  diagnostic tools, so it is not sufficient protection on its own);
-- prevent full-URL HTTP logging and do not place the URL in workflow inputs,
-  error output, shell history or test artifacts;
+- fetch it locally with its URL supplied only through a secret/environment variable;
 - parse a representative period;
 - verify cancellations/time/room changes observable through the feed;
 - verify update behavior;
