@@ -1440,8 +1440,8 @@ Weights were deliberately not assigned in this earlier broad criteria list; the 
 20. Define retention/compaction policy by memory class and maturity state so durable Memory stays useful rather than exhaustive.
 21. Define the boundary between global Ada personality evolution and per-interlocutor interaction-profile learning.
 22. Define when a conversation merits an episodic summary and the minimum summary schema for decisions, rationale, and open loops.
-23. Define a provider-independent document-reference abstraction for local files, iCloud, and future stores, including fingerprint/change detection.
-24. Decide whether Ada eventually needs a managed document store in addition to references to user-controlled external storage.
+23. Implement the accepted provider-independent source/document-reference abstraction for configured per-user/audience roots/providers (local filesystem, iCloud, and future stores), including fingerprint/change detection and human-browsable direct-import organization.
+24. Do **not** introduce a separate Ada-managed document database/store for the MVP. Existing durable originals remain in place; directly handed-in originals are persisted into the configured user/audience source root/provider. Revisit only if concrete lifecycle/search/sync needs cannot be met by this model.
 25. Characterize Letta MemFS as the closest git-Markdown architecture reference and determine whether any implementation can be reused without adopting the Letta runtime.
 26. Characterize Hindsight as a derived learning/retrieval engine, especially banks, evidence-backed observations, knowledge pages, and rebuildability from Ada-owned Memory.
 27. Characterize LangMem for storage-agnostic extraction/consolidation logic.
