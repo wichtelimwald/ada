@@ -175,13 +175,13 @@ For a confirmed memory, Ada should also preserve **how it became confirmed**. In
 - `observed_pattern` — promoted after repeated, sufficiently consistent observed outcomes without an explicit user confirmation;
 - `explicit_user` — explicitly confirmed/stated by the relevant user.
 
-This avoids conflating maturity with provenance. In a future structured
-learning record, a confirmed observation would have an
-`observed_pattern` basis while a directly confirmed statement would have
-an `explicit_user` basis. This is a semantic distinction, **not** a
-requirement to store claim YAML alongside human-edited Markdown. Any state
-visible to the user must have one authoritative, inspectable representation;
-the research fixture's parallel YAML and prose are not the MVP schema.
+This avoids conflating maturity with provenance. In a future inspectable learning-journal entry, a confirmed observation would
+have an `observed_pattern` basis while a directly confirmed statement would
+have an `explicit_user` basis. This is a semantic distinction, **not** a
+requirement for a second structured truth store alongside human-edited
+Markdown. Any user-visible Memory state must have one authoritative,
+inspectable representation; the research fixture's parallel YAML and prose
+are not the MVP schema.
 
 A memory confirmed through observation remains weaker evidence than an explicit confirmation for later contradiction resolution or sensitive decisions. Exact precedence rules still need characterization.
 
