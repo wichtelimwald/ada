@@ -260,9 +260,82 @@ Rules:
 
 Exact field names remain open, but both maturity and confirmation basis must remain visible in human-readable Memory.
 
+#### Confirmed knowledge/evidence roles and promotion boundary
+
+Ada must not encode "what the knowledge is", "how Ada learned it", and
+"how mature/trusted it is" as one overloaded field. These are separate axes.
+
+**Durable Memory kind** describes the content that Ada may eventually use as
+established Memory, for example:
+
+- `preference` — an explicit or deliberately promoted user preference;
+- `fact` — a relatively objective durable fact;
+- `routine` — an established recurring pattern;
+- `episode` — a compact summary of a materially useful interaction/event.
+
+This set may grow scenario-by-scenario; it is not a fixed ontology.
+
+**Evidence origin** describes how the candidate knowledge arose:
+
+- `explicit_statement` — directly stated/confirmed by an authorized user or
+  carried by an explicitly trusted structured source;
+- `observed_fact` — a comparatively low-interpretation fact extracted from
+  an event/document/system observation, such as an appointment time or a
+  practice address;
+- `behavioral_observation` — observed interaction/behavior that requires more
+  interpretation, such as repeatedly asking for more detail or reacting
+  positively to nerdy humor;
+- `hypothesis` — an interpretation synthesized from one or more observations.
+
+**Lifecycle/maturity** remains a separate axis
+(`observed`, `provisional`, `confirmed`, `stale`, `contradicted`,
+`superseded`, `forgotten`).
+
+This means, for example, a `preference` may originate from an
+`explicit_statement` or may be promoted from repeated
+`behavioral_observation`; an `observed_fact` may later become an
+established `fact` after validation. These paths do not have the same
+evidentiary weight merely because they end in the same Memory kind.
+
+**Promotion/assimilation is an explicit architecture boundary:**
+
+```text
+source/event/outcome
+  -> evidence (explicit statement | observed fact | behavioral observation)
+  -> optional hypothesis
+  -> Ada-owned validation
+       - source/trust classification
+       - privacy scope
+       - learning class / sensitivity
+       - provenance/lifecycle
+       - contradiction/correction checks
+  -> established authoritative Memory, or remain evidence/provisional
+```
+
+A model may propose a hypothesis or promotion, but it cannot silently
+self-promote model output into established Memory. Promotion may be automatic
+only where an explicit deterministic Ada rule for that learning class permits
+it; otherwise it requires confirmation. Evidence that has not been promoted
+may still be retained in the inspectable learning area under its protection
+domain and may support later plausibility checks.
+
+The default file organization should therefore keep established Memory and
+learning evidence logically separate inside the same protection domain, for
+example:
+
+```text
+<protection-domain>/
+├── memory/       # established/current authoritative Memory
+└── learning/     # observations, observed facts, hypotheses, evidence
+```
+
+The exact directory names/file granularity remain implementation choices.
+Both areas must remain human-readable; the learning area is not a hidden
+secondary truth store.
+
 #### Confirmed initial learning classes
 
-The maintainer confirmed four default learning classes. More specific classes may be added later, but they must map back to one of these behaviors rather than silently inventing a new trust level.
+The maintainer confirmed four default **learning-policy classes**. These are orthogonal to the content/evidence roles above: they decide how evidence may be retained/promoted based on risk, not whether something is a preference, fact, observation, or hypothesis. More specific classes may be added later, but they must map back to one of these behaviors rather than silently inventing a new trust level.
 
 | Class | Default behavior | Examples / notes |
 | --- | --- | --- |
@@ -1229,7 +1302,7 @@ Gardening must not silently perform destructive cleanup. Proposed merges, deleti
 
 ## Required representative Memory scenarios
 
-Before selecting a backend, characterize at least:
+Use these scenarios to validate implementations of the accepted architecture. The first real-household Memory slice must at minimum close scenarios 1–5, 7–8, 10, 17–18, 20–21, and 25–27; learning/gardening/episodic scenarios are gated when those features are enabled:
 
 1. **Personality bootstrap** — empty Memory seeds once; existing edited personality wins.
 2. **Outside edit** — user edits a Memory file while Ada is stopped; next start respects it and rebuilds stale derived state.
@@ -1282,7 +1355,7 @@ After hard gates, candidate scoring should consider:
 - replaceability and data portability;
 - ongoing maintenance effort.
 
-Weights are deliberately not assigned by this draft.
+Weights were deliberately not assigned in this earlier broad criteria list; the completed historical matrix below used its own frozen weights.
 
 ## Implementation and optional research after the architecture decision
 
@@ -1339,7 +1412,7 @@ Repeated semantic characterization found a material boundary condition, but not 
 - that later Auto Dream run extracted three plausible units but integrated 0/3 because generated agent receipts failed validation;
 - two explicit contradictory pickup claims remained separate rather than last-write-wins, but ReMe still created no deterministic contradiction relation/state.
 
-Therefore ReMe can remain a candidate **file-native substrate**, but its model-generated consolidation cannot by itself be authoritative Ada truth. The missing canonical fact/lifecycle/provenance semantics must be supplied outside ReMe.
+Therefore ReMe remained useful research evidence, but under the accepted architecture it may only be considered as an optional derived reader/indexer; its model-generated consolidation cannot be authoritative Ada truth. The missing canonical fact/lifecycle/provenance semantics must be supplied outside ReMe.
 
 That did **not** establish ReMe as an Ada truth engine. The subsequently
 added Markdown/Git/direct-search control is the simplest staged MVP
@@ -1354,15 +1427,24 @@ The first shared-fixture comparison provides additional evidence:
 
 These results strengthen the need to evaluate **semantic correctness and provenance integrity separately** from storage/runtime success.
 
-This moves the remaining ReMe decision work away from basic runtime feasibility and toward:
+This historical characterization moved the remaining ReMe-specific research away from basic runtime feasibility and toward:
 
-- compare ReMe, LangMem, Hindsight, Letta/MemFS, and the strongest evidence-backed composite options with the weighted decision matrix;
+- comparing ReMe, LangMem, Hindsight, Letta/MemFS, and evidence-backed composite options in the now-historical weighted decision round;
 - external document reference/lifecycle fit;
 - exact transitive license/security audit;
 - maintenance/AgentScope dependency cost;
 - whether Hindsight adds enough derived-learning value to justify a second subsystem.
 
 ## Decision status
+
+The normative architecture consists of this Decision section, the
+**Security and semantic invariants**, the **Hard gates**, and body sections
+explicitly marked **Confirmed** (including private-by-default placement,
+knowledge/evidence roles and promotion, learning-policy classes,
+contradiction/correction precedence, manual-edit provenance, and the
+forgetting/history split). Sections marked "to characterize", "Questions still
+to decide", candidate/reference surveys, historical matrices and executable
+evidence are context or follow-up work, not silently adopted components.
 
 ADR-0008 accepts the following MVP architecture:
 
@@ -1374,6 +1456,12 @@ ADR-0008 accepts the following MVP architecture:
 - normal retrieval starts with current authoritative files and the simplest sufficient local search; derived indexes/graphs/vector layers are optional, rebuildable, scope-preserving accelerators rather than independent truth sources;
 - operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
 - corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
+- evidence origin, durable Memory kind, and lifecycle/maturity are separate dimensions; established Memory is logically separated from inspectable learning evidence, with an explicit Ada-owned promotion/assimilation boundary;
+- the confirmed learning-policy classes A–D are normative: low-risk explicit knowledge may be remembered privately with provenance, inferred patterns observe first, sensitive/consequential knowledge requires confirmation or a future explicit rule, and secrets/credentials are never ordinary automatically learned Memory;
+- evidence precedence is normative and not last-write-wins: explicit user confirmation/correction outranks observational patterns, while ambiguous conflicting explicit claims remain unresolved;
+- every model-originated Memory write or promotion passes a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling before it becomes authoritative;
+- untrusted/quoted/model-generated content cannot directly rewrite trusted established Memory; it can only enter the evidence/proposal path under the applicable conservative learning rule;
+- an inspectable change-history/versioning mechanism that records observed out-of-band edits is an architectural requirement for manual-edit provenance; Git-style per-domain history is only the leading adapter candidate, not the requirement itself;
 - automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
 - the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
 - source documents may remain in external user-controlled stores and be referenced by Memory rather than being silently copied into the Memory vault;
@@ -1382,9 +1470,22 @@ ADR-0008 accepts the following MVP architecture:
 
 Git-style per-protection-domain history is the leading MVP **versioning adapter candidate**, not an authentication or security boundary. Its exact capture/concurrency/recovery mechanism must be validated before product use.
 
+A separate **architecture follow-up remains mandatory before real household
+Memory**: the protection-domain access topology delegated by ADR-0003. Ada
+must define which principals are isolated (at minimum household members from
+one another, and the runtime/model from domains not needed for the current
+authorized request) and how the runtime receives only the required domain
+access. A single mount exposing every private/shared vault to one long-lived
+Ada principal is **not implicitly accepted**. Candidate shapes include a
+host-side Memory broker, per-domain/per-request workers, or equivalent scoped
+credential/key release. The mechanism may vary, but authorized users must
+still be able to access/edit their own authoritative Memory in plain
+human-readable form.
+
+
 This acceptance chooses the architecture boundary and the smallest baseline. It does **not** claim that the Memory service, protection domains, versioning adapter, retrieval quality, learning lifecycle, or historical purge operations are already implemented or production-ready.
 
-The executable four-candidate characterization is complete. A **draft weighted decision matrix** now lives at:
+The executable four-candidate characterization is complete. The **historical weighted decision matrix** lives at:
 
 `research/memory/comparison/decision-matrix.md`
 
@@ -1465,11 +1566,12 @@ The architecture above is accepted independently from any one Memory framework o
 
 1. validate the file-native control against representative retrieval/edit/forget scenarios on the target platform and measure retrieval quality/scale before adding a derived search framework; before custom retrieval infrastructure, run a focused reuse comparison of credible local RAG/retrieval components (at minimum the SQLite FTS5 baseline and suitable modular/embedded candidates such as LlamaIndex Core, Haystack, LanceDB, or an equivalent maintained option) behind an Ada-owned retrieval port;
 2. implement safe out-of-band edit capture and Ada writes, including path-restricted history capture, same-file concurrency detection/reconciliation, Git/file lock handling, crash recovery, and explicit stale-source handling;
-3. demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes; different folders under one readable OS principal are insufficient;
-4. make current/superseded/unresolved retrieval semantics deterministic enough that obsolete or contradictory text is not promoted as current truth;
+3. close the protection-domain access-topology architecture follow-up delegated by ADR-0003, then demonstrate enforceable per-person/shared domains and scope-partitioned retrieval/indexes; different folders under one readable OS principal are insufficient and a single long-lived Ada principal with all domains exposed is not implicitly accepted;
+4. make current/superseded/unresolved retrieval semantics deterministic enough that obsolete or contradictory text is not promoted as current truth; fail closed when lifecycle/currentness is ambiguous rather than asking the model to infer it;
 5. ensure forgetting removes content from current authoritative retrieval and every reconstructible derived index, while keeping historical purge/backup retention as a separately explicit operation;
 6. define and validate the minimum provenance/source-reference and external-document lifecycle needed by implemented MVP scenarios without creating duplicate hidden truth;
-7. if a dependency-backed derived layer is selected, complete its license/security/dependency review and target-platform validation before adoption; release artifacts require their own distribution review.
+7. route every model-originated Memory write/promotion through the deterministic Ada-owned validation boundary (source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, contradiction/correction) before authoritative persistence;
+8. if a dependency-backed derived layer is selected, complete its license/security/dependency review and target-platform validation before adoption; release artifacts require their own distribution review.
 
 Historical candidate scores may be revisited only if they are reused as decision evidence. A failure of Git, direct search, ReMe, LangMem, Hindsight, or another concrete implementation should trigger replacement behind these accepted boundaries rather than reopening the human-controlled source-of-truth architecture by default.
 
@@ -1511,4 +1613,4 @@ cannot revoke content already read, synced, copied, backed up, or retained in
 shared history. Ada must present that limitation explicitly. Historical purge
 and reader revocation are separate policies/operations; they are not a
 precondition that permanently forbids scope narrowing. No narrower household
-scope is accepted implicitly by this proposed ADR.
+scope is accepted implicitly by this ADR.
