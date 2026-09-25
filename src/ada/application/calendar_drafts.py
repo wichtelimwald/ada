@@ -126,13 +126,17 @@ def _could_be_day_first_partial_date(token: str) -> bool:
     return 1 <= day <= 31 and 1 <= month <= 12
 
 
-def _could_be_partial_date(token: str) -> bool:
+def _could_be_month_first_partial_date(token: str) -> bool:
     if ":" in token:
         return False
-    first, second = (int(part) for part in token.split("."))
+    month, day = (int(part) for part in token.split("."))
+    return 1 <= month <= 12 and 1 <= day <= 31
+
+
+def _could_be_partial_date(token: str) -> bool:
     return (
         _could_be_day_first_partial_date(token)
-        or (1 <= first <= 12 and 1 <= second <= 31)
+        or _could_be_month_first_partial_date(token)
     )
 
 
@@ -158,15 +162,20 @@ def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
         ):
             return match.group(0)
         has_time_marker = re.match(r"\s+Uhr\b", source_text[match.end():], re.IGNORECASE)
-        if (
-            _could_be_day_first_partial_date(start)
-            and _could_be_day_first_partial_date(end)
-            and not has_time_marker
-        ):
-            # Preserve the existing compact DD.MM date-range ambiguity rule.
-            # Month-first ambiguity is fail-closed for standalone/date-prefixed
-            # tokens, but must not erase clear range evidence such as
-            # 09.10-10.30, which is intentionally supported as a time range.
+        same_date_order = (
+            (
+                _could_be_day_first_partial_date(start)
+                and _could_be_day_first_partial_date(end)
+            )
+            or (
+                _could_be_month_first_partial_date(start)
+                and _could_be_month_first_partial_date(end)
+            )
+        )
+        if same_date_order and not has_time_marker:
+            # A fully dotted range is ambiguous when both endpoints form
+            # valid partial dates in the same ordering (DD.MM or MM.DD).
+            # Require explicit time syntax instead of guessing.
             return " "
         # Protect an explicit time range before masking three-part dates;
         # otherwise 16.30-17.00 is partly consumed as a date token.

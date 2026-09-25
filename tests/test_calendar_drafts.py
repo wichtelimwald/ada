@@ -295,7 +295,10 @@ class CalendarDraftTests(unittest.TestCase):
                 self.assertEqual(assessment.missing, ())
 
     def test_ambiguous_dotted_date_ranges_require_a_time_marker(self) -> None:
-        for time_range in ("09.10-10.11", "09.10–10.11", "09.10. bis 10.11."):
+        for time_range in (
+            "09.10-10.11", "09.10–10.11", "09.10. bis 10.11.",
+            "09.21-10.22", "09.21 to 10.22", "09.10-10.30", "09.10 to 10.30",
+        ):
             with self.subTest(time_range=time_range):
                 assessment = assess_calendar_create_draft(
                     _draft(start_time="09:10", end_time="10:11"),
@@ -317,8 +320,8 @@ class CalendarDraftTests(unittest.TestCase):
                 )
                 self.assertEqual(assessment.missing, ())
 
-    def test_explicit_time_in_range_disambiguates_dotted_endpoint(self) -> None:
-        for time_range in ("09.10-10.30", "09.10 bis 10:30", "09.10 to 10.30"):
+    def test_explicit_time_syntax_disambiguates_dotted_endpoint(self) -> None:
+        for time_range in ("09.10 bis 10:30", "09.10 to 10:30", "09.10-10.30 Uhr"):
             with self.subTest(time_range=time_range):
                 assessment = assess_calendar_create_draft(
                     _draft(start_time="09:10", end_time="10:30"),
