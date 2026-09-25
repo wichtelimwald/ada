@@ -923,13 +923,13 @@ Legend: ✅ strong fit / 🟡 partial or adapter required / ❓ not yet verified
 | Conversation/resource ingestion | ✅ sessions + resources are first-class source layers | ✅ conversations/documents can be retained | 🟡 external memory files/context repos; broader ingestion is runtime-dependent | ✅ conversation-oriented extraction |
 | Runtime independence from another agent framework | ❌ current package import/runtime path requires AgentScope in the characterized path; target-Mac spike confirmed this path works with native Ollama | ✅ standalone server/client/embedded options | ❌ tightly coupled to Letta runtime/SDK | 🟡 core primitives are storage-agnostic, but ecosystem is LangGraph-oriented |
 | Fit as Ada authoritative Memory substrate in this earlier shortlist | ✅ leading evaluated library | ❌ | 🟡 architecture reference / possible component | ❌ |
-| Fit as Ada derived learning/recall layer | ✅ | **✅ strongest current candidate** | 🟡 | ✅ lightweight candidate |
+| Fit as Ada derived learning/recall layer in this earlier shortlist | ✅ | **✅ strongest evaluated candidate in that round** | 🟡 | ✅ lightweight candidate |
 
 ### Earlier working conclusion (superseded by staged MVP direction below)
 
 **Earlier primary deep-dive candidate: ReMe** for the authoritative, human-readable Memory substrate. This historical conclusion predates the Markdown/Git/direct-search control and is not a recommendation to adopt ReMe for the MVP.
 
-Why it currently leads:
+Why it led in that round:
 
 - Markdown/YAML files are explicitly the source of truth;
 - source/session/resource and long-term-memory layers are already separated;
@@ -938,7 +938,7 @@ Why it currently leads:
 - it already implements consolidation/refinement rather than only retrieval;
 - Apache-2.0 passes the top-level license gate.
 
-Important unresolved gates before adoption:
+Unresolved gates recorded in that round:
 
 1. verify the full runtime/dependency license path, not only ReMe's top-level Apache-2.0 license;
 2. decide whether accepting AgentScope as a Memory dependency is compatible with Ada's already accepted PydanticAI runtime boundary, or whether a narrower ReMe integration/decoupling is required;
@@ -947,13 +947,13 @@ Important unresolved gates before adoption:
 5. test correction, contradiction, deletion, episodic summaries, and external document references against Ada's semantics;
 6. characterize local-model/Ollama and Python 3.14 behavior on the accepted target platforms.
 
-**Secondary deep-dive candidate: Hindsight** for learning/consolidation and recall, not as Ada's authoritative store.
+**Earlier secondary deep-dive candidate: Hindsight** for learning/consolidation and recall, not as Ada's authoritative store.
 
 Its evidence-backed observations, strict banks, temporal/graph/lexical/semantic recall, and mental models are particularly relevant to Ada's learning design. The key question is whether it adds enough value as a rebuildable derived layer to justify operating both ReMe and Hindsight.
 
-**Letta MemFS** remains the strongest architecture/reference for Git-backed Markdown context repositories, but current runtime coupling makes it a weaker adoption candidate.
+**Letta MemFS** was the strongest architecture/reference in that round for Git-backed Markdown context repositories, but runtime coupling made it a weaker adoption candidate.
 
-**LangMem** remains the lightweight fallback for reusable extraction/consolidation logic if ReMe's or Hindsight's larger runtimes prove too invasive.
+**LangMem** was the lightweight fallback in that round for reusable extraction/consolidation logic if ReMe's or Hindsight's larger runtimes proved too invasive.
 
 Detailed source findings are tracked in:
 
@@ -1352,12 +1352,21 @@ do not enforce household privacy. Its search relevance and scale remain
 unmeasured. No numeric score or Memory-backend selection follows from this
 small control run.
 
+Any fresh comparison must price the Ada-owned work needed to make this control
+safe in practice, including edit capture, concurrency handling, scoped commits,
+source retirement, section-aware retrieval, isolation, and purge semantics.
+The control is not zero-cost merely because it has no runtime dependency.
+
 For this proposed MVP, add ReMe only when representative retrieval/indexing
 evidence justifies its AgentScope dependency; add LangMem only when a bounded
 semantic proposal helper demonstrably outperforms the simplest safe Ada-owned
 validation path. Revisit the direction if the control fails required scenarios.
 
 ### ReMe + LangMem final-fit boundary
+
+This historical integration boundary applies only if a fresh comparison later
+justifies ReMe + LangMem against the simpler control. It is not the current
+MVP implementation plan.
 
 Source/dependency review narrowed the leading composite further:
 
@@ -1390,7 +1399,7 @@ artifact evidence. No license distribution clearance is claimed.
 
 Before this ADR can move to Accepted:
 
-1. review disputed scores using the original frozen research weights; if the maintainer changes criteria/weights for a future decision, record a new comparison rather than editing the completed run;
+1. review disputed scores from the historical round only if that round is reused as decision evidence; if the maintainer changes criteria/weights for a future decision, record a new comparison rather than editing the completed run;
 2. evaluate the control against representative retrieval/edit/forget scenarios
    on the target platform, without inventing scores for missing evidence;
 3. define how out-of-band edits are captured, how old source references are
@@ -1409,21 +1418,37 @@ consulting Git history, an illustrative **single Markdown note** can place
 the current statement and its source under "Current", and the replaced
 statement and its original source under "Superseded (not current)".
 Retrieval must not promote the superseded section back to a current fact.
-For competing unconfirmed statements, use an "Unresolved" section with both
-claims and their sources; ask for clarification rather than selecting one.
-This is a proposed human-readable convention, not a parser or implemented
-write path. A direct manual edit that changes a claim but leaves an old
-source cannot silently count as a sourced new claim.
+The direct-search control does not satisfy that requirement: substring search
+still finds superseded text, so section-aware retrieval/context assembly is an
+explicit open gate. For competing unconfirmed statements, use an "Unresolved"
+section with both claims and their sources; ask for clarification rather than
+selecting one. This is a proposed human-readable convention, not a parser or
+implemented write path. A direct manual edit that changes a claim but leaves
+an old source cannot silently count as a sourced new claim.
 
 Operational Memory gates remain open. Before any Ada-originated write, capture
-out-of-band changes separately from Ada's own commit and stage only the
-intended path. Detect changed content before overwriting, and treat file/Git
-lock failures as a stopped operation requiring reconciliation; merely
-comparing a hash before an unprotected rename cannot close a concurrent
-editor race. A claim changed without its source being reviewed needs
-validation or an explicit unknown/stale-source marker. Keep mutually
-unresolved claims together and visibly unresolved in current Markdown; the
-two-file control fixture only demonstrates retention. Narrowing a shared
-scope to private must stop until a separate history/backup purge and reader
-revocation policy has been selected and verified. No narrower household
+out-of-band changes separately from Ada's own commit and restrict the commit
+itself to the intended path (for example with a path-restricted commit or a
+separate verified index); path-scoped staging alone is insufficient because
+unrelated pre-staged changes can otherwise enter the commit. Detect changed
+content before overwriting, and treat file/Git lock failures as a stopped
+operation requiring reconciliation; merely comparing a hash before an
+unprotected rename cannot close a concurrent editor race. Concurrency also
+runs in the other direction: a stale editor buffer may overwrite Ada's latest
+write. Ada must capture its own write promptly enough that a later manual
+revert remains detectable, while manual edits remain authoritative current
+content.
+
+A claim changed without its source being reviewed needs validation or an
+explicit unknown/stale-source marker. Keep mutually unresolved claims together
+and visibly unresolved in current Markdown; the two-file control fixture only
+demonstrates retention. Section-aware retrieval/context assembly is required
+before "Superseded" or "Unresolved" conventions can safely coexist with direct
+text search.
+
+Narrowing a shared scope to private may stop future current-state sharing but
+cannot revoke content already read, synced, copied, backed up, or retained in
+shared history. Ada must present that limitation explicitly. Historical purge
+and reader revocation are separate policies/operations; they are not a
+precondition that permanently forbids scope narrowing. No narrower household
 scope is accepted implicitly by this proposed ADR.
