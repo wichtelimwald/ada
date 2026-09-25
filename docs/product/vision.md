@@ -53,7 +53,7 @@ are recorded in ADR-0002 through ADR-0008. The following remain deliberately
 open or only partially decided:
 
 - local interaction/UI implementation,
-- authoritative Memory implementation, including the still-open protected-domain access topology,
+- authoritative Memory implementation, including the accepted host-side Memory Broker and its protection-domain enforcement,
 - production email/calendar provider integration,
 - optional remote-model assistance,
 - remote-data boundary implementation,
