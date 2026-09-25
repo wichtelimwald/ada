@@ -45,10 +45,10 @@ class FileMemoryTests(unittest.TestCase):
             store = FileMemoryStore(temp)
             bootstrap_personality_memory(store)
             path = Path(temp) / "memory" / "personality.md"
-            text = path.read_text(encoding="utf-8").replace(
-                'traits = ["analytical and precise"',
-                'traits = "analytical and precise"',
-            )
+            text = path.read_text(encoding="utf-8")
+            start = text.index("traits = [")
+            end = text.index("\n]", start) + 2
+            text = text[:start] + 'traits = "broken"' + text[end:]
             path.write_text(text, encoding="utf-8")
 
             with self.assertRaisesRegex(
