@@ -40,6 +40,11 @@ Security, privacy, accessibility, and usability are requirements, not optional p
 - A same-session or same-agent self-review is useful verification but is **not** independent four-eyes review.
 - Chat may summarize PR findings for the maintainer in German, but GitHub remains the record.
 
+## Project continuity
+
+- Use `docs/handover.md` as the durable entry point for a new chat/session and follow `.github/skills/project-continuity.md` at the start and before stopping material work.
+- Keep the handover pointer-based. Persist changing facts in their canonical source (for example PR state/reviews/validation in the PR, backlog in `docs/todo.md`, decisions in ADRs) instead of copying volatile state into instructions or the handover.
+
 ## Current project stage
 
 Ada has completed the initial product-discovery baseline. ADR-0002 is accepted: PydanticAI is the initial replaceable agent-runtime adapter behind Ada-owned interfaces. ADR-0003 is accepted: Ada starts as a Python-first, container-first modular monolith with separate development/runtime container profiles and authoritative Memory outside the runtime container. ADR-0004 is accepted: AdaGuard remains Ada-owned and uses Cedar as the initial policy engine through a pinned, replaceable cedarpy integration. ADR-0005 is accepted: DBOS 3.0.0 is the initial durable-execution substrate behind Ada-owned action/outcome semantics, with provider-native idempotency/reconciliation preferred before custom recovery machinery. UI, authoritative-memory implementation, production calendar/email providers, scheduler implementation, speech, general computer control, and local model strategy remain open. Current work should preserve the modular boundaries and advance the smallest representative vertical slice.
