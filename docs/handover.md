@@ -26,6 +26,8 @@ Before changing anything, verify the current repository and GitHub state rather 
 - unresolved review threads and latest review state;
 - validation evidence tied to the exact commit it was run against.
 
+If no concrete current task was supplied, reconstruct the active work thread from current GitHub state: inspect recent open PRs, prioritize in-progress non-draft work over draft backlog, then cross-check docs/todo.md. Do not encode a current PR number in this handover. If more than one candidate is genuinely active, state the ambiguity instead of guessing.
+
 Use docs/todo.md for backlog/priorities, ADRs for architecture decisions, README/docs/product for product status, and the active PR for implementation/review/validation state. Do not recreate these facts in a second summary.
 
 Continue from the latest verified state. Do not restart settled research without new decision-relevant evidence. Preserve existing user work and follow the repository branch/PR rules. Never merge without the maintainer's explicit authorization; review or CI is not merge authorization.
