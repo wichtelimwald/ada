@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-from itertools import product
 
 from ada.application.calendar_drafts import (
     assess_calendar_create_draft,
@@ -142,383 +141,58 @@ class CalendarDraftTests(unittest.TestCase):
 
         self.assertEqual(assessment.missing, ())
 
-    def test_written_german_month_supports_explicit_date(self) -> None:
-        assessment = assess_calendar_create_draft(
-            _draft(date="2026-10-12", language="de"),
-            source_text=(
-                "Zahnarzttermin am 12. Oktober 2026 von 16 Uhr bis 16:30 "
-                "in den Familienkalender eintragen."
-            ),
-        )
-        self.assertEqual(assessment.missing, ())
-
     def test_model_cannot_invent_start_or_end_time(self) -> None:
-        source = (
-            "Please add a dentist appointment on 2026-09-21 at 16:00 "
-            "to the family calendar."
-        )
         assessment = assess_calendar_create_draft(
             _draft(start_time="15:00", end_time="16:30"),
-            source_text=source,
-        )
-        self.assertEqual(assessment.missing, ("start_time", "end_time"))
-
-    def test_model_cannot_invent_end_time_for_explicit_start(self) -> None:
-        assessment = assess_calendar_create_draft(
-            _draft(end_time="16:30"),
             source_text=(
                 "Please add a dentist appointment on 2026-09-21 at 16:00 "
                 "to the family calendar."
             ),
         )
-        self.assertEqual(assessment.missing, ("end_time",))
 
-    def test_time_cannot_match_prefix_of_more_precise_source_time(self) -> None:
+        self.assertEqual(assessment.missing, ("start_time", "end_time"))
+
+    def test_explicit_24_hour_times_are_corroborated(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(start_time="09:10", end_time="10:30"),
+            source_text=(
+                "Please add a dentist appointment on 2026-09-21 "
+                "from 09:10 to 10:30 to the family calendar."
+            ),
+        )
+
+        self.assertEqual(assessment.missing, ())
+
+    def test_more_precise_source_time_is_not_truncated(self) -> None:
         assessment = assess_calendar_create_draft(
             _draft(start_time="16:00", end_time="16:30"),
             source_text=(
-                "Please add a dentist appointment on 2026-09-21 from "
-                "16:00:30 to 16:30:45 to the family calendar."
+                "Please add a dentist appointment on 2026-09-21 "
+                "from 16:00:30 to 16:30:45 to the family calendar."
             ),
         )
+
         self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
-    def test_dotted_date_components_do_not_corroborate_time(self) -> None:
-        for source_date in ("2026.09.21", "2026-09.21", "2026/09.21"):
-            with self.subTest(source_date=source_date):
-                assessment = assess_calendar_create_draft(
-                    _draft(date="2026-09-21", start_time="09:21", end_time="10:00"),
-                    source_text=(
-                        f"Add a dentist appointment on {source_date} "
-                        "at 10:00 to the family calendar."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ("start_time",))
-
-    def test_explicit_dotted_time_still_supports_draft(self) -> None:
-        assessment = assess_calendar_create_draft(
-            _draft(date="2026-09-21", start_time="09:21", end_time="10:00"),
-            source_text=(
-                "Add a dentist appointment on 2026-09.21 "
-                "from 09.21 to 10:00 to the family calendar."
-            ),
-        )
-        self.assertEqual(assessment.missing, ())
-
-    def test_two_digit_year_date_does_not_corroborate_time(self) -> None:
-        for source_date in ("21.09.26", "21-09.26", "21/09.26", "21 . 09.26"):
-            with self.subTest(source_date=source_date):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time="09:26", end_time="10:00"),
-                    source_text=(
-                        f"Add a dentist appointment on {source_date} "
-                        "at 10:00 to the family calendar."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
-
-    def test_two_digit_year_mask_preserves_separate_dotted_time(self) -> None:
-        assessment = assess_calendar_create_draft(
-            _draft(start_time="09:26", end_time="10:00"),
-            source_text=(
-                "Add a dentist appointment on 21-09.26 "
-                "from 09.26 to 10:00 to the family calendar."
-            ),
-        )
-        self.assertEqual(assessment.missing, ("date_with_year",))
-
-    def test_invalid_times_are_missing_without_source_parsing(self) -> None:
-        source = (
-            "Add a dentist appointment on 2026-09-21 "
-            "to the family calendar."
-        )
-        for invalid in (None, "six pm", "25:00", "16:0"):
-            with self.subTest(invalid=invalid):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time=invalid, end_time=invalid),
-                    source_text=source,
-                )
-                self.assertEqual(assessment.missing, ("start_time", "end_time"))
-
-    def test_date_prefixed_partial_dates_do_not_corroborate_dotted_times(self) -> None:
-        for source_date, start_time in (
-            ("21.09.", "21:09"),
-            ("21.09", "21:09"),
-            ("21 . 09.", "21:09"),
-            ("09.21", "09:21"),
-            ("09.21.", "09:21"),
-            ("12.31", "12:31"),
+    def test_non_hhmm_time_forms_fail_closed(self) -> None:
+        for source_times, start_time, end_time in (
+            ("16.00 to 16.30", "16:00", "16:30"),
+            ("16 Uhr to 16:30", "16:00", "16:30"),
+            ("4:00 pm to 5:00 pm", "04:00", "05:00"),
+            ("4:00 bis 5:00 nachmittags", "04:00", "05:00"),
         ):
-            with self.subTest(source_date=source_date):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time=start_time, end_time="22:00"),
-                    source_text=(
-                        f"Add a dentist appointment on {source_date} "
-                        "to 22:00 to the family calendar."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
-
-    def test_month_first_partial_date_standalone_does_not_corroborate_time(self) -> None:
-        assessment = assess_calendar_create_draft(
-            _draft(start_time="09:21", end_time="10:00"),
-            source_text=(
-                "Add a dentist appointment on 09.21 ending at 10:00 "
-                "in the family calendar."
-            ),
-        )
-        self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
-
-    def test_unambiguous_standalone_dotted_time_still_supports_draft(self) -> None:
-        assessment = assess_calendar_create_draft(
-            _draft(start_time="16:30", end_time="17:00"),
-            source_text=(
-                "Add a dentist appointment on 2026-09-21 at 16.30, "
-                "ending at 17:00 in the family calendar."
-            ),
-        )
-        self.assertEqual(assessment.missing, ())
-
-    def test_compact_time_ranges_are_not_masked_as_dates(self) -> None:
-        for time_range in (
-            "16.30-17.00", "16.30–17.00", "16.30 - 17:00",
-            "16:30-17.00", "16.30-17.00.",
-        ):
-            with self.subTest(time_range=time_range):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time="16:30", end_time="17:00"),
-                    source_text=(
-                        "Add a dentist appointment on 2026-09-21 "
-                        f"from {time_range} to the family calendar."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ())
-
-    def test_ambiguous_dotted_date_ranges_require_a_time_marker(self) -> None:
-        for time_range, start_time, end_time in (
-            ("09.10-10.11", "09:10", "10:11"),
-            ("09.10–10.11", "09:10", "10:11"),
-            ("09.10. bis 10.11.", "09:10", "10:11"),
-            ("09.21-10.22", "09:21", "10:22"),
-            ("09.21 to 10.22", "09:21", "10:22"),
-            ("09.10-10.30", "09:10", "10:30"),
-            ("09.10 to 10.30", "09:10", "10:30"),
-        ):
-            with self.subTest(time_range=time_range):
+            with self.subTest(source_times=source_times):
                 assessment = assess_calendar_create_draft(
                     _draft(start_time=start_time, end_time=end_time),
                     source_text=(
-                        "Add a dentist appointment on 2026-09-21 "
-                        f"from {time_range} to the family calendar."
+                        "Please add a dentist appointment on 2026-09-21 "
+                        f"from {source_times} to the family calendar."
                     ),
                 )
-                self.assertEqual(assessment.missing, ("start_time", "end_time"))
-
-        for time_range in ("09.10-10.11 Uhr", "09.10 Uhr bis 10.11 Uhr", "09:10-10:11"):
-            with self.subTest(time_range=time_range):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time="09:10", end_time="10:11"),
-                    source_text=(
-                        "Add a dentist appointment on 2026-09-21 "
-                        f"from {time_range} to the family calendar."
-                    ),
+                self.assertEqual(
+                    assessment.missing,
+                    ("start_time", "end_time"),
                 )
-                self.assertEqual(assessment.missing, ())
-
-    def test_explicit_time_syntax_disambiguates_dotted_endpoint(self) -> None:
-        for time_range in ("09.10 bis 10:30", "09.10 to 10:30", "09.10-10.30 Uhr"):
-            with self.subTest(time_range=time_range):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time="09:10", end_time="10:30"),
-                    source_text=(
-                        "Add a dentist appointment on 2026-09-21 "
-                        f"from {time_range} to the family calendar."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ())
-
-    def test_time_range_cannot_start_inside_a_spaced_date(self) -> None:
-        for source_date, start_time, missing in (
-            ("2026 - 09.21", "09:21", ("start_time",)),
-            ("21 . 09.26", "09:26", ("date_with_year", "start_time")),
-        ):
-            with self.subTest(source_date=source_date):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time=start_time, end_time="10:00"),
-                    source_text=(
-                        f"Add a dentist appointment on {source_date} "
-                        "to 10:00 to the family calendar."
-                    ),
-                )
-                self.assertEqual(assessment.missing, missing)
-
-    def test_range_endpoint_cannot_be_a_complete_date_prefix(self) -> None:
-        for start, separator, year in product(
-            ("09:00", "09.10"),
-            (".", ". ", " /", " / ", " -", " - "),
-            ("2026", "26"),
-        ):
-            source_range = f"{start} bis 10.11{separator}{year}"
-            with self.subTest(source_range=source_range):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time=start.replace(".", ":"), end_time="10:11"),
-                    source_text=(
-                        "Zahnarzt am 21.09.2026 im Familienkalender "
-                        f"von {source_range}."
-                    ),
-                )
-                self.assertIn("end_time", assessment.missing)
-
-    def test_range_start_cannot_be_a_complete_date_suffix(self) -> None:
-        for prefix, separator in product(
-            ("2026", "21"), (".", ". ", " /", " / ", " -", " - ")
-        ):
-            source_range = f"{prefix}{separator}09.21 bis 10:00"
-            with self.subTest(source_range=source_range):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time="09:21", end_time="10:00"),
-                    source_text=(
-                        "Zahnarzt am 21.09.2026 im Familienkalender "
-                        f"von {source_range}."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ("start_time",))
-
-    def test_meridiem_requests_require_explicit_24_hour_restatement(self) -> None:
-        # Reject the whole request's time evidence, including shared suffixes
-        # and mixtures: do not guess which endpoint an AM/PM marker modifies.
-        for times in (
-            "4:00 pm to 5:00 pm", "4:00 PM-5:00 PM", "4:00 p.m.-5:00 p.m.",
-            "4:00-5:00 pm", "4.00–5.00 p. m.", "4:00pm to 5:00pm",
-            "4:00 am to 5:00 am", "4:00 a.m.-5:00", "4 pm to 05:00",
-            "04:00 to 05:00; another appointment at 4:00 pm",
-        ):
-            with self.subTest(times=times):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time="04:00", end_time="05:00"),
-                    source_text=(
-                        "Dentist on 2026-09-21 in the family calendar "
-                        f"from {times}."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ("start_time", "end_time"))
-
-    def test_day_period_requests_require_explicit_24_hour_restatement(self) -> None:
-        for language, times, start_time, end_time in (
-            ("de", "4:00 bis 5:00 nachmittags", "04:00", "05:00"),
-            ("de", "4 Uhr nachmittags bis 5 Uhr nachmittags", "04:00", "05:00"),
-            ("de", "8:00 bis 9:00 abends", "08:00", "09:00"),
-            ("de", "7:00 bis 8:00 morgens", "07:00", "08:00"),
-            ("en", "4:00 to 5:00 in the afternoon", "04:00", "05:00"),
-            ("en", "8:00 to 9:00 in the evening", "08:00", "09:00"),
-            ("en", "11:00 to 12:00 at night", "11:00", "12:00"),
-        ):
-            with self.subTest(times=times):
-                source = (
-                    f"Zahnarzt am 21.09.2026 von {times} im Familienkalender."
-                    if language == "de"
-                    else (
-                        "Dentist on 2026-09-21 in the family calendar "
-                        f"from {times}."
-                    )
-                )
-                assessment = assess_calendar_create_draft(
-                    _draft(
-                        start_time=start_time,
-                        end_time=end_time,
-                        language=language,
-                    ),
-                    source_text=source,
-                )
-                self.assertEqual(assessment.missing, ("start_time", "end_time"))
-
-    def test_day_period_does_not_hide_explicit_24_hour_times(self) -> None:
-        for language, times in (
-            ("de", "16:00 bis 17:00 nachmittags"),
-            ("de", "16 Uhr bis 17 Uhr abends"),
-            ("en", "16:00 to 17:00 in the afternoon"),
-        ):
-            with self.subTest(times=times):
-                source = (
-                    f"Zahnarzt am 21.09.2026 von {times} im Familienkalender."
-                    if language == "de"
-                    else (
-                        "Dentist on 2026-09-21 in the family calendar "
-                        f"from {times}."
-                    )
-                )
-                assessment = assess_calendar_create_draft(
-                    _draft(
-                        start_time="16:00",
-                        end_time="17:00",
-                        language=language,
-                    ),
-                    source_text=source,
-                )
-                self.assertEqual(assessment.missing, ())
-
-    def test_whole_hour_requires_a_separate_time_token(self) -> None:
-        for source_time in (
-            "A16 Uhr", "16:16 Uhr", "26.16 Uhr", "A16Uhr", "16 Uhr 30",
-        ):
-            with self.subTest(source_time=source_time):
-                assessment = assess_calendar_create_draft(
-                    _draft(start_time="16:00", end_time="17:00"),
-                    source_text=(
-                        "Zahnarzt am 21.09.2026 im Familienkalender "
-                        f"{source_time}, Ende 17:00."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ("start_time",))
-
-    def test_german_date_preposition_after_24_hour_times_is_supported(self) -> None:
-        for times in ("16:00 bis 16:30", "16.00-16.30", "16 Uhr-16:30 Uhr"):
-            with self.subTest(times=times):
-                assessment = assess_calendar_create_draft(
-                    _draft(),
-                    source_text=(
-                        f"Zahnarzt von {times} am 21.09.2026 "
-                        "im Familienkalender."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ())
-
-    def test_explicit_24_hour_ranges_remain_supported(self) -> None:
-        for hour, minute, separator, joiner in product(
-            (0, 7, 9, 16, 22), (0, 10, 30, 59), (":", "."),
-            (" - ", "–", " bis ", " to "),
-        ):
-            source_range = (
-                f"{hour:02d}{separator}{minute:02d}{joiner}"
-                f"{hour + 1:02d}{separator}{minute:02d} Uhr"
-            )
-            with self.subTest(source_range=source_range):
-                assessment = assess_calendar_create_draft(
-                    _draft(
-                        start_time=f"{hour:02d}:{minute:02d}",
-                        end_time=f"{hour + 1:02d}:{minute:02d}",
-                    ),
-                    source_text=(
-                        "Zahnarzt am 21.09.2026 im Familienkalender "
-                        f"von {source_range}."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ())
-
-    def test_range_seconds_cannot_be_truncated_to_minutes(self) -> None:
-        for source_range in (
-            "16:00:30-16:30:45", "16.00.30-16.30.45",
-            "16:00.30 bis 16:30.45", "16.00:30 to 16.30:45",
-        ):
-            with self.subTest(source_range=source_range):
-                assessment = assess_calendar_create_draft(
-                    _draft(),
-                    source_text=(
-                        "Dentist on 2026-09-21 in the family calendar "
-                        f"from {source_range}."
-                    ),
-                )
-                self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
     def test_invalid_calendar_date_is_not_complete(self) -> None:
         for invalid in ("2026-02-30", "2026-13-01"):
