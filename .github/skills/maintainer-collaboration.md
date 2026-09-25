@@ -15,6 +15,7 @@ These preferences remain valid across chats unless the maintainer explicitly cha
 - Once implementation/findings work is explicitly authorized, continue through the reasonable implementation, PR updates, validation, and finding-resolution steps without repeatedly asking for the same start permission.
 - Prefer one coherent correction/validation cycle over a sequence of tiny fix -> user test -> review loops. Check the surrounding error class and positive controls before handing work back.
 - Reproduce or substantiate review findings before changing code; a reviewer finding is evidence to investigate, not an instruction to obey blindly.
+- Avoid broad completion claims such as “all green”, “review done”, “license-cleared”, or “adopted” unless the exact scope, artifact/commit, and supporting evidence justify them.
 - When terminal work genuinely requires the maintainer's machine, provide one coherent copy-and-paste block and ask for one result batch rather than repeated micro-runs.
 - If the maintainer uses `/eli5`, explain more simply with concrete examples without becoming technically inaccurate.
 
