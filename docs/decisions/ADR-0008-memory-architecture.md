@@ -199,16 +199,16 @@ A memory confirmed through observation remains weaker evidence than an explicit 
 
 #### Aging and staleness
 
-Ada may automatically move a **pattern-based** memory from `confirmed` to `stale` when its supporting observations have not been refreshed for a sufficiently long time.
+Ada may automatically move only **observation-derived** knowledge from `confirmed` to `stale` when its supporting observations have not been refreshed for a sufficiently long time.
 
 This is allowed only when:
 
 - the confirmation basis is observational (for example `observed_pattern`);
 - the transition is non-destructive and inspectable;
-- the original observations/provenance remain available according to retention policy;
+- the compact retained rationale/provenance remains available according to retention policy;
 - the rule for staleness is deterministic and category-specific rather than an LLM guess.
 
-Explicitly confirmed durable facts must not become stale merely because time passed. A future memory type may still define an explicit validity window where time is semantically relevant.
+**Explicitly stated/confirmed facts and preferences do not age or become forgotten automatically.** They remain current until an explicit correction/supersession, an explicit user forget/delete request, or a semantically explicit validity boundary says otherwise. Mere passage of time is never enough to stale or remove explicit knowledge.
 
 Useful metadata to characterize includes:
 
@@ -515,13 +515,15 @@ source:
 
 The URI/reference format must remain provider-independent at the Memory layer. iCloud may be one concrete storage provider, but Ada should not encode iCloud-specific semantics into the canonical Memory model.
 
-Document handling rules:
+Document/source handling rules:
 
-- the original document may remain outside Git and outside the Memory vault;
-- Ada may retain only a summary/reference when that is sufficient;
-- if a task requires the original document, Ada must resolve/access it through the applicable file/provider boundary and permissions;
-- a missing/unavailable source must be distinguishable from a deleted/forgotten memory;
-- Memory deletion does not automatically delete an externally stored document unless an explicit document-management action is separately authorized;
+- **original/raw source material is outside the Memory lifecycle**. Memory does not modify, compact, age, forget, move, or delete the original;
+- when Ada receives a document or other source artifact, the system must deliberately place it in or reference it from a configured source/document store; the authoritative Memory vault is not the default original-file store;
+- Ada may retain a provider-independent source reference plus an extract/summary/derived knowledge when that is useful;
+- if a task requires the original document, Ada resolves/accesses it through the applicable source/document provider boundary and permissions;
+- a missing/unavailable source must be distinguishable from a deleted/forgotten Memory extract;
+- forgetting/deleting a Memory extract or summary never deletes or mutates the original source; any future file/document-management capability is a separate explicitly authorized action path and is not triggered by Memory retention;
+- extracts/summaries/derived knowledge may age or be compacted when they are observation-derived/non-explicit, unless explicitly marked durable; explicit confirmed knowledge derived from the source follows the no-automatic-aging rule;
 - document summaries inherit the same privacy/scope rules as other Memory;
 - raw document content must not be copied into a broader scope merely for retrieval convenience.
 
@@ -538,15 +540,16 @@ Initial principles:
 - allow explicitly retained **durable episodes** for special conversations, workshops, trips, celebrations, major decisions, and meaningful events; Ada may propose this status but model judgment alone cannot silently create indefinite retention;
 - durable episodes are exempt from ordinary automatic aging/compaction but remain subject to explicit user correction/forget/delete;
 - retain document summaries/references when future tasks need the source context without copying the source document into Memory;
-- **learning evidence is normally more ephemeral than established Memory**: behavioral observations, observed facts used only as evidence, and hypotheses should be compacted, expired, or discarded after promotion, rejection, supersession, or loss of usefulness;
+- **only learning evidence is normally ephemeral**: behavioral observations, observed facts used only as evidence, and hypotheses may be compacted, expired, or discarded after promotion, rejection, supersession, or loss of usefulness;
+- **explicitly stated/confirmed facts and preferences have no automatic aging or forgetting policy**; they persist until explicitly corrected/superseded or the user explicitly asks to forget/delete them;
 - after a promotion, prefer a compact human-readable promotion/evidence rationale over retaining an unbounded list of raw observations;
 - source-owned evidence should normally retain a reference rather than a raw duplicate of the source;
 - sensitive observations should have the shortest retention compatible with the applicable learning rule and should not be retained merely because they might become useful later;
 - repeated equivalent memories should converge rather than accumulate indefinitely;
 - low-value incidental details should normally remain session context only;
 - sensitive information has a higher bar for durable retention than ordinary low-risk preferences;
-- durable Memory should be periodically gardened so the human-readable corpus remains understandable rather than becoming an append-only transcript;
-- retention policy may differ by memory kind, evidence origin, lifecycle/maturity, explicit durable-retention status, and privacy sensitivity.
+- durable Memory may be reorganized/gardened for clarity, but gardening must not silently age out explicit knowledge/preferences or explicitly durable episodes;
+- retention policy for automatic expiry/compaction applies to evidence/hypotheses and derived summaries, not to explicit confirmed knowledge unless a semantic validity window was explicitly part of that knowledge.
 
 The target is **useful continuity, not exhaustive surveillance**.
 
@@ -1501,7 +1504,7 @@ ADR-0008 accepts the following MVP architecture:
 - operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
 - corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
 - evidence origin, durable Memory kind, and lifecycle/maturity are separate dimensions; established Memory is logically separated from inspectable learning evidence, with an explicit Ada-owned promotion/assimilation boundary;
-- learning evidence is more ephemeral by default than established Memory and is compacted after promotion/rejection rather than accumulating as an exhaustive behavioral archive; special episodic memories may be explicitly retained as durable, exempt from automatic compaction but never from explicit user forgetting/deletion;
+- only observation-derived learning evidence/hypotheses and non-durable derived summaries are subject to automatic aging/compaction; explicitly stated/confirmed facts and preferences do **not** age or get forgotten automatically, while special episodic memories may be explicitly retained as durable; all remain subject to explicit user correction/forget/delete;
 - the confirmed learning-policy classes A–D are normative: low-risk explicit knowledge may be remembered privately with provenance, inferred patterns observe first, sensitive/consequential knowledge requires confirmation or a future explicit rule, and secrets/credentials are never ordinary automatically learned Memory;
 - evidence precedence is normative and not last-write-wins: explicit user confirmation/correction outranks observational patterns, while ambiguous conflicting explicit claims remain unresolved;
 - every model-originated Memory write or promotion passes a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling before it becomes authoritative;
@@ -1509,7 +1512,7 @@ ADR-0008 accepts the following MVP architecture:
 - an inspectable change-history/versioning mechanism that records observed out-of-band edits is an architectural requirement for manual-edit provenance; Git-style per-domain history is only the leading adapter candidate, not the requirement itself;
 - automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
 - the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
-- source documents may remain in external user-controlled stores and be referenced by Memory rather than being silently copied into the Memory vault;
+- original/raw source artifacts live outside the Memory lifecycle in a configured source/document store or provider reference; Memory may hold references, extracts, summaries and derived knowledge, but Memory aging/forgetting never mutates or deletes the original;
 - facts owned by another authoritative system (for example calendar/contact/source-document facts) remain source-owned by default; Memory stores a reference, derived abstraction, or explicitly requested independent copy rather than creating a competing source of truth;
 - ReMe, LangMem, Hindsight, Letta/MemFS, vector stores, graph stores and similar frameworks are **not required MVP layers**. They may be added only behind Ada-owned boundaries when representative evidence justifies their runtime, privacy and maintenance cost;
 - `Memory != Permission`, `Memory != Action Truth`, and `Authoritative Memory != Derived Index` remain architecture invariants.
