@@ -9,36 +9,12 @@ from ada.core.actions import CreateCalendarEventDraft
 
 _ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _TIME_RE = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-_NUMERIC_DATE_RE = re.compile(
-    r"(?<!\d)(?:\d{4}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{1,2}|"
-    r"\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*(?:\d{4}|\d{2}))(?!\d)"
-)
-_SOURCE_TIME_TOKEN = r"(?:[01]?\d|2[0-3])[:.][0-5]\d"
-_SOURCE_TIME_RANGE_RE = re.compile(
-    rf"(?<![\w:./-])(?P<start>{_SOURCE_TIME_TOKEN})\s*"
-    rf"(?:[-–—]|\b(?:to|bis)\b)\s*(?P<end>{_SOURCE_TIME_TOKEN})"
-    # A range must not stop inside a date, including before a spaced year.
-    r"(?![\w:]|\s*[./-]\s*\d)",
+_UNSUPPORTED_12_HOUR_TIME_RE = re.compile(
+    r"(?<![\w:.])(?:0?[1-9]|1[0-2])(?:[:.][0-5]\d)?(?:\s+Uhr)?\s*"
+    r"(?:[ap]\.?\s*m\.?(?!\w)|morgens\b|vormittags\b|mittags\b|"
+    r"nachmittags\b|abends\b|nachts\b|früh\b|"
+    r"in\s+the\s+(?:morning|afternoon|evening)\b|at\s+night\b)",
     re.IGNORECASE,
-)
-_MERIDIEM_TIME_RE = re.compile(
-    # Only a 12-hour clock can carry a meridiem. In German, "16:30 am ..."
-    # introduces a date; do not reinterpret its minutes as a separate hour.
-    r"(?<![\w:.])(?:0?[1-9]|1[0-2])(?:[:.]\d{2})?\s*[ap]\.?\s*m\.?(?!\w)",
-    re.IGNORECASE,
-)
-_DAY_PERIOD_TIME_RE = re.compile(
-    # Day-period words make a 1-12 hour expression semantically 12-hour input.
-    # Reject the request's time evidence rather than corroborating a different
-    # 24-hour interpretation (for example, 4:00 nachmittags -> 04:00).
-    r"(?<![\w:.])(?:0?[1-9]|1[0-2])(?:[:.]\d{2})?(?:\s+Uhr)?\s+"
-    r"(?:morgens|vormittags|mittags|nachmittags|abends|nachts|früh|"
-    r"in\s+the\s+(?:morning|afternoon|evening)|at\s+night)\b",
-    re.IGNORECASE,
-)
-_MONTHS_DE = (
-    "januar", "februar", "märz", "april", "mai", "juni", "juli", "august",
-    "september", "oktober", "november", "dezember",
 )
 
 
@@ -84,17 +60,7 @@ def _source_explicitly_supports_date(
         rf"(?<!\d){year}\s*[-/.]\s*0?{month}\s*[-/.]\s*0?{day}(?!\d)",
         rf"(?<!\d)0?{day}\s*[-/.]\s*0?{month}\s*[-/.]\s*{year}(?!\d)",
     )
-    if any(re.search(pattern, source_text) for pattern in patterns):
-        return True
-    # A written month is equally explicit; require day, month and four-digit
-    # year together so a year elsewhere in the message cannot corroborate it.
-    month_name = _MONTHS_DE[value.month - 1]
-    if month_name == "märz":
-        month_name = r"(?:märz|maerz)"
-    return bool(re.search(
-        rf"(?<!\d)0?{day}\.?(?:\s+){month_name}\s+{year}(?!\d)",
-        source_text, re.IGNORECASE,
-    ))
+    return any(re.search(pattern, source_text) for pattern in patterns)
 
 
 def _source_explicitly_supports_calendar(
@@ -128,89 +94,20 @@ def _valid_time(value: str | None) -> bool:
     return bool(value and _TIME_RE.fullmatch(value.strip()))
 
 
-def _could_be_day_first_partial_date(token: str) -> bool:
-    if ":" in token:
-        return False
-    day, month = (int(part) for part in token.split("."))
-    return 1 <= day <= 31 and 1 <= month <= 12
-
-
-def _could_be_month_first_partial_date(token: str) -> bool:
-    if ":" in token:
-        return False
-    month, day = (int(part) for part in token.split("."))
-    return 1 <= month <= 12 and 1 <= day <= 31
-
-
-def _could_be_partial_date(token: str) -> bool:
-    return (
-        _could_be_day_first_partial_date(token)
-        or _could_be_month_first_partial_date(token)
-    )
-
-
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
-    # This slice accepts 24-hour input only. Reject 12-hour/meridiem or
-    # day-period requests as a whole rather than guessing suffix scope.
-    if (
-        _MERIDIEM_TIME_RE.search(source_text)
-        or _DAY_PERIOD_TIME_RE.search(source_text)
-    ):
+    """Corroborate only explicit 24-hour HH:MM source text.
+
+    Natural-language temporal interpretation belongs to ADR-0007. Ambiguous
+    or unsupported forms stay unresolved so Ada can ask the user to restate
+    them rather than growing a second parser in this guard.
+    """
+
+    if _UNSUPPORTED_12_HOUR_TIME_RE.search(source_text):
         return False
+
     hour, minute = (int(part) for part in value.strip().split(":"))
-    date_spans = [match.span() for match in _NUMERIC_DATE_RE.finditer(source_text)]
-
-    def normalize_range(match: re.Match[str]) -> str:
-        if any(
-            start < match.start() < end or start < match.end() < end
-            for start, end in date_spans
-        ):
-            # Check both original boundaries before changing any dots: neither
-            # a date suffix nor a date prefix can become time evidence.
-            return match.group(0)
-        start, end = match.group("start", "end")
-        if _could_be_partial_date(start) and re.search(
-            r"\b(?:am|on|den)\s*$", source_text[:match.start()], re.IGNORECASE
-        ):
-            return match.group(0)
-        has_time_marker = re.match(r"\s+Uhr\b", source_text[match.end():], re.IGNORECASE)
-        same_date_order = (
-            (
-                _could_be_day_first_partial_date(start)
-                and _could_be_day_first_partial_date(end)
-            )
-            or (
-                _could_be_month_first_partial_date(start)
-                and _could_be_month_first_partial_date(end)
-            )
-        )
-        if same_date_order and not has_time_marker:
-            # A fully dotted range is ambiguous when both endpoints form
-            # valid partial dates in the same ordering (DD.MM or MM.DD).
-            # Require explicit time syntax instead of guessing.
-            return " "
-        # Protect an explicit time range before masking three-part dates;
-        # otherwise 16.30-17.00 is partly consumed as a date token.
-        return f"{start.replace('.', ':')} - {end.replace('.', ':')}"
-
-    time_ranges_normalized = _SOURCE_TIME_RANGE_RE.sub(normalize_range, source_text)
-    # A complete numeric date may contain a dotted month/day fragment that
-    # resembles a time, including when the date uses mixed separators.
-    # Two-digit years are masked too, without using them to infer a century.
-    without_dates = _NUMERIC_DATE_RE.sub(" ", time_ranges_normalized)
-    forms = [rf"(?<![\w:.])0?{hour}:{minute:02d}(?![\w:]|\.\d)"]
-    dotted = rf"(?<![\w:./-])0?{hour}\.{minute:02d}"
-    if _could_be_partial_date(f"{hour}.{minute:02d}"):
-        # 21.09 or 21.09. alone is not evidence for 21:09.
-        dotted += r"\s+Uhr\b"
-    else:
-        dotted += r"(?![\w:]|\.\d)"
-    forms.append(dotted)
-    if minute == 0:
-        forms.append(
-            rf"(?<![\w:./])0?{hour}\s+Uhr(?!\w)(?!\s+\d{{1,2}}\b)"
-        )
-    return any(re.search(form, without_dates, re.IGNORECASE) for form in forms)
+    pattern = rf"(?<![\w:.])0?{hour}:{minute:02d}(?![\w:]|\.\d)"
+    return bool(re.search(pattern, source_text))
 
 
 def assess_calendar_create_draft(
