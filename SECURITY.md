@@ -1,6 +1,6 @@
 # Security policy
 
-Ada is currently in product discovery and architecture exploration. There is no production release yet.
+Ada has an implementation foundation and narrow local-chat/synthetic action slices, but no production release. Current architecture status lives in `docs/decisions/`, open work in `docs/todo.md`, and active implementation/review state in GitHub.
 
 ## Security principles
 
@@ -17,7 +17,7 @@ Ada is currently in product discovery and architecture exploration. There is no 
 
 Please do not publish vulnerability or exploit details in a public issue.
 
-GitHub Private Vulnerability Reporting is the intended reporting channel. It must be enabled before Ada has a runnable public release. Until a private channel is available, do not publish sensitive vulnerability details publicly.
+GitHub Private Vulnerability Reporting is the intended reporting channel and is enabled for this repository. Do not publish sensitive vulnerability details publicly.
 
 ## Scope
 
