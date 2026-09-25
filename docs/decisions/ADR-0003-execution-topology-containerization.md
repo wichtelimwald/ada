@@ -202,7 +202,7 @@ Therefore:
 - Ada does not mount the user's entire home directory;
 - the first vertical slice uses no authoritative Memory mount.
 
-The later Memory ADR will decide whether Ada uses a narrow external bind mount or a stronger host-side Memory broker/API.
+ADR-0008 accepts file-native, protected Memory domains but deliberately leaves the **runtime access topology** as a required follow-up before real household Memory: a narrow external bind mount that exposes only the currently authorized domain(s), a host-side Memory broker/API, per-domain/per-request workers, scoped key/credential release, or an equivalent design. A single long-lived Ada principal with all private/shared domains mounted/readable is not implicitly accepted.
 
 ## Ollama / local model runtime
 
