@@ -134,7 +134,7 @@ Where coordination requires broader visibility, Ada should prefer a deliberately
 
 ### Confirmed learning direction: evidence-based and class-dependent
 
-Memory ingestion should not use one universal rule. Different classes of knowledge need different learning paths.
+Memory ingestion should not use one universal rule. Different classes of knowledge need different learning paths. **This learning distinction is part of the accepted architecture from the first implementation slice**, even if autonomous promotion/aging rules are implemented incrementally. The initial representation must not collapse explicit user statements, observations, hypotheses, and established Memory into one indistinguishable fact type.
 
 Ada should support a small learning lifecycle:
 
@@ -600,7 +600,18 @@ In particular:
 
 ## Architectural split
 
-Ada should evaluate Memory as two distinct layers.
+Ada's accepted Memory architecture has three distinct concerns. They may share
+files or process boundaries where that stays simple, but their semantics must
+not collapse:
+
+1. authoritative human-controlled Memory;
+2. inspectable learning evidence/state that can propose changes to Memory;
+3. a rebuildable RAG-style retrieval/index layer.
+
+Automatic learning is therefore designed in from the start even when the first
+implementation supports only a subset of promotion/aging behavior. Retrieval
+optimization is likewise replaceable and must never become an alternate truth
+store.
 
 ### 1. Authoritative human-controlled Memory
 
@@ -635,9 +646,34 @@ A future document-storage abstraction should provide at least:
 - optional fingerprint/version observation;
 - no assumption that the source is always local or always online.
 
-### 2. Derived retrieval/index layer
+### 2. Inspectable learning evidence/state
+
+Automatic learning consumes source events, observations and outcomes, but it
+must not write model guesses directly into established Memory.
+
+The architecture must preserve at least the semantic distinction between:
+
+- explicit user/source statements;
+- observations;
+- provisional hypotheses;
+- confirmed/established Memory;
+- contradicted, superseded, stale, or forgotten state.
+
+Learning evidence and state must remain human-inspectable, scoped to the same
+or narrower protection domain as the source, attributable enough to explain
+promotion/correction, and unable to grant permission. Exact files/fields,
+promotion thresholds, aging rules and compaction are implementation details,
+but the distinction itself is architectural.
+
+A first implementation may deliberately defer automatic promotion while still
+persisting/representing the above semantics correctly. Later learning logic
+must fit this boundary rather than requiring a second opaque truth store.
+
+### 3. Derived RAG retrieval/index layer
 
 This layer exists only to make authoritative Memory efficiently retrievable.
+It is conceptually an automatically maintained **cache/index** over the
+human-readable source of truth, not Memory authority in its own right.
 
 It may contain:
 
@@ -651,15 +687,34 @@ It may contain:
 
 Rules:
 
-- it is reconstructible from authoritative Memory;
+- it is reconstructible from authoritative Memory and, where needed, inspectable learning state;
 - it is never an independent truth source;
 - deleting/rebuilding it must not lose authoritative Memory;
 - stale index state must be detectable and repairable;
 - it must preserve enough scope metadata that retrieval cannot widen audience/access boundaries;
+- forgotten or superseded content must not be returned as current context;
 - remote embedding/index services are not part of the default local path;
 - inferred graph edges remain derived evidence and never become authoritative Memory merely because an indexer generated them.
 
-This split allows Ada to reuse mature retrieval technology without giving an opaque agent-memory database ownership of user truth.
+The preferred retrieval flow is:
+
+```text
+query
+  -> determine permitted protection domains
+  -> derived retriever/index returns candidate references
+  -> re-read current authoritative Markdown for those references
+  -> validate scope + current/superseded/unresolved/forgotten state
+  -> assemble the minimum relevant model context
+```
+
+For very small vaults the retriever can simply be direct file/FTS search. For
+larger vaults it may use chunks, embeddings, hybrid search, graphs, or another
+RAG implementation behind an Ada-owned retrieval port. The final context must
+remain grounded in current authoritative content rather than trusting a stale
+cached chunk merely because an index returned it.
+
+This split allows Ada to reuse mature RAG/retrieval technology without giving
+an opaque agent-memory database ownership of user truth.
 
 ## Hard gates before scoring
 
@@ -1319,6 +1374,8 @@ ADR-0008 accepts the following MVP architecture:
 - normal retrieval starts with current authoritative files and the simplest sufficient local search; derived indexes/graphs/vector layers are optional, rebuildable, scope-preserving accelerators rather than independent truth sources;
 - operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
 - corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
+- automatic learning is architecture-relevant from the first slice: explicit statements, observations, hypotheses and established Memory remain semantically distinct, while concrete promotion/aging algorithms may be added incrementally;
+- the RAG/retrieval layer is an automatically rebuildable cache/index over current authoritative Memory; candidate hits are re-grounded in current source content before entering model context;
 - source documents may remain in external user-controlled stores and be referenced by Memory rather than being silently copied into the Memory vault;
 - ReMe, LangMem, Hindsight, Letta/MemFS, vector stores, graph stores and similar frameworks are **not required MVP layers**. They may be added only behind Ada-owned boundaries when representative evidence justifies their runtime, privacy and maintenance cost;
 - `Memory != Permission`, `Memory != Action Truth`, and `Authoritative Memory != Derived Index` remain architecture invariants.
