@@ -21,7 +21,7 @@ Target behavior:
 5. Replacing or upgrading Ada does not silently reset the personality.
 6. A user may explicitly reset or replace the active personality from a known seed/profile later.
 
-The code-level bootstrap contract is represented by `PersonalityMemoryPort`. The concrete Memory backend remains a separate architecture decision.
+The code-level bootstrap contract is represented by `PersonalityMemoryPort`. ADR-0008 now defines the authoritative Memory and retrieval architecture; the concrete implementation/versioning/retrieval components remain implementation decisions behind those accepted boundaries.
 
 ## Different initial characters
 
@@ -96,7 +96,7 @@ Personality Memory is operator/user-controlled model context and therefore secur
 
 Untrusted websites, files, emails, retrieved text, tool output, or model output must not directly rewrite the personality profile.
 
-Later Memory design must define:
+The accepted ADR-0008 Memory design now requires:
 
 - who may update personality;
 - how proposed personality changes are represented;
@@ -114,4 +114,4 @@ PR #22 introduces:
 - bootstrap semantics: seed empty Memory once, existing Memory wins;
 - model instructions rendered from a `PersonalityProfile`.
 
-Until the authoritative Memory backend is selected and implemented, the development local-chat path may still fall back directly to the bootstrap seed. That fallback is temporary and must be removed once Memory is wired.
+Until the accepted authoritative Memory architecture is implemented and wired, the development local-chat path may still fall back directly to the bootstrap seed. That fallback is temporary and must be removed once Memory is wired.
