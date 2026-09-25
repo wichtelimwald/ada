@@ -95,9 +95,6 @@ def _chat(\n    *,\n    model: str,\n    ollama_url: str,\n    memory_root: str 
     try:
         personality = None
         if memory_root is not None:
-            from ada.adapters.file_memory import FileMemoryError, FileMemoryStore
-            from ada.bootstrap.personality import bootstrap_personality_memory
-
             memory = FileMemoryStore(memory_root)
             personality = bootstrap_personality_memory(memory)
 
