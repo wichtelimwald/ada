@@ -1,11 +1,12 @@
 # ADR-0008: Authoritative Memory and retrieval architecture
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-21
+- **Accepted:** 2026-09-25
 
 ## Context
 
-Ada's first MVP requires persistent personal and household memory, but the Memory architecture is intentionally still open.
+Ada's first MVP requires persistent personal and household memory. This ADR records the accepted architecture boundary; implementation details and optional derived components remain separately gated.
 
 The confirmed product baseline requires Memory to be:
 
@@ -970,9 +971,9 @@ Detailed source findings are tracked in:
 
 ## Candidate architectures
 
-No candidate is selected by this draft.
+The accepted MVP architecture selects candidate A as the baseline. The remaining candidates are retained as research/reference options or optional derived components and are not required by the MVP.
 
-### A. Ada-owned file-native Memory + optional derived index — control option
+### A. Ada-owned file-native Memory + optional derived index — accepted baseline
 
 Concept:
 
@@ -1012,7 +1013,7 @@ Risks / work:
 - correction, contradiction, concurrent edit, and index reconciliation semantics are Ada-owned work;
 - semantic retrieval quality must be characterized rather than assumed.
 
-This is the control option. It is not preferred merely because it is custom.
+This is the accepted baseline architecture. It is selected because it satisfies the human-control and trust-boundary requirements with the smallest mandatory runtime surface. Optional derived components must demonstrate measured value before they are added.
 
 ### B. sqlite-memory
 
@@ -1228,7 +1229,7 @@ After hard gates, candidate scoring should consider:
 
 Weights are deliberately not assigned by this draft.
 
-## Open research before a decision
+## Implementation and optional research after the architecture decision
 
 1. Define the smallest Ada-owned general Memory semantic model from the scenarios above without turning the vault into a rigid ontology.
 2. Characterize **Markdown-first notes with optional non-duplicated YAML properties**; capture manual edits in file history and use separate structured files only where justified by a concrete data type.
@@ -1308,19 +1309,23 @@ This moves the remaining ReMe decision work away from basic runtime feasibility 
 
 ## Decision status
 
-No Memory backend is adopted by this draft.
+ADR-0008 accepts the following MVP architecture:
 
-**Maintainer-confirmed proposed MVP path (2026-09-23):** keep each current
-memory and its source information together in human-editable Markdown, with
-simple current-file reads and search as the first retrieval path. A manual
-edit to the file becomes the current authoritative content. Use Git history
-per protected domain as the candidate change record once capture of real
-out-of-band edits, concurrency, recovery and retention are designed and
-verified. Git commit identity alone does not authenticate who edited a note.
-Do not introduce separate claim YAML, ReMe or LangMem as a required MVP layer.
-This is an explicit direction for the next implementation and comparison,
-not acceptance of the architecture or a claim that the control has passed
-the open privacy, search-quality, edit-capture and forgetting gates below.
+- authoritative Memory is **file-native, Markdown-first, human-readable and directly editable** outside Ada;
+- a manual edit to the current authoritative file becomes the current content Ada must respect;
+- claim/source/lifecycle information that matters to the user stays inspectable with the human-readable Memory and must not be duplicated into a second drifting claim truth store;
+- ordinary new personal knowledge is private by default, and private/shared scopes map to **enforceable protection domains**, not merely folders or model-interpreted tags;
+- authoritative Memory, version history/backup/sync, derived retrieval indexes, permissions, and action truth remain distinct mechanisms;
+- normal retrieval starts with current authoritative files and the simplest sufficient local search; derived indexes/graphs/vector layers are optional, rebuildable, scope-preserving accelerators rather than independent truth sources;
+- operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
+- corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
+- source documents may remain in external user-controlled stores and be referenced by Memory rather than being silently copied into the Memory vault;
+- ReMe, LangMem, Hindsight, Letta/MemFS, vector stores, graph stores and similar frameworks are **not required MVP layers**. They may be added only behind Ada-owned boundaries when representative evidence justifies their runtime, privacy and maintenance cost;
+- `Memory != Permission`, `Memory != Action Truth`, and `Authoritative Memory != Derived Index` remain architecture invariants.
+
+Git-style per-protection-domain history is the leading MVP **versioning adapter candidate**, not an authentication or security boundary. Its exact capture/concurrency/recovery mechanism must be validated before product use.
+
+This acceptance chooses the architecture boundary and the smallest baseline. It does **not** claim that the Memory service, protection domains, versioning adapter, retrieval quality, learning lifecycle, or historical purge operations are already implemented or production-ready.
 
 The executable four-candidate characterization is complete. A **draft weighted decision matrix** now lives at:
 
@@ -1338,7 +1343,7 @@ LangMem and Hindsight are not decision-eligible standalone authoritative archite
 
 Among the **scored** options, the current matrix points to ReMe as the file-native reader/indexer with LangMem as an optional semantic-change proposal helper. The simpler Markdown + captured history + basic-search control is unscored. A backend decision must compare it before requiring either added component. Hindsight remains an optional later derived-learning/retrieval layer if representative real-world retrieval tests justify its operational cost.
 
-This remains decision evidence, not an Accepted ADR.
+This historical scoring remains decision evidence; it does not override the accepted simpler baseline or require a scored framework dependency.
 
 A dependency-free [Markdown/Git/direct-search control](../../research/memory/control/README.md)
 now exercises the same synthetic preference, correction, contradiction, and
@@ -1357,7 +1362,7 @@ safe in practice, including edit capture, concurrency handling, scoped commits,
 source retirement, section-aware retrieval, isolation, and purge semantics.
 The control is not zero-cost merely because it has no runtime dependency.
 
-For this proposed MVP, add ReMe only when representative retrieval/indexing
+For this accepted MVP architecture, add ReMe only when representative retrieval/indexing
 evidence justifies its AgentScope dependency; add LangMem only when a bounded
 semantic proposal helper demonstrably outperforms the simplest safe Ada-owned
 validation path. Revisit the direction if the control fails required scenarios.
@@ -1397,21 +1402,19 @@ AgentScope tree and `orjson` to LangMem's LangSmith tree. The installed macOS
 redistribution obligations remain open. See the fit review for paths and
 artifact evidence. No license distribution clearance is claimed.
 
-Before this ADR can move to Accepted:
+## Production and implementation gates after architecture acceptance
 
-1. review disputed scores from the historical round only if that round is reused as decision evidence; if the maintainer changes criteria/weights for a future decision, record a new comparison rather than editing the completed run;
-2. evaluate the control against representative retrieval/edit/forget scenarios
-   on the target platform, without inventing scores for missing evidence;
-3. define how out-of-band edits are captured, how old source references are
-   retired, and how normal retrieval/indexes exclude forgotten content while
-   history and backup purge remain separate operations;
-4. demonstrate enforceable per-person protection domains and scoped indexes,
-   not only different folders or read-only MCP tool names;
-5. complete license/security review for the selected dependency path and
-   intended release scope; a published image requires separate artifact review;
-6. define the smallest deterministic validation boundary around semantic
-   proposals and close external document-reference/lifecycle fit;
-7. obtain independent review and explicit maintainer acceptance.
+The architecture above is accepted independently from any one Memory framework or versioning implementation. Before Ada stores real household Memory or claims a production-ready Memory service, the implementation must still close the following gates:
+
+1. validate the file-native control against representative retrieval/edit/forget scenarios on the target platform and measure retrieval quality/scale before adding a derived search framework;
+2. implement safe out-of-band edit capture and Ada writes, including path-restricted history capture, same-file concurrency detection/reconciliation, Git/file lock handling, crash recovery, and explicit stale-source handling;
+3. demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes; different folders under one readable OS principal are insufficient;
+4. make current/superseded/unresolved retrieval semantics deterministic enough that obsolete or contradictory text is not promoted as current truth;
+5. ensure forgetting removes content from current authoritative retrieval and every reconstructible derived index, while keeping historical purge/backup retention as a separately explicit operation;
+6. define and validate the minimum provenance/source-reference and external-document lifecycle needed by implemented MVP scenarios without creating duplicate hidden truth;
+7. if a dependency-backed derived layer is selected, complete its license/security/dependency review and target-platform validation before adoption; release artifacts require their own distribution review.
+
+Historical candidate scores may be revisited only if they are reused as decision evidence. A failure of Git, direct search, ReMe, LangMem, Hindsight, or another concrete implementation should trigger replacement behind these accepted boundaries rather than reopening the human-controlled source-of-truth architecture by default.
 
 Where an explicit correction requires explaining the old statement without
 consulting Git history, an illustrative **single Markdown note** can place
