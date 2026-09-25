@@ -40,6 +40,23 @@ class FileMemoryTests(unittest.TestCase):
                 edited,
             )
 
+    def test_malformed_manual_personality_edit_fails_closed(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            bootstrap_personality_memory(store)
+            path = Path(temp) / "memory" / "personality.md"
+            text = path.read_text(encoding="utf-8").replace(
+                'traits = ["analytical and precise"',
+                'traits = "analytical and precise"',
+            )
+            path.write_text(text, encoding="utf-8")
+
+            with self.assertRaisesRegex(
+                RuntimeError,
+                "invalid personality Memory metadata",
+            ):
+                store.load_personality()
+
     def test_explicit_preference_is_established_memory(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
