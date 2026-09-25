@@ -55,6 +55,7 @@ ADR-0007. The following remain deliberately open or only partially decided:
 - authoritative Memory implementation,
 - production email/calendar provider integration,
 - optional remote-model assistance,
+- remote-data boundary implementation,
 - packaging/update and broader deployment strategy,
 - speech/perception architecture,
 - general computer control,
