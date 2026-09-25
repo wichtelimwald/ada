@@ -1406,7 +1406,7 @@ artifact evidence. No license distribution clearance is claimed.
 
 The architecture above is accepted independently from any one Memory framework or versioning implementation. Before Ada stores real household Memory or claims a production-ready Memory service, the implementation must still close the following gates:
 
-1. validate the file-native control against representative retrieval/edit/forget scenarios on the target platform and measure retrieval quality/scale before adding a derived search framework;
+1. validate the file-native control against representative retrieval/edit/forget scenarios on the target platform and measure retrieval quality/scale before adding a derived search framework; before custom retrieval infrastructure, run a focused reuse comparison of credible local RAG/retrieval components (at minimum the SQLite FTS5 baseline and suitable modular/embedded candidates such as LlamaIndex Core, Haystack, LanceDB, or an equivalent maintained option) behind an Ada-owned retrieval port;
 2. implement safe out-of-band edit capture and Ada writes, including path-restricted history capture, same-file concurrency detection/reconciliation, Git/file lock handling, crash recovery, and explicit stale-source handling;
 3. demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes; different folders under one readable OS principal are insufficient;
 4. make current/superseded/unresolved retrieval semantics deterministic enough that obsolete or contradictory text is not promoted as current truth;
