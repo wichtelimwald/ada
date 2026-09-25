@@ -332,7 +332,7 @@ Before converting the matrix result into an ADR decision:
 ## Remaining gates before ADR acceptance
 
 1. Maintainer review of disputed scores with the frozen weights. Any changed criteria/weights require a separately recorded new comparison, including the unscored control; do not overwrite this research round.
-2. Exact transitive license/security review of the intended dependency path, especially ReMe -> AgentScope and LangMem/LangChain dependencies.
+2. Exact transitive license/security review of the selected dependency path, if a dependency-backed design is selected; for example ReMe -> AgentScope and LangMem/LangChain dependencies.
 3. Define the narrow deterministic boundary between:
    - model-generated semantic proposal;
    - provenance/scope validation;
