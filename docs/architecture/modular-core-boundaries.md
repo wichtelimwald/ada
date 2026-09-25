@@ -183,11 +183,11 @@ boundary for protected Memory domains.
 
 Responsibility:
 
-- mediate access to authoritative vaults and protection-domain-specific derived retrieval state;
+- mediate access to authoritative vaults, independently configured source/document providers per protection domain, and protection-domain-specific derived retrieval state;
 - accept only trusted Ada-owned actor/audience/authorization context, never raw model claims of scope;
 - expose only the domain(s) required for the current authorized task;
 - fail closed on missing/ambiguous scope;
-- keep filesystem paths, keys/credentials and unrelated vault contents outside the model/runtime boundary;
+- keep filesystem/provider paths, keys/credentials and unrelated vault/source contents outside the model/runtime boundary;
 - preserve direct human access to each user's own Markdown Memory without requiring Ada.
 
 The broker is not an authorization engine: AdaGuard and application context
