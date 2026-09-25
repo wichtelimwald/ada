@@ -157,8 +157,10 @@ Multi-turn draft clarification is not implemented; durations are not converted
 into end times, and no default calendar is assumed.
 
 Use 24-hour `HH:MM` for calendar times. If a message contains an AM/PM time
-expression (including mixed formats or shared suffixes such as `4:00-5:00 pm`),
-Ada asks for both times again in 24-hour form instead of guessing. Place the date
+expression (including mixed formats or shared suffixes such as `4:00-5:00 pm`)
+or a 1-12 hour with a day-period qualifier such as `nachmittags` or
+`in the afternoon`, Ada asks for both times again in 24-hour form instead of
+guessing. Place the date
 before the times to avoid ambiguity with the German preposition `am` after a
 morning time. Dotted values such as `09.10` can
 also mean a partial date, so they need `Uhr` or an unambiguous time in the same
