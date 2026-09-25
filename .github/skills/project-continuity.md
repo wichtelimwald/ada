@@ -14,8 +14,9 @@ The stable entry point is `docs/handover.md`. Changing facts stay in their canon
    - active/relevant PRs and their actual heads;
    - unresolved review threads;
    - latest validation evidence and the exact commit it covers.
-3. Read only the canonical documents needed for the task. Do not reload broad historical research by default.
-4. Treat old chat summaries, copied SHAs, test counts, mergeability, and local scratch paths as hints until re-verified.
+3. If no current task is supplied, reconstruct the active work thread from recent open PR state and activity, prioritizing in-progress non-draft work over draft backlog, then cross-check `docs/todo.md`. Do not hard-code a current PR into the stable handover.
+4. Read only the canonical documents needed for the task. Do not reload broad historical research by default.
+5. Treat old chat summaries, copied SHAs, test counts, mergeability, and local scratch paths as hints until re-verified.
 
 ## During work
 
