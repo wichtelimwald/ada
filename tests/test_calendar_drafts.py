@@ -240,7 +240,7 @@ class CalendarDraftTests(unittest.TestCase):
                 )
                 self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
-    def test_partial_dates_in_both_orders_do_not_corroborate_dotted_times(self) -> None:
+    def test_date_prefixed_partial_dates_do_not_corroborate_dotted_times(self) -> None:
         for source_date, start_time in (
             ("21.09.", "21:09"),
             ("21.09", "21:09"),
@@ -403,8 +403,39 @@ class CalendarDraftTests(unittest.TestCase):
                 )
                 self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
+    def test_day_period_requests_require_explicit_24_hour_restatement(self) -> None:
+        for language, times, start_time, end_time in (
+            ("de", "4:00 bis 5:00 nachmittags", "04:00", "05:00"),
+            ("de", "4 Uhr nachmittags bis 5 Uhr nachmittags", "04:00", "05:00"),
+            ("de", "8:00 bis 9:00 abends", "08:00", "09:00"),
+            ("de", "7:00 bis 8:00 morgens", "07:00", "08:00"),
+            ("en", "4:00 to 5:00 in the afternoon", "04:00", "05:00"),
+            ("en", "8:00 to 9:00 in the evening", "08:00", "09:00"),
+            ("en", "11:00 to 12:00 at night", "11:00", "12:00"),
+        ):
+            with self.subTest(times=times):
+                source = (
+                    f"Zahnarzt am 21.09.2026 von {times} im Familienkalender."
+                    if language == "de"
+                    else (
+                        "Dentist on 2026-09-21 in the family calendar "
+                        f"from {times}."
+                    )
+                )
+                assessment = assess_calendar_create_draft(
+                    _draft(
+                        start_time=start_time,
+                        end_time=end_time,
+                        language=language,
+                    ),
+                    source_text=source,
+                )
+                self.assertEqual(assessment.missing, ("start_time", "end_time"))
+
     def test_whole_hour_requires_a_separate_time_token(self) -> None:
-        for source_time in ("A16 Uhr", "16:16 Uhr", "26.16 Uhr", "A16Uhr"):
+        for source_time in (
+            "A16 Uhr", "16:16 Uhr", "26.16 Uhr", "A16Uhr", "16 Uhr 30",
+        ):
             with self.subTest(source_time=source_time):
                 assessment = assess_calendar_create_draft(
                     _draft(start_time="16:00", end_time="17:00"),
