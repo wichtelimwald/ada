@@ -362,7 +362,7 @@ example:
 
 ```text
 <protection-domain>/
-├── memory/       # established/current authoritative Memory; no automatic aging
+├── memory/       # established/current authoritative Memory; no automatic expiry/removal
 └── learning/     # observations, observed facts, hypotheses, temporary extracts/summaries
 ```
 
@@ -550,7 +550,7 @@ Document/source handling rules:
 - if a task requires the original document, Ada resolves/accesses it through the applicable source/document provider boundary and permissions;
 - a missing/unavailable source must be distinguishable from a deleted/forgotten Memory extract;
 - forgetting/deleting a Memory extract or summary never deletes or mutates the original source; if Ada itself previously persisted that original, the forget/delete result must make clear where the original remains. Any future file/document-management capability is a separate explicitly authorized action path and is not triggered by Memory retention;
-- extracts/summaries/derived knowledge may age or be compacted when they are observation-derived/non-explicit, unless explicitly marked durable; explicit confirmed knowledge derived from the source follows the no-automatic-aging rule;
+- extracts/summaries/derived knowledge may age or be compacted **while they remain in `learning/`** when they are observation-derived/non-explicit, unless explicitly marked durable; once promoted into `memory/`, they follow the established-Memory lifecycle rules above;
 - document summaries inherit the same privacy/scope rules as other Memory;
 - raw document content must not be copied into a broader scope merely for retrieval convenience.
 
@@ -575,7 +575,7 @@ Initial principles:
 - repeated equivalent memories should converge rather than accumulate indefinitely;
 - low-value incidental details should normally remain session context only;
 - sensitive information has a higher bar for durable retention than ordinary low-risk preferences;
-- durable Memory may be reorganized/gardened for clarity, but gardening must not silently age out explicit knowledge/preferences or explicitly durable episodes;
+- durable Memory may be reorganized/gardened for clarity, but gardening must not silently age out or remove established knowledge/preferences or durable episodes;
 - automatic expiry/compaction/removal is confined to `learning/`; established `memory/` content is not automatically removed. Observation-derived evidence/hypotheses and non-durable extracts/summaries remain in `learning/` until promoted, rejected, superseded, or compacted. Promoted `confirmed/observed_pattern` knowledge may later be marked `stale` non-destructively; explicit knowledge may not.
 
 The target is **useful continuity, not exhaustive surveillance**.
@@ -1469,7 +1469,7 @@ Weights were deliberately not assigned in this earlier broad criteria list; the 
 21. Define the boundary between global Ada personality evolution and per-interlocutor interaction-profile learning.
 22. Define when a conversation merits an episodic summary and the minimum summary schema for decisions, rationale, and open loops.
 23. Implement the accepted provider-independent source/document-reference abstraction for configured per-user/audience roots/providers (local filesystem, iCloud, and future stores), including fingerprint/change detection and human-browsable direct-import organization.
-24. Do **not** introduce a separate Ada-managed document database/store for the MVP. Existing durable originals remain in place; directly handed-in originals are persisted into the configured user/audience source root/provider. Revisit only if concrete lifecycle/search/sync needs cannot be met by this model.
+24. Do **not** introduce a separate Ada-managed document database/store for the MVP. Existing durable originals remain in place; directly handed-in originals are persisted into the configured protection-domain source root/provider **only under the retention conditions above**. Revisit only if concrete lifecycle/search/sync needs cannot be met by this model.
 25. Characterize Letta MemFS as the closest git-Markdown architecture reference and determine whether any implementation can be reused without adopting the Letta runtime.
 26. Characterize Hindsight as a derived learning/retrieval engine, especially banks, evidence-backed observations, knowledge pages, and rebuildability from Ada-owned Memory.
 27. Characterize LangMem for storage-agnostic extraction/consolidation logic.
@@ -1540,7 +1540,7 @@ ADR-0008 accepts the following MVP architecture:
 - authoritative Memory, version history/backup/sync, derived retrieval indexes, permissions, and action truth remain distinct mechanisms;
 - runtime access to protected Memory domains is mediated by an Ada-owned **host-side Memory Broker**; the long-lived Ada runtime/model does not receive standing access to all household vaults;
 - normal retrieval starts with current authoritative files and the simplest sufficient local search; derived indexes/graphs/vector layers are optional, rebuildable, scope-preserving accelerators rather than independent truth sources;
-- operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
+- operational forgetting removes content from Ada's current readable state and derived retrieval, and removes or neutralizes the current `learning/` evidence it was promoted from so pre-forget evidence cannot silently re-promote it; historical purge/backup retention is a separate lifecycle/operations concern;
 - corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
 - evidence origin, durable Memory kind, and lifecycle/maturity are separate dimensions; established Memory is logically separated from inspectable learning evidence, with an explicit Ada-owned promotion/assimilation boundary;
 - `learning/` is the sole Memory area with automatic expiry/compaction/removal and contains observed facts, behavioral observations, hypotheses and non-durable derived extracts/summaries; established `memory/` content never disappears or becomes forgotten automatically, while `confirmed/observed_pattern` entries may transition non-destructively to `stale` under deterministic category-specific rules; explicitly stated/confirmed facts/preferences never become stale merely through time;
