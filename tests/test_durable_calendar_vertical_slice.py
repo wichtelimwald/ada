@@ -473,7 +473,7 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         self.assertEqual(calendar.create_attempts, 2)
         self.assertEqual(calendar.effect_count, 1)
 
-    def test_provider_without_duplicate_safety_fails_closed_as_ambiguous(self) -> None:
+    def test_provider_without_duplicate_safety_is_not_attempted(self) -> None:
         calendar = InMemoryCalendarAdapter(
             create_capability=ProviderCapability.NONE,
         )
@@ -492,16 +492,24 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
         assert response.execution is not None
         self.assertEqual(
             response.execution.provider.status,
-            ProviderOutcomeStatus.AMBIGUOUS,
+            ProviderOutcomeStatus.FAILED,
         )
         self.assertEqual(
             response.execution.business.status,
-            BusinessOutcomeStatus.AMBIGUOUS,
+            BusinessOutcomeStatus.FAILED,
+        )
+        self.assertEqual(
+            response.execution.provider.error_code,
+            "provider_not_recoverable",
         )
         self.assertEqual(calendar.create_attempts, 0)
-        self.assertIn(
-            "will not retry it blindly",
+        self.assertEqual(
             render_calendar_action_response(proposal(), response),
+            (
+                "I did not attempt to create the calendar event: "
+                "Parent-teacher meeting. "
+                "This calendar provider cannot safely recover from a retry."
+            ),
         )
 
     def test_guard_denial_produces_zero_provider_effects(self) -> None:
