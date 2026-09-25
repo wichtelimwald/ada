@@ -93,7 +93,15 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
         # once bridge for such providers, fail closed rather than risk a
         # duplicate real-world effect during workflow recovery.
         if capability is ProviderCapability.NONE:
-            return self._ambiguous(request, "provider_not_recoverable")
+            provider = ProviderOutcome(
+                status=ProviderOutcomeStatus.FAILED,
+                error_code="provider_not_recoverable",
+            )
+            return ActionExecutionResult(
+                operation_id=request.operation_id,
+                provider=provider,
+                business=business_outcome_from_provider(provider),
+            )
 
         return self._create_calendar_step(request)
 
