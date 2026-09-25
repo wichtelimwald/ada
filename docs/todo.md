@@ -49,7 +49,6 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [x] Re-validate real local multi-turn chat on target hardware; final qwen3.5:9b run passed 50 tests and the local-chat acceptance flow, enabling ADR-0006 acceptance.
 - [ ] Define/select the authoritative Memory backend and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
 - [ ] Connect local-chat typed action proposals to the existing AdaGuard + durable-action path; do not expose direct privileged model tools.
-- [ ] Calendar corroboration follow-up: resolve the German `am` location-preposition collision after 1-12 hour times, broaden or explicitly document supported written-month forms, and decide locale-aware slash-date semantics.
 - [ ] Guard robustness follow-up: reject invalid `AuthenticationAssurance` types as `invalid_request` rather than raising during context construction.
 - [ ] Add Dependabot configuration only after package ecosystems actually exist.
 - [ ] Revisit ProjectAtlas vs Graphify only when repository size/complexity justifies repository indexing.
