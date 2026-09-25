@@ -96,7 +96,7 @@ Personality Memory is operator/user-controlled model context and therefore secur
 
 Untrusted websites, files, emails, retrieved text, tool output, or model output must not directly rewrite the personality profile.
 
-The accepted ADR-0008 Memory design now requires:
+Within ADR-0008's accepted boundaries, the implementation must still define:
 
 - who may update personality;
 - how proposed personality changes are represented;
