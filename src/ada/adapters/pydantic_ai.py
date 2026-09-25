@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, Sequence
 
 from ada.core.actions import (
@@ -42,10 +44,12 @@ class PydanticAIRuntime(AgentRuntimePort):
         agent: _PydanticAgentLike,
         *,
         keep_session_history: bool = False,
+        close_callback: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         self._agent = agent
         self._keep_session_history = keep_session_history
         self._message_history: tuple[Any, ...] = ()
+        self._close_callback = close_callback
 
     def run(self, request: AgentRequest) -> AgentResponse:
         if self._keep_session_history and self._message_history:
@@ -75,3 +79,15 @@ class PydanticAIRuntime(AgentRuntimePort):
         """Forget ephemeral conversation context held by this adapter."""
 
         self._message_history = ()
+
+    async def aclose(self) -> None:
+        """Release resources on the event loop used for model requests."""
+
+        callback, self._close_callback = self._close_callback, None
+        if callback is not None:
+            await callback()
+
+    def close(self) -> None:
+        """Release resources when no event loop is already running."""
+
+        asyncio.run(self.aclose())

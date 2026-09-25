@@ -1,7 +1,8 @@
 # ADR-0007: Context-aware natural-language interpretation
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-20
+- **Accepted:** 2026-09-25
 
 ## Context
 
@@ -605,7 +606,7 @@ Current evidence favors:
 
 Detailed evidence is recorded in `research/context_awareness/RESULTS-2026-09-20-RUN3.md`.
 
-The remaining major architecture trade-off is maintenance: carrying a small auditable Quickadd safe-loader adaptation versus adopting a heavier independently maintained specialist such as Duckling. This should be resolved before ADR acceptance.
+The remaining major architecture trade-off is maintenance: carrying a small auditable Quickadd safe-loader adaptation versus adopting a heavier independently maintained specialist such as Duckling. This remains a production-adoption trade-off and does not block the accepted architecture boundary.
 
 ## Duckling operational characterization
 
@@ -1014,22 +1015,19 @@ AdaGuard
 
 This keeps framework choice, parser choice, derivation evidence, action identity, and authorization independently replaceable.
 
-## Acceptance criteria for ADR-0007
+## Architecture acceptance
 
-The proposed resolver strategy can move from Proposed to Accepted only when:
+ADR-0007 is accepted for its architecture boundary and responsibility split:
 
-1. the representative characterization corpus and explicit ambiguity policies are documented;
-2. no Ada-owned natural-language dictionary is required for ordinary temporal interpretation;
-3. ambiguous, invalid, or conflicting values fail safely without forcing verbose input for obvious context;
-4. the selected primary and shadow adapters map into Ada-owned evidence/derivation types without leaking framework-specific types into core;
-5. code, scorer-model/artifact provenance, redistribution terms, and NOTICE obligations are compatible with Ada's project/distribution strategy;
-6. the complete production dependency graph is pinned/auditable rather than only top-level packages;
-7. the Quickadd primary path has a reproducible, versioned, integrity-checked JSON scorer artifact and does not deserialize pickle in Ada's normal build/runtime path;
-8. the selected production adapters are validated in Ada's supported Python/container deployment path, including the future Linux path before that path is claimed supported;
-9. resolver operational health is established independently from per-expression parse outcomes;
-10. replacement through the Ada-owned temporal resolver port remains practical.
+1. free language is interpreted semantically by the model rather than by an Ada-owned general regex/keyword grammar;
+2. trusted runtime context is supplied through an Ada-owned context type and the existing PydanticAI run-context mechanism;
+3. temporal normalization is isolated behind an Ada-owned resolver port;
+4. explicit, context-derived, and defaulted values remain distinguishable through Ada-owned derivation/provenance semantics;
+5. ambiguity fails safely and must not create authority;
+6. Draft -> Proposal -> AdaGuard -> durable execution remains the authority boundary;
+7. resolver implementations remain replaceable and must not leak framework-specific types into Ada core.
 
-The current research closes the semantic-feasibility question but **does not yet close items 5-8**. Therefore ADR-0007 remains Proposed.
+The characterization evidence is sufficient to accept these architecture decisions. Production adoption of a concrete resolver remains separately gated by dependency, artifact, licensing, platform, determinism, thread-safety, and operational-health requirements. Those implementation gates do not reopen this architecture decision unless they invalidate the boundary itself.
 
 ## Characterization harness
 
@@ -1047,13 +1045,15 @@ The Python candidates are installed into isolated temporary virtual environments
 
 The comparison records `agreement`, `interpretation_conflict`, `single_resolver_result`, `input_error`, and `unresolved`. These are research-result states, not runtime health states.
 
-## Remaining follow-ups before acceptance
+## Production follow-ups after architecture acceptance
+
+The following items remain implementation/adoption gates for a concrete temporal resolver. They are tracked in `docs/todo.md` and are **not** prerequisites for the accepted architecture boundary itself:
 
 1. define the production-safe Quickadd JSON artifact generation/provenance/integrity process, including separate scorer-model licensing/redistribution evidence;
 2. capture a fully resolved production dependency lock rather than relying on top-level pins;
 3. characterize the selected adapters in the intended Ada container/runtime profile and retain Linux validation as a prerequisite before claiming Linux support;
-4. complete the still-open characterization required above: verified input-span/source attribution, determinism across repeated runs, thread safety, and measured dependency footprint;
-5. convert the proposed conceptual types/port into an implementation plan without changing the existing Draft -> Proposal -> AdaGuard authority boundary;
-6. independently review the corrected ADR/research evidence.
+4. complete verified input-span/source attribution, determinism across repeated runs, thread safety, and measured dependency footprint;
+5. implement the Ada-owned context/derivation types and temporal resolver port without changing the existing Draft -> Proposal -> AdaGuard authority boundary;
+6. independently review the production resolver implementation/evidence before adoption.
 
-Only after these follow-ups should ADR-0007 move from Proposed to Accepted.
+A failure of a specific resolver candidate should lead to another implementation behind the same port, not to an Ada-owned natural-language grammar.
