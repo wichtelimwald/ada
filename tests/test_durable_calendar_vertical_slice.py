@@ -498,10 +498,18 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
             response.execution.business.status,
             BusinessOutcomeStatus.FAILED,
         )
+        self.assertEqual(
+            response.execution.provider.error_code,
+            "provider_not_recoverable",
+        )
         self.assertEqual(calendar.create_attempts, 0)
-        self.assertIn(
-            "did not attempt to create",
+        self.assertEqual(
             render_calendar_action_response(proposal(), response),
+            (
+                "I did not attempt to create the calendar event: "
+                "Parent-teacher meeting. "
+                "This calendar provider cannot safely recover from a retry."
+            ),
         )
 
     def test_guard_denial_produces_zero_provider_effects(self) -> None:
