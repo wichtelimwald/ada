@@ -43,7 +43,8 @@ Security, privacy, accessibility, and usability are requirements, not optional p
 ## Project continuity
 
 - Use `docs/handover.md` as the durable entry point for a new chat/session and follow `.github/skills/project-continuity.md` at the start and before stopping material work.
-- Keep the handover pointer-based. Persist changing facts in their canonical source (for example PR state/reviews/validation in the PR, backlog in `docs/todo.md`, decisions in ADRs) instead of copying volatile state into instructions or the handover.
+- Follow the stable maintainer working preferences in `.github/skills/maintainer-collaboration.md`.
+- Keep the handover pointer-based. Persist changing facts in their canonical source (for example PR state/reviews/validation and task-specific authorization in the PR, backlog in `docs/todo.md`, decisions in ADRs) instead of copying volatile state into instructions or the handover.
 
 ## Current project stage
 

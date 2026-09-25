@@ -17,7 +17,8 @@ Start by reading:
 1. AGENTS.md
 2. docs/handover.md
 3. .github/skills/project-continuity.md
-4. only the task-relevant canonical documents referenced there.
+4. .github/skills/maintainer-collaboration.md
+5. only the task-relevant canonical documents referenced there.
 
 Before changing anything, verify the current repository and GitHub state rather than trusting an old chat:
 - default-branch head and current working branch/worktree if available;
@@ -40,6 +41,7 @@ Chat with the maintainer in German unless asked otherwise; repository and GitHub
 | --- | --- |
 | Agent rules and development gates | `AGENTS.md`, `.github/skills/development-process.md` |
 | Session continuity process | `.github/skills/project-continuity.md` |
+| Maintainer collaboration preferences | `.github/skills/maintainer-collaboration.md` |
 | Product direction and user-facing status | `README.md`, `docs/product/` |
 | Backlog and priorities | `docs/todo.md` |
 | Architecture decisions and status | `docs/decisions/` |
@@ -51,6 +53,17 @@ Chat with the maintainer in German unless asked otherwise; repository and GitHub
 | Durable local setup instructions | `docs/manual-setup.md` |
 
 If a durable fact has no suitable canonical home, create or extend the narrowest appropriate document. Do not make this handover the default dumping ground.
+
+## What must survive a chat boundary
+
+The old one-off handover mixed several useful categories. Keep them, but in separate durable homes:
+
+- **Maintainer preferences and working style** -> `.github/skills/maintainer-collaboration.md`.
+- **Project invariants and decisions that must not be forgotten** -> their owning ADR, product, security/privacy, license, setup, or backlog document.
+- **Current work state, blockers, exact validation evidence, review findings, and task/merge authorization** -> the relevant active PR.
+- **Ephemeral local paths, tool availability, and scratch state** -> re-verify in the new session; persist only when they become supported setup instructions.
+
+This keeps the important information durable without turning the handover itself into a second copy of project state.
 
 ## Continuity rule
 

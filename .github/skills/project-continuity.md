@@ -8,7 +8,7 @@ The stable entry point is `docs/handover.md`. Changing facts stay in their canon
 
 ## At session start
 
-1. Read `docs/handover.md` and `AGENTS.md`.
+1. Read `docs/handover.md`, `AGENTS.md`, and `.github/skills/maintainer-collaboration.md`.
 2. Verify current Git/GitHub state relevant to the task:
    - default-branch head;
    - active/relevant PRs and their actual heads;
@@ -22,6 +22,7 @@ The stable entry point is `docs/handover.md`. Changing facts stay in their canon
 Persist material facts where they belong, preferably in the same focused PR:
 
 - implementation/review/validation state -> PR description, review thread, or PR comment;
+- task-specific implementation or merge authorization -> the relevant PR; never promote it into a repository-wide permission;
 - backlog/priority -> `docs/todo.md`;
 - architecture decision -> ADR, plus `README.md` when user-relevant;
 - product scope -> `docs/product/`;
