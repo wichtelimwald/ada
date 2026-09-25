@@ -168,8 +168,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--memory-root",
         default=os.getenv("ADA_MEMORY_ROOT"),
         help=(
-            "Explicit development Memory root. Omit until a protected Memory "
-            "domain is intentionally configured."
+            "Development-only file-native Memory root; do not use real household "
+            "data until protected domains are implemented."
         ),
     )
     return parser
