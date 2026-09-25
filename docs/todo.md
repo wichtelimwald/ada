@@ -49,6 +49,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [x] Re-validate real local multi-turn chat on target hardware; final qwen3.5:9b run passed 50 tests and the local-chat acceptance flow, enabling ADR-0006 acceptance.
 - [ ] Implement ADR-0008's accepted file-native Memory baseline and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
 - [ ] From the first Memory slice, preserve separate dimensions for durable Memory kind (`preference` / `fact` / `routine` / `episode`), evidence origin (`explicit_statement` / `observed_fact` / `behavioral_observation` / `hypothesis`), and lifecycle/maturity; promotion into established Memory is explicit and inspectable.
+- [ ] Implement retention semantics: learning evidence is more ephemeral than established Memory and compacts after promotion/rejection; explicitly retained durable episodes (special conversations/workshops/events) survive ordinary aging/compaction but remain manually forgettable/deletable.
 
 **Gates before real household Memory (ADR-0008):**
 
