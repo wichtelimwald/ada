@@ -240,17 +240,34 @@ class CalendarDraftTests(unittest.TestCase):
                 )
                 self.assertEqual(assessment.missing, ("start_time", "end_time"))
 
-    def test_partial_dates_do_not_corroborate_dotted_times(self) -> None:
-        for source_date in ("21.09.", "21.09", "21 . 09."):
+    def test_partial_dates_in_both_orders_do_not_corroborate_dotted_times(self) -> None:
+        for source_date, start_time in (
+            ("21.09.", "21:09"),
+            ("21.09", "21:09"),
+            ("21 . 09.", "21:09"),
+            ("09.21", "09:21"),
+            ("09.21.", "09:21"),
+            ("12.31", "12:31"),
+        ):
             with self.subTest(source_date=source_date):
                 assessment = assess_calendar_create_draft(
-                    _draft(start_time="21:09", end_time="22:00"),
+                    _draft(start_time=start_time, end_time="22:00"),
                     source_text=(
                         f"Add a dentist appointment on {source_date} "
                         "to 22:00 to the family calendar."
                     ),
                 )
                 self.assertEqual(assessment.missing, ("date_with_year", "start_time"))
+
+    def test_unambiguous_standalone_dotted_time_still_supports_draft(self) -> None:
+        assessment = assess_calendar_create_draft(
+            _draft(start_time="16:30", end_time="17:00"),
+            source_text=(
+                "Add a dentist appointment on 2026-09-21 at 16.30, "
+                "ending at 17:00 in the family calendar."
+            ),
+        )
+        self.assertEqual(assessment.missing, ())
 
     def test_compact_time_ranges_are_not_masked_as_dates(self) -> None:
         for time_range in (

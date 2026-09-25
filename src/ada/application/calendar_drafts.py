@@ -122,8 +122,11 @@ def _valid_time(value: str | None) -> bool:
 def _could_be_partial_date(token: str) -> bool:
     if ":" in token:
         return False
-    day, month = (int(part) for part in token.split("."))
-    return 1 <= day <= 31 and 1 <= month <= 12
+    first, second = (int(part) for part in token.split("."))
+    return (
+        (1 <= first <= 31 and 1 <= second <= 12)
+        or (1 <= first <= 12 and 1 <= second <= 31)
+    )
 
 
 def _source_explicitly_supports_time(value: str, source_text: str) -> bool:
