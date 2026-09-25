@@ -3,8 +3,8 @@
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 import os
 import subprocess
 import tempfile
@@ -67,40 +67,46 @@ def probe_failure_modes(base: Path) -> list[str]:
     write(root, "ada.md", "Current: 16:30\nSource: SRC_ADA_NEW\n")
     snapshot(root, "Ada changed ada.md")
     assert "editor.md" in git(root, "show", "--format=%s", "--name-only", "HEAD")
-    # Capture the external edit separately, then stage only Ada's note.
+    # A path-restricted commit must not absorb unrelated content that another
+    # tool/editor already staged in the shared index.
     write(root, "editor.md", "Current: 17:45\nSource: SRC_EDITOR_LATER\n")
     git(root, "add", "--", "editor.md")
-    git(root, "commit", "-q", "-m", "external edit captured")
     write(root, "ada.md", "Current: 16:45\nSource: SRC_ADA_LATER\n")
-    git(root, "add", "--", "ada.md")
-    git(root, "commit", "-q", "-m", "Ada updated scoped note")
+    git(root, "commit", "-q", "--only", "-m", "Ada updated scoped note", "--", "ada.md")
     assert "editor.md" not in git(root, "show", "--format=", "--name-only", "HEAD")
+    assert git(root, "diff", "--cached", "--name-only").strip() == "editor.md"
+    git(root, "commit", "-q", "-m", "external edit captured")
 
-    # A stale lock stops Git; never silently remove a possibly live lock.
+    # A stale lock stops history capture after a file write; never silently
+    # remove a possibly live lock.
+    write(root, "ada.md", "Current: 16:50\nSource: SRC_ADA_LOCKED\n")
     lock = root / ".git" / "index.lock"
     lock.write_text("synthetic stale lock", encoding="utf-8")
     try:
         try:
             git(root, "add", "--", "ada.md")
-        except subprocess.CalledProcessError:
-            pass
+        except subprocess.CalledProcessError as exc:
+            assert "index.lock" in exc.stderr
         else:
             raise AssertionError("Git accepted a locked index")
     finally:
         lock.unlink()  # Fixture cleanup only, not a production recovery rule.
+    assert git(root, "diff", "--name-only").strip() == "ada.md"
+    git(root, "commit", "-q", "--only", "-m", "capture after lock recovery", "--", "ada.md")
 
-    # A stale read detects the intervening change; the unsafe baseline would
-    # overwrite it if it wrote without checking and serializing writers.
+    # Model the actual stale-write sequence: Ada reads, an editor changes the
+    # file, then Ada writes content derived from its stale snapshot.
     note = root / "ada.md"
-    expected = hashlib.sha256(note.read_bytes()).digest()
-    note.write_text("Current: 17:00\nSource: SRC_EXTERNAL\n", encoding="utf-8")
+    stale_read = note.read_text(encoding="utf-8")
+    expected = hashlib.sha256(stale_read.encode("utf-8")).digest()
+    note.write_text(
+        "Current: 17:00\nSource: SRC_EXTERNAL\nEditor-note: keep me\n",
+        encoding="utf-8",
+    )
     assert hashlib.sha256(note.read_bytes()).digest() != expected
-    assert "Current: 17:00" in note.read_text(encoding="utf-8")
-    naive = root / "naive.md"
-    naive.write_text("Current: 16:00\n", encoding="utf-8")
-    naive.write_text("Current: 17:00\n", encoding="utf-8")  # Intervening editor.
-    naive.write_text("Current: 16:45\n", encoding="utf-8")  # Stale Ada write.
-    assert "17:00" not in naive.read_text(encoding="utf-8")
+    stale_ada_write = stale_read.replace("16:50", "16:55")
+    note.write_text(stale_ada_write, encoding="utf-8")
+    assert "Editor-note: keep me" not in note.read_text(encoding="utf-8")
 
     shared, private = base / "scope-shared", base / "scope-private"
     init(shared)
@@ -114,10 +120,29 @@ def probe_failure_modes(base: Path) -> list[str]:
     assert search(shared, "SHARED_SECRET_CANARY") == []
     assert "SHARED_SECRET_CANARY" in git(shared, "log", "--all", "-p")
 
-    # Plain text does not invalidate an unchanged source or classify conflict.
-    stale_source = "Current: Friday 17:00\nSource: SRC_THURSDAY\n"
-    assert "SRC_THURSDAY" in stale_source
-    assert "Unresolved" not in "Claim: 16:00\nClaim: 17:00\n"
+    # Direct Markdown/search does not automatically retire stale sources,
+    # classify conflicts, or exclude superseded sections from retrieval.
+    write(root, "stale-source.md", "Current: Thursday 17:00\nSource: SRC_THURSDAY\n")
+    snapshot(root, "record sourced claim")
+    write(root, "stale-source.md", "Current: Friday 17:00\nSource: SRC_THURSDAY\n")
+    assert search(root, "Current: Friday 17:00") == ["stale-source.md"]
+    assert "SRC_THURSDAY" in (root / "stale-source.md").read_text(encoding="utf-8")
+
+    write(root, "pickup-16.md", "# Pickup\nClaim: 16:00\nSource: SRC_16\n")
+    write(root, "pickup-17.md", "# Pickup\nClaim: 17:00\nSource: SRC_17\n")
+    assert search(root, "# Pickup") == ["pickup-16.md", "pickup-17.md"]
+    assert all(
+        "Unresolved" not in (root / name).read_text(encoding="utf-8")
+        for name in ("pickup-16.md", "pickup-17.md")
+    )
+
+    write(
+        root,
+        "superseded.md",
+        "# Music\nCurrent: Thursday 17:00\n"
+        "Superseded (not current): Wednesday 17:00\n",
+    )
+    assert search(root, "Wednesday 17:00") == ["superseded.md"]
     return [
         "unscoped staging attributes an external edit to an Ada commit",
         "a Git index lock prevents capture until deliberate recovery",
@@ -184,12 +209,12 @@ def run() -> dict[str, object]:
             ],
             "failure_probes": probe_failure_modes(base),
             "open_gates": [
-                "automatic external-edit capture, path-scoped commits, and crash/concurrency handling",
+                "automatic external-edit capture, path-restricted commits, and crash/concurrency handling in both directions",
                 "editor identity is not authenticated by Git commit metadata",
                 "history remains recoverable by design; exclusion from future Ada indexes is untested",
-                "scope narrowing and eventual history/backup purge need a separate policy",
+                "scope narrowing needs explicit non-revocation semantics; historical purge is a separate policy",
                 "separate roots under the same OS principal do not enforce privacy",
-                "search relevance, size and latency on representative vaults are unmeasured",
+                "search relevance, section-aware current/superseded handling, size and latency on representative vaults are unmeasured",
                 "source/document-reference lifecycle and generalized semantic validation are untested",
             ],
         }
