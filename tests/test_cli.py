@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from io import StringIO
+from tempfile import TemporaryDirectory
 import json
 import subprocess
 import sys
@@ -152,6 +153,37 @@ class CliTests(unittest.TestCase):
                 130,
             )
         self.assertIsNotNone(interrupt_runtime.close_loop)
+
+    def test_chat_uses_explicit_file_memory_personality(self) -> None:
+        runtime = FakeChatRuntime()
+        runtime.aclose = AsyncMock()
+        captured: dict[str, object] = {}
+
+        def build_runtime(config: object, *, personality: object = None) -> FakeChatRuntime:
+            captured["config"] = config
+            captured["personality"] = personality
+            return runtime
+
+        with TemporaryDirectory() as temp:
+            with (
+                patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+                patch(
+                    "ada.adapters.local_ollama.build_local_ollama_runtime",
+                    side_effect=build_runtime,
+                ),
+                patch("ada.cli._chat_loop", return_value=0),
+            ):
+                result = _chat(
+                    model="qwen3.5:9b",
+                    ollama_url="http://localhost:11434/v1",
+                    memory_root=temp,
+                )
+
+        self.assertEqual(result, 0)
+        personality = captured["personality"]
+        self.assertIsNotNone(personality)
+        self.assertEqual(personality.display_name, "Ada")
+        runtime.aclose.assert_awaited_once_with()
 
     def test_chat_defaults_to_qwen35_9b(self) -> None:
         with patch("ada.cli.os.getenv", side_effect=lambda key, default=None: default):
