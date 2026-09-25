@@ -445,7 +445,10 @@ Rules:
 - extracted facts/preferences may still live as separate ordinary Memory entries;
 - the episode may reference the original conversation where that reference remains available;
 - if the original transcript is deleted, the summary may remain according to normal Memory rules;
-- later retrieval may use episodic summaries to answer references such as "we talked about this the other day" without loading full historical conversations.
+- later retrieval may use episodic summaries to answer references such as "we talked about this the other day" without loading full historical conversations;
+- materially special conversations, workshops, trips, celebrations, major decisions, or other meaningful events may be marked as **durable episodes** for long-term continuity;
+- a user may explicitly mark an episode as durable; Ada may propose durable retention when a clear rule identifies an unusually important episode, but it must not silently make indefinite retention decisions from model judgment alone;
+- durable means exempt from ordinary automatic aging/compaction, **not** undeletable: an explicit later forget/delete request still wins.
 
 #### Referenced documents and external source material
 
@@ -532,13 +535,18 @@ Initial principles:
 
 - prefer compact durable facts/preferences/routines over raw interaction history;
 - retain selective episodic summaries when the conversation as a whole is likely to provide useful future continuity;
+- allow explicitly retained **durable episodes** for special conversations, workshops, trips, celebrations, major decisions, and meaningful events; Ada may propose this status but model judgment alone cannot silently create indefinite retention;
+- durable episodes are exempt from ordinary automatic aging/compaction but remain subject to explicit user correction/forget/delete;
 - retain document summaries/references when future tasks need the source context without copying the source document into Memory;
-- observations used for learning may be temporary and should be compacted, expired, or discarded when no longer useful;
+- **learning evidence is normally more ephemeral than established Memory**: behavioral observations, observed facts used only as evidence, and hypotheses should be compacted, expired, or discarded after promotion, rejection, supersession, or loss of usefulness;
+- after a promotion, prefer a compact human-readable promotion/evidence rationale over retaining an unbounded list of raw observations;
+- source-owned evidence should normally retain a reference rather than a raw duplicate of the source;
+- sensitive observations should have the shortest retention compatible with the applicable learning rule and should not be retained merely because they might become useful later;
 - repeated equivalent memories should converge rather than accumulate indefinitely;
 - low-value incidental details should normally remain session context only;
 - sensitive information has a higher bar for durable retention than ordinary low-risk preferences;
 - durable Memory should be periodically gardened so the human-readable corpus remains understandable rather than becoming an append-only transcript;
-- retention policy may differ by memory class, maturity state, and privacy sensitivity.
+- retention policy may differ by memory kind, evidence origin, lifecycle/maturity, explicit durable-retention status, and privacy sensitivity.
 
 The target is **useful continuity, not exhaustive surveillance**.
 
@@ -588,8 +596,10 @@ Requirements:
 - it belongs to the same human-controlled Memory domain, not a hidden runtime database;
 - it follows the same hard directory privacy boundaries;
 - it stores minimized observations rather than raw conversations by default;
-- entries may expire or be compacted once promoted, rejected, superseded, or no longer useful;
-- rebuilding retrieval indexes must not change learning maturity;
+- entries are normally ephemeral relative to established Memory and may expire or be compacted once promoted, rejected, superseded, or no longer useful;
+- promotion should preserve a compact inspectable rationale/evidence summary when useful without retaining every raw observation indefinitely;
+- durable episodic Memory is a separate retention decision from keeping learning-journal evidence;
+- rebuilding retrieval indexes must not change learning maturity or retention state;
 - users can inspect/correct/remove learning observations.
 
 The exact representation remains open; Markdown/YAML or another human-readable append-friendly form should be characterized.
@@ -1491,6 +1501,7 @@ ADR-0008 accepts the following MVP architecture:
 - operational forgetting removes content from Ada's current readable state and derived retrieval; historical purge/backup retention is a separate lifecycle/operations concern;
 - corrections, contradictions, provenance, maturity and confirmation basis remain visible enough for deterministic validation and safe conflict handling;
 - evidence origin, durable Memory kind, and lifecycle/maturity are separate dimensions; established Memory is logically separated from inspectable learning evidence, with an explicit Ada-owned promotion/assimilation boundary;
+- learning evidence is more ephemeral by default than established Memory and is compacted after promotion/rejection rather than accumulating as an exhaustive behavioral archive; special episodic memories may be explicitly retained as durable, exempt from automatic compaction but never from explicit user forgetting/deletion;
 - the confirmed learning-policy classes A–D are normative: low-risk explicit knowledge may be remembered privately with provenance, inferred patterns observe first, sensitive/consequential knowledge requires confirmation or a future explicit rule, and secrets/credentials are never ordinary automatically learned Memory;
 - evidence precedence is normative and not last-write-wins: explicit user confirmation/correction outranks observational patterns, while ambiguous conflicting explicit claims remain unresolved;
 - every model-originated Memory write or promotion passes a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling before it becomes authoritative;
