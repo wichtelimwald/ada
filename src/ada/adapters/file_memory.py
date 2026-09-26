@@ -160,11 +160,13 @@ class FileMemoryStore:
                     create_only=True,
                 )
             except MemoryAlreadyExistsError:
+                self._capture_external_changes()
                 return False
             self._verify_revision(path, revision)
             self._capture_ada_write(
                 (self._history_path(path),),
                 reason="initialize personality",
+                expected_revisions=((path, revision),),
             )
         return True
 
@@ -198,6 +200,7 @@ class FileMemoryStore:
             self._capture_ada_write(
                 (self._history_path(path),),
                 reason="update personality",
+                expected_revisions=((path, revision),),
             )
 
         return PersonalitySnapshot(profile=profile, revision=revision)
@@ -235,6 +238,7 @@ class FileMemoryStore:
             self._capture_ada_write(
                 (self._history_path(path),),
                 reason="create explicit Memory",
+                expected_revisions=((path, revision),),
             )
         return entry
 
@@ -272,6 +276,7 @@ class FileMemoryStore:
             self._capture_ada_write(
                 (self._history_path(path),),
                 reason="record learning evidence",
+                expected_revisions=((path, revision),),
             )
         return entry
 
@@ -371,6 +376,10 @@ class FileMemoryStore:
                     self._history_path(learning_path),
                 ),
                 reason="promote learning evidence",
+                expected_revisions=(
+                    (memory_path, memory_revision),
+                    (learning_path, learning_revision),
+                ),
             )
         return established
 
@@ -423,6 +432,7 @@ class FileMemoryStore:
             self._capture_ada_write(
                 (self._history_path(path),),
                 reason="correct explicit Memory",
+                expected_revisions=((path, revision),),
             )
         return corrected
 
@@ -470,12 +480,15 @@ class FileMemoryStore:
                     memory_path,
                     expected_revision=memory_revision,
                 )
+                assert learning_revision is not None
                 self._capture_ada_write(
                     (
                         self._history_path(memory_path),
                         self._history_path(learning_path),
                     ),
                     reason="complete interrupted Memory forget",
+                    expected_revisions=((learning_path, learning_revision),),
+                    expected_absent=(memory_path,),
                 )
                 return ForgetResult.FORGOTTEN
 
@@ -502,6 +515,8 @@ class FileMemoryStore:
                     self._history_path(learning_path),
                 ),
                 reason="forget current Memory",
+                expected_revisions=((learning_path, tombstone_revision),),
+                expected_absent=(memory_path,),
             )
         return ForgetResult.FORGOTTEN
 
@@ -1213,7 +1228,14 @@ class FileMemoryStore:
         paths: tuple[str, ...],
         *,
         reason: str,
+        expected_revisions: tuple[tuple[Path, str], ...] = (),
+        expected_absent: tuple[Path, ...] = (),
     ) -> None:
+        for path, revision in expected_revisions:
+            self._verify_revision(path, revision)
+        for path in expected_absent:
+            self._verify_absent(path)
+
         try:
             self._history.capture_ada_write(paths, reason=reason)
         except GitMemoryHistoryError as exc:
@@ -1223,6 +1245,13 @@ class FileMemoryStore:
                 f"{exc}",
                 paths=paths,
             ) from exc
+
+        # Do not report a clean success if a non-cooperating editor changed the
+        # just-written state while history was being captured.
+        for path, revision in expected_revisions:
+            self._verify_revision(path, revision)
+        for path in expected_absent:
+            self._verify_absent(path)
 
     @staticmethod
     def _history_call(operation: Any) -> Any:
@@ -1237,6 +1266,14 @@ class FileMemoryStore:
             self._capture_external_changes()
             raise MemoryConflictError(
                 f"Memory file changed concurrently and Ada will not overwrite it: {path}"
+            )
+
+    def _verify_absent(self, path: Path) -> None:
+        if self._path_exists(path):
+            self._capture_external_changes()
+            raise MemoryConflictError(
+                "Memory file reappeared before the operation completed "
+                f"and will not be reported as a clean success: {path}"
             )
 
     @staticmethod
