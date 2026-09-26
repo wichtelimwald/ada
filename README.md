@@ -65,10 +65,13 @@ Current examples:
 | Python Cedar integration | `cedarpy` around the Cedar Rust engine | Apache-2.0; implemented behind AdaGuard |
 | Durable external actions / recovery | DBOS behind Ada-owned action/outcome semantics | MIT; accepted by ADR-0005, synthetic calendar slice implemented |
 | Local model serving | Self-hosted Ollama with configurable model profile; qwen3.5:9b target-Mac baseline | MIT runtime; model artifact Apache-2.0; accepted by ADR-0006 |
+| Calendar integration | Standard CalDAV via a small Ada-owned adapter with provider profiles (IONOS Mail Business first), using `icalendar` and `recurring-ical-events` | BSD-2-Clause / LGPL-3.0-or-later; accepted by ADR-0009, not yet implemented |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
 
 The current DBOS-backed calendar path is **synthetic/test-only**. No real calendar account or personal event data is connected yet. Before a production provider is added, Ada must review how sensitive event payloads are stored in durable workflow state and minimize or reference them appropriately.
+
+**Accepted, not yet implemented:** [ADR-0009](docs/decisions/ADR-0009-calendar-provider-integration.md) connects calendars through standard CalDAV with one small Ada-owned adapter; differences between providers are described as configuration profiles, and IONOS Mail Business is the first provider. Ada would have its **own** mailbox holding one calendar per family member plus one family calendar; Ada shares each family member's calendar and the family calendar read-only with that person's own mailbox in the same IONOS contract, where it appears automatically in their calendar apps; changes go through Ada. Ada never stores a family member's password, and Ada's password is never set up on family devices. For the MVP this deliberately trades separate accounts for simplicity: all family calendars sit in Ada's account, and Ada's own rules decide who may see which details in chat or email. Ada only knows appointments that are in its calendars, and in the MVP only people with a mailbox in the same IONOS contract can see them. Other providers and a stricter per-person setup remain possible later through separate adapters.
 
 ## Current phase
 

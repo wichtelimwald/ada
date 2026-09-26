@@ -228,6 +228,11 @@ private content never appears in shared chat.
 **Goal:** replace the synthetic provider with one supported real provider while
 retaining Ada-owned action semantics.
 
+**First provider:** IONOS Mail Business (maintainer decision, 2026-09-26);
+further providers must remain addable through separate adapters.
+**Step plan:** [MVP-60](../plans/MVP-60-real-calendar-provider.md);
+architecture: ADR-0009 (accepted).
+
 **Plan must cover:**
 
 - provider choice and least-privilege credentials;
