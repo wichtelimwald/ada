@@ -99,10 +99,15 @@ def _chat(
     )
 
     config = LocalOllamaConfig(model=model, base_url=ollama_url)
+    normalized_memory_root = (
+        memory_root.strip()
+        if isinstance(memory_root, str) and memory_root.strip()
+        else None
+    )
     try:
         personality = None
-        if memory_root is not None:
-            memory = FileMemoryStore(memory_root)
+        if normalized_memory_root is not None:
+            memory = FileMemoryStore(normalized_memory_root)
             personality = bootstrap_personality_memory(memory)
 
         check_local_ollama_ready(config)
@@ -166,7 +171,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     chat.add_argument(
         "--memory-root",
-        default=os.getenv("ADA_MEMORY_ROOT"),
+        default=os.getenv("ADA_MEMORY_ROOT") or None,
         help=(
             "Development-only file-native Memory root; do not use real household "
             "data until protected domains are implemented."
