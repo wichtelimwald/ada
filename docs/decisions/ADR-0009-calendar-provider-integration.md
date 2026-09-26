@@ -17,8 +17,9 @@ domain semantics. The family gets **one** IONOS mailbox, for Ada.
 
 IONOS Mail Business runs on Open-Xchange App Suite and exposes calendars via
 CalDAV with mailbox credentials or app passwords. Documented OX behavior and
-observations against a self-hosted OX image shape the design: provider-enforced
-`If-Match` concurrency, no server-side recurrence expansion, no free/busy
+observations against a self-hosted OX image shape the design: `If-Match`
+concurrency (honored but, per the first IONOS probe run, not required by
+IONOS), no server-side recurrence expansion, no free/busy
 report, bounded query windows, read-only outward sharing to external guests,
 and lossy iCalendar conversion. Details and sources are in the evaluation.
 
@@ -71,7 +72,7 @@ accounts per protection domain (revisit with MVP-30).
   duplicate-safety capabilities.
 - The implementation is one **generic CalDAV adapter** with explicit
   configuration. IONOS/OX specifics live in a **server profile** (for example
-  query window, `If-Match` requirement, component post-filtering), not in
+  query window, component post-filtering), not in
   domain code and not in an IONOS-specific adapter.
 - Provider libraries' types (iCalendar objects, XML elements, HTTP responses)
   never cross the adapter boundary.
@@ -110,7 +111,8 @@ distribution obligations once they are added.
   reconciles by reading that resource. The declared capability follows probe
   evidence (`IDEMPOTENT` if a repeated create-only PUT is rejected, otherwise
   `RECONCILABLE`).
-- **Update/cancel:** read-modify-write with `If-Match`. A 412/409 after
+- **Update/cancel:** read-modify-write with `If-Match`, always sent by Ada
+  because IONOS does not require it. A 412/409 after
   another party changed the event is reported as a concurrent-change conflict,
   never overwritten. Ambiguous outcomes are reconciled by re-reading and
   comparing the Ada-owned fields; unresolved cases stay `ambiguous`.
@@ -149,7 +151,9 @@ Before this ADR becomes **Accepted**:
    store~~ — decided 2026-09-26 (D1: `recurring-ical-events`; D2: Keychain).
 2. ~~The maintainer confirms the thin Ada-owned adapter over python-caldav
    (section 4)~~ — confirmed 2026-09-26.
-3. The IONOS probe confirms the CalDAV basics on Ada's mailbox (P1-P4, P7) and
+3. The IONOS probe confirms the CalDAV basics on Ada's mailbox (P1-P4, P7;
+   run 1 on 2026-09-26 confirmed P1-P3 and P7, and found an open conditional-update
+   anomaly in P4 that run 2 must resolve) and
    that outward sharing delivers the calendars to family members in a usable
    way (P10, M2, M3). If outward sharing is unusable, the access topology is
    re-opened before implementation.

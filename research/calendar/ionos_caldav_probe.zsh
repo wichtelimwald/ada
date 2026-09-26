@@ -30,7 +30,7 @@ read -r "SHARED_RO_URL?CalDAV URL of a synthetic calendar shared READ-ONLY with 
 read -r "SHARED_RW_URL?CalDAV URL of a synthetic calendar shared READ/WRITE with Ada (optional): "
 SHARED_DAY=""
 [[ -n $SHARED_RO_URL ]] && read -r "SHARED_DAY?Date of the synthetic events in the read-only calendar (YYYYMMDD): "
-read -r "IMAP_HOST?IMAP host for the credential-scope check [imap.ionos.de]: "
+read -r "IMAP_HOST?IMAP server hostname for the credential-scope check, not the mailbox address [imap.ionos.de]: "
 IMAP_HOST=${IMAP_HOST:-imap.ionos.de}
 
 # Webmail shows collection URLs without a trailing slash; normalize.
@@ -43,6 +43,7 @@ done
 [[ -z $PROBE_URL ]] && { print -u2 "the probe calendar URL is required"; exit 1 }
 [[ -z $SHARED_RO_URL || $SHARED_DAY == <19000101-29991231> ]] || { print -u2 "date must be YYYYMMDD"; exit 1 }
 [[ -z $SHARE_LINK || $SHARE_LINK == https://* ]] || { print -u2 "the share link must start with https://"; exit 1 }
+[[ $IMAP_HOST == *[^A-Za-z0-9.-]* ]] && { print -u2 "IMAP host must be a hostname such as imap.ionos.de"; exit 1 }
 # curl --config strings treat quote and backslash specially.
 if [[ $ADA_PASS == *[\"\\]* || $ADA_USER == *[\"\\]* ]]; then
   print -u2 "credentials containing quote or backslash are not supported by this probe"
@@ -79,6 +80,19 @@ put_new() { # url file -> status; records created resources for cleanup
 current_etag() { # url -> quoted ETag or empty
   dav --dump-header "$WORK/etag.hdr" --output /dev/null "$1" >/dev/null
   grep -i '^etag:' "$WORK/etag.hdr" | head -n 1 | cut -d' ' -f2- | tr -d '\r'
+}
+
+etag_shape() { # etag -> shape description; never prints the value
+  local v=$1 weak=no quoted=no
+  [[ -z $v ]] && { print -r -- "absent"; return }
+  [[ $v == W/* ]] && weak=yes
+  [[ ${v#W/} == \"*\" ]] && quoted=yes
+  print -r -- "weak=$weak quoted=$quoted length=${#v}"
+}
+
+put_if_match() { # url file etag -> status
+  dav --dump-header "$WORK/last-update.hdr" --output /dev/null --write-out '%{http_code}' \
+    -X PUT -H "If-Match: $3" -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$2" "$1"
 }
 
 query_range() { # url start end outfile -> status
@@ -137,6 +151,31 @@ report P4b-stale-if-match "$(http_code -X PUT -H 'If-Match: "ada-stale-etag"' -H
 etag=$(current_etag ${PROBE_URL}${EVT_A}.ics)
 report P4c-matching-if-match "$(http_code -X PUT -H "If-Match: $etag" -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/a2.ics" ${PROBE_URL}${EVT_A}.ics)" "204 or 201"
 
+print "== P4 diagnostics (fresh event; conditional updates before any blind overwrite)"
+EVT_F=$(new_event_id); URL_F=${PROBE_URL}${EVT_F}.ics
+for v in 1 2 3 4 5 6; do
+  ics $EVT_F "Ada probe F v$v" ${NEAR_DAY}T140000Z ${NEAR_DAY}T150000Z > "$WORK/f$v.ics"
+done
+report P4d-create "$(put_new $URL_F "$WORK/f1.ics")" "201"
+e1=$(current_etag $URL_F)
+report P4e-get-etag-shape "$(etag_shape $e1)" "quoted, not weak"
+report P4f-update-with-get-etag "$(put_if_match $URL_F "$WORK/f2.ics" "$e1")" "204 or 201"
+report P4g-etag-on-update-response "$(grep -qi '^etag:' "$WORK/last-update.hdr" && print present || print absent)" "informational"
+e2=$(current_etag $URL_F)
+report P4h-etag-changed-after-update "$([[ -n $e2 && $e2 != $e1 ]] && print yes || print no)" "yes"
+report P4i-second-update "$(put_if_match $URL_F "$WORK/f3.ics" "$e2")" "204 or 201"
+e3=$(current_etag $URL_F)
+code=$(query_range $PROBE_URL ${NEAR_DAY}T000000Z ${NEAR_DAY}T235959Z "$WORK/f.xml")
+r3=$([[ $code == 207 ]] && $PY "$SUMMARIZE" etag-for-uid "$WORK/f.xml" $EVT_F)
+report P4j-report-etag-equals-get-etag "$([[ -n $r3 && $r3 == $e3 ]] && print yes || print "no (report etag $(etag_shape $r3))")" "yes"
+report P4k-update-with-report-etag "$(put_if_match $URL_F "$WORK/f4.ics" "${r3:-missing}")" "204 or 201"
+report P4l-blind-overwrite "$(http_code -X PUT -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/f5.ics" $URL_F)" "409 = If-Match required; 201/204 = not required"
+e5=$(current_etag $URL_F)
+report P4m-update-after-blind-overwrite "$(put_if_match $URL_F "$WORK/f6.ics" "$e5")" "204 or 201"
+code=$(query_range $PROBE_URL ${NEAR_DAY}T000000Z ${NEAR_DAY}T235959Z "$WORK/f-final.xml")
+report P4n-copies-of-event "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/f-final.xml" $EVT_F || print "status $code")" "1 (more = duplicates)"
+report P4o-stored-version "$(dav --output - $URL_F | grep -o 'SUMMARY:Ada probe F v[0-9]' | head -n 1)" "the last successful write"
+
 print "== P10 outward share link (anonymous subscription view)"
 if [[ -n $SHARE_LINK ]]; then
   [[ $SHARE_LINK == *\?* ]] && ical_link="$SHARE_LINK&ical=true" || ical_link="$SHARE_LINK?ical=true"
@@ -191,6 +230,19 @@ ics $EVT_D "Ada probe past" ${PAST_DAY}T100000Z ${PAST_DAY}T110000Z > "$WORK/d.i
 report P8c-create-past "$(put_new ${PROBE_URL}${EVT_D}.ics "$WORK/d.ics")" "201"
 code=$(query_range $PROBE_URL ${PAST_DAY}T000000Z ${PAST_DAY}T235959Z "$WORK/past.xml")
 report P8d-past-found "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/past.xml" $EVT_D || print "status $code")" "1 = within query window, 0 = hidden"
+
+print "== P8 window boundaries"
+for off in +11m +13m -20d -40d; do
+  day=$(date -u -v$off +%Y%m%d); evt=$(new_event_id)
+  ics $evt "Ada probe window $off" ${day}T100000Z ${day}T110000Z > "$WORK/w.ics"
+  code=$(put_new ${PROBE_URL}${evt}.ics "$WORK/w.ics")
+  if [[ $code == 201 ]]; then
+    qcode=$(query_range $PROBE_URL ${day}T000000Z ${day}T235959Z "$WORK/w.xml")
+    report "P8-window $off" "$([[ $qcode == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/w.xml" $evt || print "status $qcode")" "1 = inside window, 0 = outside"
+  else
+    report "P8-window $off create" "$code" "201"
+  fi
+done
 
 print "== P9 credential scope"
 print -r -- "user = \"$ADA_USER:$ADA_PASS\"" |

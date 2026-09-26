@@ -147,9 +147,23 @@ def count_uid(xml_path: str, uid: str) -> None:
     print(sum(1 for event in _events(xml_path) if event.get("UID") == uid))
 
 
+def etag_for_uid(xml_path: str, uid: str) -> None:
+    """Print the getetag of the first response whose calendar data has ``uid``."""
+
+    root = _parse(xml_path)
+    for response in root.iter(f"{DAV}response"):
+        data = response.find(f".//{CALDAV}calendar-data")
+        if data is None or f"UID:{uid}" not in "".join(_unfold(data.text or "")):
+            continue
+        print((response.findtext(f".//{DAV}getetag") or "").strip())
+        return
+
+
 def main(argv: list[str]) -> None:
     if len(argv) < 3:
-        raise SystemExit("usage: probe_summarize.py listing|events|count-uid FILE ARGS...")
+        raise SystemExit(
+            "usage: probe_summarize.py listing|events|count-uid|etag-for-uid FILE ARGS..."
+        )
     mode, xml_path, *rest = argv[1:]
     if mode == "listing":
         listing(xml_path, rest)
@@ -157,6 +171,8 @@ def main(argv: list[str]) -> None:
         events(xml_path, rest[0] if rest else "events")
     elif mode == "count-uid":
         count_uid(xml_path, rest[0])
+    elif mode == "etag-for-uid":
+        etag_for_uid(xml_path, rest[0])
     else:
         raise SystemExit(f"unknown mode: {mode}")
 

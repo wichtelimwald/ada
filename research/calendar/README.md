@@ -1,8 +1,9 @@
 # IONOS Mail Business CalDAV probe (MVP-60)
 
-**Status:** prepared, not yet run against IONOS. The script was syntax-checked
-and run end-to-end against a local HTTPS fake CalDAV server that uses synthetic
-data. The summarizer was exercised against synthetic XML.
+**Status:** run 1 against IONOS on 2026-09-26 (results in the
+[evaluation](../../docs/research/calendar-provider-evaluation.md#10-ionos-probe-results));
+run 2 pending. Script changes are smoke-tested end-to-end against a local HTTPS
+fake CalDAV server with synthetic data before each run.
 
 This probe collects the provider facts that
 [ADR-0009](../../docs/decisions/ADR-0009-calendar-provider-integration.md) and
@@ -52,6 +53,7 @@ Record these manual observations with the probe output:
 - **M2:** Which outward sharing options does webmail offer for Ada's calendars: invite by external address, anonymous link, read-only vs read/write, expiry, PIN? Does an invited guest see anything besides the shared calendar?
 - **M3:** Can the share be subscribed in Apple Calendar (and Google Calendar, if used), and how long does an event created by the probe take to appear there?
 - **M4:** Did the invited external address receive any email when the probe created, changed or deleted events?
+- **M5:** After the run, is the `Ada probe` calendar in webmail empty? Report any remaining `Ada probe …` event (title only) and delete it manually.
 
 ## Run
 
@@ -71,11 +73,12 @@ status.
 | P1 | Is Ada's calendar listed with write privileges; are change tokens (`getctag`, `sync-token`) offered? | Basic CalDAV usability; later change detection. |
 | P2 | Does `If-None-Match: *` reject a repeated create, and is a duplicate UID rejected? | Create capability: provider-native create-only (`IDEMPOTENT`) vs reconcile-by-GET (`RECONCILABLE`). |
 | P3 | Are UID and resource name preserved; are `X-` properties kept? | Event identity/reconciliation; whether Ada may tag its own events with provenance properties. |
-| P4, P7 | Are updates/deletes ETag-conditional; is a blind overwrite rejected? | Update/cancel concurrency and reconciliation design. |
-| P8 | Does the server hide events outside a query window? | Supported look-ahead/look-back range and user-visible limits. |
+| P4, P7 | Are updates/deletes ETag-conditional; is a blind overwrite rejected? P4d–P4o diagnose conditional updates on a fresh event (ETag shape, GET vs REPORT ETag, update before/after a blind overwrite, duplicates). | Update/cancel concurrency and reconciliation design. |
+| P8 | Does the server hide events outside a query window? The boundary checks test +11/+13 months and −20/−40 days. | Supported look-ahead/look-back range and user-visible limits. |
 | P9, M1 | Does the app password also grant IMAP? | Credential blast radius (residual risk vs narrower credential). |
 | P10, M2, M3 | Does the outward share deliver current iCalendar data, and how do family members receive it? | Feasibility and UX of the Ada-owned calendar model (read-only subscriptions, refresh latency). |
 | M4 | Do Ada's writes notify guests? | Whether calendar writes can cause unintended email side effects. |
+| M5 | Did the probe leave events behind? | Whether a blind overwrite created hidden copies (P4 anomaly). |
 | P5, P6 (optional) | Inbound sharing: visibility of confidential/private events; enforcement of read-only shares. | Only for the later "users share their own calendars with Ada" option. |
 
 Record the results (redacted as needed) in the MVP-60 PR and summarize the

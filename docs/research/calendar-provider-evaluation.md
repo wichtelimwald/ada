@@ -62,10 +62,10 @@ and the OX profile in python-caldav 3.3.1 `caldav/compatibility_hints.py`
 | Behavior | Consequence for Ada |
 | --- | --- |
 | `CONFIDENTIAL` events appear to non-attending viewers of a shared folder as anonymous blocks with summary "Private"; `PRIVATE` events are not exposed to them at all and do not count in free/busy. | Relevant only for inbound sharing (a later option): the owner would control disclosure at the source, and Ada could not see private events. In the Ada-owned model, Ada owns every event and AdaGuard enforces disclosure. |
-| Updates require `If-Match`; a blind overwrite is rejected with 409. | Optimistic concurrency is enforced by the provider. Ada must always read-modify-write with ETags. |
+| Self-hosted OX: updates require `If-Match`; a blind overwrite is rejected with 409. **IONOS (run 1): a blind overwrite is accepted (201)**; a stale `If-Match` is rejected (412). | The provider does not enforce optimistic concurrency on IONOS. Ada must always send `If-Match` itself; other clients can still overwrite blindly. |
 | The object resource name is preserved; the collection also has an opaque canonical URL (`cal://0/NNN`, base64 path) besides the requested alias. | Ada addresses events by `<canonical collection URL>/<resource name>`, adopting the canonical URL reported by the server. |
 | Server-side recurrence expansion is unsupported; time-range queries do find recurring events whose occurrences fall in range (within the window). | Ada must expand recurrences client-side. |
-| Queries use a sliding window (OX defaults `com.openexchange.caldav.interval.start=one_month`, `...interval.end=one_year`); unbounded queries are broken. | Ada must query bounded ranges and report the provider window as a limit. IONOS values: *probe* (P8). |
+| Queries use a sliding window (OX defaults `com.openexchange.caldav.interval.start=one_month`, `...interval.end=one_year`); unbounded queries are broken. | Ada must query bounded ranges and report the provider window as a limit. IONOS run 1: events 18 months ahead and 3 months back are not returned by time-range queries; boundaries *probe* (run 2). |
 | `comp-filter` and `is-not-defined` filters are silently ignored. | Ada post-filters components client-side. |
 | RFC 4791 `free-busy-query` returns 400. | Busy-time must be derived from event reads, not a free/busy report. |
 | Limited RRULE set (legacy subset of DAILY/WEEKLY/MONTHLY/YEARLY parts). Rescheduling a series with exceptions returns 409. | Writing recurring series is risky; MVP writes only non-recurring events. |
@@ -172,9 +172,29 @@ development path for the Ada app password:
 - **S2 owner-only file** (`0600`, regular file, no symlink, outside repository and Memory root): portable to containers; plaintext on a FileVault-protected disk.
 - Environment variables and command-line arguments are rejected (child-process inheritance, process listings, shell history).
 
-## 10. Evidence still required
+## 10. IONOS probe results
 
-See [the probe](../../research/calendar/README.md): CalDAV basics on Ada's
-mailbox (P1-P4, P7), outward sharing and subscription (P10, M2, M3), query
-window (P8), credential scope (P9/M1), notification side effects (M4), and,
-optionally, inbound sharing (P5, P6).
+### Run 1 (2026-09-26, Ada mailbox, synthetic probe calendar)
+
+| Probe | Result | Conclusion |
+| --- | --- | --- |
+| P1 | 4 collections: 2 writable `VEVENT` calendars with full privileges, `getctag` and `sync-token` (Ada's default calendar and the probe calendar); 1 read-only `VEVENT` collection without `sync-token` (origin not identified); 1 `VTODO` collection. | CalDAV works with an app password of Ada's mailbox. `sync-token` (RFC 6578) is available for later incremental change detection. |
+| P2 | Create-only `PUT` 201; repeated create-only `PUT` 412; same UID under another resource name 403; no `ETag` in the create response. | Provider-native create-only semantics work; UID uniqueness is enforced. Ada must `GET` after create to learn the version. |
+| P3 | `GET` 200 with `ETag`; UID and resource name preserved; `X-` property preserved. | Resource-name reconciliation works. Ada may mark its own events with an `X-` property (a hint, not authority). |
+| P4 | Blind overwrite 201; stale `If-Match` 412; **`If-Match` with the `ETag` just read via `GET` 412** (after the blind overwrite). | `If-Match` is honored but not required. The failed matching update is an **open anomaly**; diagnosis in run 2 (P4d–P4o). |
+| P7 | Stale conditional `DELETE` 412; matching `DELETE` 204; repeated `DELETE` 404. | Conditional delete and idempotent "already absent" reporting work. |
+| P8 | Events at +18 months and −3 months not returned by time-range queries. | The query window is narrower than 18 months ahead / 3 months back; boundaries in run 2. |
+| P9 | Inconclusive: the IMAP host prompt received a mailbox address; the connection timed out (curl exit 28) before any login. | Rerun; the script now rejects non-hostname input. |
+| P10, M1–M4 | Not run (no share link). | Needed for ADR acceptance. |
+
+If conditional updates stay unreliable on IONOS, the fallback to evaluate is
+update as conditional `DELETE` + create-only `PUT` of a new resource inside one
+durable workflow. That would change event identity for subscribers and is
+non-atomic, so it is not adopted before run 2.
+
+## 11. Evidence still required
+
+See [the probe](../../research/calendar/README.md): the P4 conditional-update
+anomaly (P4d–P4o), outward sharing and subscription (P10, M2, M3), query-window
+boundaries (P8), credential scope (P9/M1), notification side effects (M4),
+leftover probe events (M5), and, optionally, inbound sharing (P5, P6).
