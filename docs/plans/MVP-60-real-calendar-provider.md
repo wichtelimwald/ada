@@ -150,9 +150,9 @@ S6-S7 (roadmap `done` only in the last PR).
 
 - **S0 Evidence:** maintainer creates the Ada calendars' probe counterpart and an
   outward share, runs the IONOS probe; results recorded in the PR and the
-  evaluation; capabilities and limits fixed; ADR-0009 accepted. Run 1
-  (2026-09-26) is recorded in the evaluation; run 2 must resolve the P4
-  conditional-update anomaly and cover P8 boundaries, P9, P10 and M1–M5.
+  evaluation; capabilities and limits fixed; ADR-0009 accepted. Runs 1 and 2
+  (2026-09-26) are recorded in the evaluation; run 3 must pin down the update
+  freshness rule (P11) and the share-link subscription (P10, M3).
 - **S1 Domain and port:** types above, in-memory adapter updated, shared
   `CalendarPort` contract test suite, architecture-boundary test extended to
   forbid `httpx2`/`icalendar` imports in core/ports. No new dependency.

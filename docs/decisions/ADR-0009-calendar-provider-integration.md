@@ -152,8 +152,8 @@ Before this ADR becomes **Accepted**:
 2. ~~The maintainer confirms the thin Ada-owned adapter over python-caldav
    (section 4)~~ — confirmed 2026-09-26.
 3. The IONOS probe confirms the CalDAV basics on Ada's mailbox (P1-P4, P7;
-   run 1 on 2026-09-26 confirmed P1-P3 and P7, and found an open conditional-update
-   anomaly in P4 that run 2 must resolve) and
+   runs 1 and 2 on 2026-09-26 confirmed P1-P3 and P7; P4 showed that IONOS
+   rejects updates it considers stale, which run 3 (P11) must pin down) and
    that outward sharing delivers the calendars to family members in a usable
    way (P10, M2, M3). If outward sharing is unusable, the access topology is
    re-opened before implementation.
@@ -172,8 +172,9 @@ Positive:
 Negative / residual risks:
 
 - Accepted MVP trade-offs of the Ada-owned calendar model (section 2).
-- IONOS app passwords may not be CalDAV-scoped (probe P9/M1); then the Ada
-  mailbox credential also grants access to Ada's mail.
+- IONOS app passwords are not CalDAV-scoped (probe run 2, P9): the calendar
+  credential also grants access to Ada's mailbox. Ada uses separate app
+  passwords per purpose so each can be revoked independently.
 - Read-only subscriptions: family members cannot edit directly in their
   calendar apps; subscription refresh intervals of their apps delay updates.
 - Ada owns a small CalDAV client, including XML and HTTP edge cases.

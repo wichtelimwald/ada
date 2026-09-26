@@ -187,6 +187,19 @@ development path for the Ada app password:
 | P9 | Inconclusive: the IMAP host prompt received a mailbox address; the connection timed out (curl exit 28) before any login. | Rerun; the script now rejects non-hostname input. |
 | P10, M1–M4 | Not run (no share link). | Needed for ADR acceptance. |
 
+### Run 2 (2026-09-26)
+
+P1–P3, P4a–c and P7 repeated run 1. No event from run 1 was left behind (M5).
+
+| Probe | Result | Conclusion |
+| --- | --- | --- |
+| P4d–P4o | Fresh event: `GET` ETag quoted and strong; first conditional update **201** and applied; no `ETag` in the update response; ETag changes; **every later `PUT` returns 412**, including one with the fresh `GET` ETag, one with the `REPORT` ETag and one **without `If-Match`**; still one copy; stored version = first update. | The rejections do not depend on `If-Match`. The server most likely rejects content it considers stale. Probe `SEQUENCE`/`DTSTAMP` never changed; normal clients increment them. P11 (run 3) tests this. |
+| P4j | `REPORT` `getetag` is **unquoted** (29 characters vs 31 quoted in the `GET` header). | Ada must normalize entity tags to the quoted form before sending `If-Match`. |
+| P8 boundaries | +11 and +13 months, −20 and −40 days are returned; +18 months and −3 months are not. Direct `GET`/`DELETE` of those resources works. | Supported query window at least −40 days to +13 months. Ada uses a conservative window (−1 month, +12 months) and states the limit; its own events stay addressable by resource name. |
+| P9 | IMAP login with the app password **succeeded** (curl exit 0). | The IONOS app password is **not** CalDAV-scoped; it grants access to Ada's mailbox. Residual risk accepted in ADR-0009; separate app passwords per purpose allow independent revocation. |
+| P10 | Anonymous share link with `?ical=true` answers **302** (not followed in run 2). | Run 3 follows HTTPS redirects anonymously and checks for iCalendar output. |
+| M2 | A read-only share link could be created. | Further options (invitation, expiry) still to report. |
+
 If conditional updates stay unreliable on IONOS, the fallback to evaluate is
 update as conditional `DELETE` + create-only `PUT` of a new resource inside one
 durable workflow. That would change event identity for subscribers and is
@@ -194,7 +207,7 @@ non-atomic, so it is not adopted before run 2.
 
 ## 11. Evidence still required
 
-See [the probe](../../research/calendar/README.md): the P4 conditional-update
-anomaly (P4d–P4o), outward sharing and subscription (P10, M2, M3), query-window
-boundaries (P8), credential scope (P9/M1), notification side effects (M4),
-leftover probe events (M5), and, optionally, inbound sharing (P5, P6).
+See [the probe](../../research/calendar/README.md): the update freshness rule
+(P11), whether the share link delivers iCalendar and works as a subscription
+(P10, M3), app-password dialog (M1), remaining sharing options (M2),
+notification side effects (M4), and, optionally, inbound sharing (P5, P6).

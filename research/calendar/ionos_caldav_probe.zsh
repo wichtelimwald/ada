@@ -68,6 +68,43 @@ ics() { # event-id summary dtstart dtend [extra-property-line]
   print -rn -- "BEGIN:VCALENDAR${crlf}VERSION:2.0${crlf}PRODID:-//Ada//MVP-60 CalDAV probe//EN${crlf}BEGIN:VEVENT${crlf}UID:$1${crlf}DTSTAMP:$(date -u +%Y%m%dT%H%M%SZ)${crlf}DTSTART:$3${crlf}DTEND:$4${crlf}SUMMARY:$2${crlf}${extra:+$extra$crlf}END:VEVENT${crlf}END:VCALENDAR${crlf}"
 }
 
+ics_v() { # event-id summary dtstamp sequence(empty = omit); fixed near-future time
+  local crlf=$'\r\n' seq_line=""
+  [[ -n $4 ]] && seq_line="SEQUENCE:$4$crlf"
+  print -rn -- "BEGIN:VCALENDAR${crlf}VERSION:2.0${crlf}PRODID:-//Ada//MVP-60 CalDAV probe//EN${crlf}BEGIN:VEVENT${crlf}UID:$1${crlf}DTSTAMP:$3${crlf}${seq_line}DTSTART:${NEAR_DAY}T160000Z${crlf}DTEND:${NEAR_DAY}T170000Z${crlf}SUMMARY:$2${crlf}END:VEVENT${crlf}END:VCALENDAR${crlf}"
+}
+
+stored_state() { # url -> sets S_ETAG S_SEQ S_DTSTAMP S_LASTMOD S_SUMMARY S_DATE
+  dav --dump-header "$WORK/st.hdr" --output "$WORK/st.ics" "$1" >/dev/null
+  S_ETAG=$(grep -i '^etag:' "$WORK/st.hdr" | head -n 1 | cut -d' ' -f2- | tr -d '\r')
+  S_DATE=$(grep -i '^date:' "$WORK/st.hdr" | head -n 1 | cut -d' ' -f2- | tr -d '\r')
+  S_SEQ=$(grep -m 1 '^SEQUENCE:' "$WORK/st.ics" | cut -d: -f2 | tr -d '\r')
+  S_DTSTAMP=$(grep -m 1 '^DTSTAMP' "$WORK/st.ics" | cut -d: -f2 | tr -d '\r')
+  S_LASTMOD=$(grep -m 1 '^LAST-MODIFIED' "$WORK/st.ics" | cut -d: -f2 | tr -d '\r')
+  S_SUMMARY=$(grep -m 1 '^SUMMARY:' "$WORK/st.ics" | cut -d: -f2- | tr -d '\r')
+}
+
+p11() { # label dtstamp(old|fresh) sequence(none|equal|plus1) etag(current|wrong|none)
+  local label=$1 dts seq code before applied=no
+  stored_state $URL_G
+  before=${S_SEQ:-absent}
+  [[ $2 == old ]] && dts=$G_DTSTAMP0 || dts=$(date -u +%Y%m%dT%H%M%SZ)
+  case $3 in
+    none) seq="" ;;
+    equal) seq=${S_SEQ:-0} ;;
+    plus1) seq=$(( ${S_SEQ:-0} + 1 )) ;;
+  esac
+  ics_v $EVT_G "Ada probe G $label" $dts "$seq" > "$WORK/g.ics"
+  case $4 in
+    current) code=$(put_if_match $URL_G "$WORK/g.ics" "$S_ETAG") ;;
+    wrong) code=$(put_if_match $URL_G "$WORK/g.ics" '"ada-stale-etag"') ;;
+    none) code=$(http_code -X PUT -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/g.ics" $URL_G) ;;
+  esac
+  stored_state $URL_G
+  [[ $S_SUMMARY == "Ada probe G $label" ]] && applied=yes
+  report "P11-$label" "$code applied=$applied sequence ${before}->${S_SEQ:-absent}" "see README"
+}
+
 put_new() { # url file -> status; records created resources for cleanup
   local code
   code=$(dav --dump-header "$WORK/last-put.hdr" --output /dev/null --write-out '%{http_code}' \
@@ -176,14 +213,59 @@ code=$(query_range $PROBE_URL ${NEAR_DAY}T000000Z ${NEAR_DAY}T235959Z "$WORK/f-f
 report P4n-copies-of-event "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/f-final.xml" $EVT_F || print "status $code")" "1 (more = duplicates)"
 report P4o-stored-version "$(dav --output - $URL_F | grep -o 'SUMMARY:Ada probe F v[0-9]' | head -n 1)" "the last successful write"
 
+print "== P11 update freshness rules (SEQUENCE / DTSTAMP)"
+EVT_G=$(new_event_id); URL_G=${PROBE_URL}${EVT_G}.ics
+G_DTSTAMP0=$(date -u +%Y%m%dT%H%M%SZ)
+ics_v $EVT_G "Ada probe G v0" $G_DTSTAMP0 "" > "$WORK/g0.ics"
+report P11-create "$(put_new $URL_G "$WORK/g0.ics")" "201"
+stored_state $URL_G
+server_epoch=$(date -j -u -f '%a, %d %b %Y %H:%M:%S GMT' "$S_DATE" +%s 2>/dev/null)
+report P11-clock-skew "$([[ -n $server_epoch ]] && print "$(( $(date -u +%s) - server_epoch ))s (local minus server)" || print unknown)" "within a few seconds"
+report P11-stored-after-create "sequence=${S_SEQ:-absent} dtstamp=${S_DTSTAMP:-absent} last-modified=${S_LASTMOD:-absent}" "informational"
+sleep 2
+p11 proper-1 fresh plus1 current
+sleep 2
+p11 old-dtstamp-no-seq old none current
+p11 old-dtstamp-seq-plus1 old plus1 current
+sleep 2
+p11 fresh-dtstamp-seq-equal fresh equal current
+sleep 2
+p11 fresh-dtstamp-no-seq fresh none current
+sleep 2
+p11 proper-2 fresh plus1 current
+sleep 2
+p11 proper-wrong-etag fresh plus1 wrong
+sleep 2
+p11 proper-no-if-match fresh plus1 none
+stored_state $URL_G
+report P11-stored-final "sequence=${S_SEQ:-absent} dtstamp=${S_DTSTAMP:-absent} last-modified=${S_LASTMOD:-absent}" "informational"
+
 print "== P10 outward share link (anonymous subscription view)"
 if [[ -n $SHARE_LINK ]]; then
   [[ $SHARE_LINK == *\?* ]] && ical_link="$SHARE_LINK&ical=true" || ical_link="$SHARE_LINK?ical=true"
+  link_host=${${ical_link#https://}%%/*}
   code=$(curl --silent --show-error --proto '=https' --max-redirs 0 --max-time 30 \
-    --output "$WORK/share.ics" --write-out '%{http_code}' "$ical_link")
-  report P10a-share-link-get "$code" "200 (iCalendar)"
-  report P10b-share-link-type "$(head -c 15 "$WORK/share.ics" 2>/dev/null | tr -d '\r\n')" "BEGIN:VCALENDAR"
-  report P10c-new-event-visible "$(grep -c "^UID:$EVT_A" "$WORK/share.ics" 2>/dev/null)" "1 = event created seconds ago is already in the feed"
+    --dump-header "$WORK/share.hdr" --output /dev/null --write-out '%{http_code}' "$ical_link")
+  report P10a-share-link-status "$code" "200, or 30x (see P10b)"
+  loc=$(grep -i '^location:' "$WORK/share.hdr" | head -n 1 | cut -d' ' -f2- | tr -d '\r')
+  if [[ -n $loc ]]; then
+    loc_host=$link_host
+    [[ $loc == http*://* ]] && loc_host=${${loc#*://}%%/*}
+    report P10b-redirect-shape "https=$([[ $loc == http://* ]] && print no || print yes) same-host=$([[ $loc_host == $link_host ]] && print yes || print no) web-ui=$([[ $loc == *appsuite* || $loc == *'#!'* ]] && print yes || print no) keeps-ical=$([[ $loc == *ical=true* ]] && print yes || print no)" "informational (the link itself is not printed)"
+  fi
+  share_fetch() { # label extra-curl-args... ; anonymous, follows https-only redirects
+    local label=$1 out meta final is_ics=no
+    shift
+    out=$(curl --silent --proto '=https' --proto-redir '=https' --location --max-redirs 5 --max-time 30 \
+      --output "$WORK/share-$label.out" \
+      --write-out '%{http_code} redirects=%{num_redirects} type=%{content_type}\n%{url_effective}' "$@" "$ical_link")
+    meta=${out%%$'\n'*}; final=${out#*$'\n'}
+    [[ $(head -c 15 "$WORK/share-$label.out" 2>/dev/null) == BEGIN:VCALENDAR ]] && is_ics=yes
+    report "P10-$label" "$meta final-same-host=$([[ ${${final#https://}%%/*} == $link_host ]] && print yes || print no) ics=$is_ics probe-event-visible=$(grep -c "^UID:$EVT_A" "$WORK/share-$label.out" 2>/dev/null)" "200 ics=yes probe-event-visible=1"
+  }
+  share_fetch follow
+  share_fetch accept-calendar -H 'Accept: text/calendar'
+  share_fetch calendar-client-ua -A 'CalendarAgent/988 CFNetwork/1568 Darwin/23.0.0'
 else
   print "skipped (no share link given)"
 fi
