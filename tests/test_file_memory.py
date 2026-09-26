@@ -488,6 +488,57 @@ class FileMemoryTests(unittest.TestCase):
             assert current is not None
             self.assertEqual(current.content, "Fallback publication works.")
 
+    def test_non_markdown_editor_artifacts_are_not_recorded_in_history(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            artifact = Path(temp) / "memory" / ".editor.swp"
+            artifact.write_text(
+                "synthetic editor artifact with private-looking text",
+                encoding="utf-8",
+            )
+
+            store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Legitimate Memory write.",
+            )
+
+            self.assertTrue(artifact.exists())
+            tracked = _git(temp, "ls-files", "--", "memory/.editor.swp")
+            self.assertEqual(tracked, "")
+            history = _git(
+                temp,
+                "log",
+                "--format=%H",
+                "--all",
+                "--",
+                "memory/.editor.swp",
+            )
+            self.assertEqual(history, "")
+
+    def test_stale_ada_temp_is_removed_before_history_capture(self) -> None:
+        with TemporaryDirectory() as temp:
+            FileMemoryStore(temp)
+            stale = (
+                Path(temp)
+                / "memory"
+                / ".ada-memory-tmp-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+            stale.write_text(
+                "synthetic interrupted write content",
+                encoding="utf-8",
+            )
+
+            FileMemoryStore(temp)
+
+            self.assertFalse(stale.exists())
+            tracked = _git(
+                temp,
+                "ls-files",
+                "--",
+                "memory/.ada-memory-tmp-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            )
+            self.assertEqual(tracked, "")
+
     def test_external_edit_is_captured_before_next_ada_write(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
