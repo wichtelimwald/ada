@@ -550,6 +550,10 @@ class FileMemoryTests(unittest.TestCase):
             ):
                 FileMemoryStore(temp)
 
+            self.assertFalse((Path(temp) / "memory").exists())
+            self.assertFalse((Path(temp) / "learning").exists())
+            self.assertFalse((Path(temp) / ".ada-memory.lock").exists())
+
     def test_ada_owned_history_can_be_reopened(self) -> None:
         with TemporaryDirectory() as temp:
             first_store = FileMemoryStore(temp)
