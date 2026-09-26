@@ -164,6 +164,11 @@ commit.
 ## Follow-ups
 
 - MVP-30 owns encrypted per-domain history and broker-enforced protection domains.
+  It must keep history metadata (`.git` config/attributes) unwritable by untrusted
+  vault editors or sync tools, because repo-local Git config can execute commands
+  as Ada (ADR-0010 limitation).
 - MVP-40 owns automatic lifecycle transitions, contradiction/currentness resolution
-  and derived retrieval.
+  and derived retrieval. Its explicit-user confirmation binding must also bind
+  promotion to the evidence revision the user saw; MVP-20 `promote_learning`
+  promotes the evidence content current at promotion time.
 - Packaging must decide how Git is provisioned for non-developer installations.
