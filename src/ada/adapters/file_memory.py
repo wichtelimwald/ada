@@ -245,31 +245,64 @@ class FileMemoryStore:
         return established
 
     def forget(self, entry_id: str) -> bool:
-        """Remove current established Memory and neutralize retained evidence."""
+        """Forget current Memory before any later retrieval/re-learning can use it.
+
+        The current learning file becomes a content-free tombstone before the
+        established Memory file is removed. A malformed learning file therefore
+        does not block forgetting an otherwise valid established entry.
+        """
 
         self._validate_entry_id(entry_id)
-        changed = False
         memory_path = self.memory_dir / f"{entry_id}.md"
-        evidence = self.load_learning_entry(entry_id, include_inactive=True)
+        learning_path = self.learning_dir / f"{entry_id}.md"
+
+        memory_entry = (
+            self._read_entry(memory_path)
+            if memory_path.exists()
+            else None
+        )
+        if memory_entry is None and not learning_path.exists():
+            return False
+
+        tombstone_kind = (
+            memory_entry.kind
+            if memory_entry is not None
+            else MemoryKind.FACT
+        )
+        tombstone_origin = (
+            memory_entry.evidence_origin
+            if memory_entry is not None
+            else EvidenceOrigin.HYPOTHESIS
+        )
+
+        if memory_entry is None and learning_path.exists():
+            try:
+                evidence = self._read_entry(learning_path)
+            except FileMemoryError:
+                evidence = None
+            if evidence is not None:
+                tombstone_kind = evidence.kind
+                tombstone_origin = evidence.evidence_origin
+
+        forgotten = MemoryEntry(
+            entry_id=entry_id,
+            kind=tombstone_kind,
+            evidence_origin=tombstone_origin,
+            lifecycle=MemoryLifecycle.FORGOTTEN,
+            content=_FORGOTTEN_BODY,
+        )
+        self._write_entry(learning_path, forgotten)
 
         if memory_path.exists():
             self._reject_symlink(memory_path)
-            memory_path.unlink()
-            changed = True
-        if evidence is not None and evidence.lifecycle is not MemoryLifecycle.FORGOTTEN:
-            forgotten = MemoryEntry(
-                entry_id=evidence.entry_id,
-                kind=evidence.kind,
-                evidence_origin=evidence.evidence_origin,
-                lifecycle=MemoryLifecycle.FORGOTTEN,
-                content=evidence.content,
-                confirmation_basis=evidence.confirmation_basis,
-                supports_memory_id=evidence.supports_memory_id,
-            )
-            self._write_entry(self.learning_dir / f"{entry_id}.md", forgotten)
-            changed = True
+            try:
+                memory_path.unlink()
+            except OSError as exc:
+                raise FileMemoryError(
+                    f"cannot remove established Memory file {memory_path}"
+                ) from exc
 
-        return changed
+        return True
 
     def load_memory_entry(self, entry_id: str) -> MemoryEntry | None:
         self._validate_entry_id(entry_id)
@@ -292,14 +325,23 @@ class FileMemoryStore:
         if not path.exists():
             return None
         entry = self._read_entry(path)
-        if not include_inactive and entry.lifecycle in {
-            MemoryLifecycle.FORGOTTEN,
-            MemoryLifecycle.SUPERSEDED,
-        }:
+        if not include_inactive and (
+            entry.lifecycle in {
+                MemoryLifecycle.FORGOTTEN,
+                MemoryLifecycle.SUPERSEDED,
+            }
+            or entry.supports_memory_id is not None
+        ):
             return None
         return entry
 
-    def _write_entry(self, path: Path, entry: MemoryEntry) -> None:
+    def _write_entry(
+        self,
+        path: Path,
+        entry: MemoryEntry,
+        *,
+        create_only: bool = False,
+    ) -> None:
         metadata: dict[str, Any] = {
             "schema_version": 1,
             "entry_id": entry.entry_id,
@@ -311,29 +353,55 @@ class FileMemoryStore:
             metadata["confirmation_basis"] = entry.confirmation_basis.value
         if entry.supports_memory_id is not None:
             metadata["supports_memory_id"] = entry.supports_memory_id
-        self._write_markdown(path, metadata, f"{entry.content}\n")
+        self._write_markdown(
+            path,
+            metadata,
+            f"{entry.content}\n",
+            create_only=create_only,
+        )
 
     def _read_entry(self, path: Path) -> MemoryEntry:
         metadata, body = self._read_markdown(path)
         try:
-            if int(metadata["schema_version"]) != 1:
+            if self._require_int(metadata, "schema_version") != 1:
                 raise ValueError("unsupported Memory entry schema")
+            entry_id = self._require_str(metadata, "entry_id")
+            self._validate_entry_id(entry_id)
+            supports_memory_id = (
+                self._require_str(metadata, "supports_memory_id")
+                if "supports_memory_id" in metadata
+                else None
+            )
+            if supports_memory_id is not None:
+                self._validate_entry_id(supports_memory_id)
+                if supports_memory_id != entry_id:
+                    raise ValueError(
+                        "baseline learning evidence may only support the same entry id"
+                    )
+            lifecycle = MemoryLifecycle(
+                self._require_str(metadata, "lifecycle")
+            )
+            content = (
+                body.strip()
+                if lifecycle is MemoryLifecycle.FORGOTTEN
+                else self._validate_content(body)
+            )
             entry = MemoryEntry(
-                entry_id=str(metadata["entry_id"]),
-                kind=MemoryKind(str(metadata["kind"])),
-                evidence_origin=EvidenceOrigin(str(metadata["evidence_origin"])),
-                lifecycle=MemoryLifecycle(str(metadata["lifecycle"])),
-                content=self._validate_content(body),
+                entry_id=entry_id,
+                kind=MemoryKind(self._require_str(metadata, "kind")),
+                evidence_origin=EvidenceOrigin(
+                    self._require_str(metadata, "evidence_origin")
+                ),
+                lifecycle=lifecycle,
+                content=content,
                 confirmation_basis=(
-                    ConfirmationBasis(str(metadata["confirmation_basis"]))
+                    ConfirmationBasis(
+                        self._require_str(metadata, "confirmation_basis")
+                    )
                     if "confirmation_basis" in metadata
                     else None
                 ),
-                supports_memory_id=(
-                    str(metadata["supports_memory_id"])
-                    if "supports_memory_id" in metadata
-                    else None
-                ),
+                supports_memory_id=supports_memory_id,
             )
         except (KeyError, TypeError, ValueError) as exc:
             raise FileMemoryError(f"invalid Memory entry metadata in {path}") from exc
