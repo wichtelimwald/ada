@@ -633,29 +633,38 @@ class FileMemoryTests(unittest.TestCase):
     def test_non_markdown_editor_artifacts_are_not_recorded_in_history(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
-            artifact = Path(temp) / "memory" / ".editor.swp"
-            artifact.write_text(
-                "synthetic editor artifact with private-looking text",
-                encoding="utf-8",
+            artifacts = (
+                Path(temp) / "memory" / ".editor.swp",
+                # AppleDouble metadata on non-xattr volumes and Emacs locks.
+                Path(temp) / "memory" / ("._m-" + ("d" * 32) + ".md"),
+                Path(temp) / "learning" / ".#notes.md",
             )
+            for artifact in artifacts:
+                artifact.write_text(
+                    "synthetic editor artifact with private-looking text",
+                    encoding="utf-8",
+                )
 
             store.remember_explicit(
                 kind=MemoryKind.FACT,
                 content="Legitimate Memory write.",
             )
 
-            self.assertTrue(artifact.exists())
-            tracked = _git(temp, "ls-files", "--", "memory/.editor.swp")
-            self.assertEqual(tracked, "")
-            history = _git(
-                temp,
-                "log",
-                "--format=%H",
-                "--all",
-                "--",
-                "memory/.editor.swp",
-            )
-            self.assertEqual(history, "")
+            for artifact in artifacts:
+                relative = artifact.relative_to(temp).as_posix()
+                with self.subTest(artifact=relative):
+                    self.assertTrue(artifact.exists())
+                    tracked = _git(temp, "ls-files", "--", relative)
+                    self.assertEqual(tracked, "")
+                    history = _git(
+                        temp,
+                        "log",
+                        "--format=%H",
+                        "--all",
+                        "--",
+                        relative,
+                    )
+                    self.assertEqual(history, "")
 
     def test_stale_ada_temp_is_removed_before_history_capture(self) -> None:
         with TemporaryDirectory() as temp:

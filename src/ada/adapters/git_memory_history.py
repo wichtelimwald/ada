@@ -166,8 +166,11 @@ class GitMemoryHistory:
             try:
                 with os.scandir(directory) as entries:
                     for entry in entries:
+                        # Dotfiles are OS/editor artifacts such as AppleDouble
+                        # `._x.md` or Emacs `.#x.md`, never Memory entries.
                         if (
                             entry.name.endswith(".md")
+                            and not entry.name.startswith(".")
                             and not entry.is_dir(follow_symlinks=False)
                         ):
                             paths.add(f"{root_name}/{entry.name}")
