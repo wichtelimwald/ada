@@ -362,6 +362,15 @@ class FileMemoryTests(unittest.TestCase):
                 )
             )
 
+            self.assertEqual(
+                store.forget(entry.entry_id),
+                ForgetResult.ALREADY_FORGOTTEN,
+            )
+            self.assertFalse(
+                (Path(temp) / "memory" / f"{entry.entry_id}.md").exists()
+            )
+            self.assertIsNone(store.load_memory_entry(entry.entry_id))
+
     def test_malformed_established_memory_is_never_destroyed_by_forget(
         self,
     ) -> None:
