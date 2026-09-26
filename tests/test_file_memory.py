@@ -237,6 +237,61 @@ class FileMemoryTests(unittest.TestCase):
             )
             self.assertIn("Capture external Memory edit", log)
 
+    def test_late_manual_edit_is_detected_at_publication(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            original = store.remember_explicit(
+                kind=MemoryKind.PREFERENCE,
+                content="Before late edit.",
+            )
+            snapshot = store.load_memory_snapshot(original.entry_id)
+            self.assertIsNotNone(snapshot)
+            assert snapshot is not None
+            path = Path(temp) / "memory" / f"{original.entry_id}.md"
+            original_write_entry = store._write_entry
+            injected = False
+
+            def write_with_late_human_edit(*args, **kwargs):
+                nonlocal injected
+                if not injected:
+                    injected = True
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "Before late edit.",
+                            "Late human edit wins.",
+                        ),
+                        encoding="utf-8",
+                    )
+                return original_write_entry(*args, **kwargs)
+
+            with patch.object(
+                store,
+                "_write_entry",
+                side_effect=write_with_late_human_edit,
+            ):
+                with self.assertRaises(MemoryConflictError):
+                    store.correct_explicit(
+                        original.entry_id,
+                        content="Ada must not overwrite.",
+                        expected_revision=snapshot.revision,
+                    )
+
+            current = store.load_memory_entry(original.entry_id)
+            self.assertIsNotNone(current)
+            assert current is not None
+            self.assertEqual(current.content, "Late human edit wins.")
+            log = _git(
+                temp,
+                "log",
+                "--format=%s",
+                "--",
+                f"memory/{original.entry_id}.md",
+            )
+            self.assertEqual(
+                log.splitlines()[0],
+                "Capture external Memory edit",
+            )
+
     def test_explicit_correction_keeps_identity_and_records_history(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
