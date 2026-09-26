@@ -296,6 +296,9 @@ class FileMemoryTests(unittest.TestCase):
             )
             tombstone = tombstone_path.read_text(encoding="utf-8")
             self.assertNotIn(original_text, tombstone)
+            self.assertNotIn("kind =", tombstone)
+            self.assertNotIn("evidence_origin =", tombstone)
+            self.assertIn('lifecycle = "forgotten"', tombstone)
             self.assertIn("[forgotten]", tombstone)
 
             history = _git(
@@ -369,7 +372,7 @@ class FileMemoryTests(unittest.TestCase):
                 (Path(temp) / "learning" / f"{entry.entry_id}.md").exists()
             )
 
-    def test_malformed_learning_evidence_also_fails_forget_closed(self) -> None:
+    def test_forget_neutralizes_malformed_learning_evidence(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
             observed = store.record_learning(
@@ -380,15 +383,19 @@ class FileMemoryTests(unittest.TestCase):
             learning = Path(temp) / "learning" / f"{observed.entry_id}.md"
             learning.write_text("not front matter\n", encoding="utf-8")
 
-            with self.assertRaisesRegex(
-                FileMemoryError,
-                "missing TOML front matter",
-            ):
-                store.forget(observed.entry_id)
-
             self.assertEqual(
-                learning.read_text(encoding="utf-8"),
-                "not front matter\n",
+                store.forget(observed.entry_id),
+                ForgetResult.FORGOTTEN,
+            )
+
+            tombstone = learning.read_text(encoding="utf-8")
+            self.assertNotIn("Observed wording.", tombstone)
+            self.assertNotIn("kind =", tombstone)
+            self.assertNotIn("evidence_origin =", tombstone)
+            self.assertIn('lifecycle = "forgotten"', tombstone)
+            self.assertEqual(
+                store.forget(observed.entry_id),
+                ForgetResult.ALREADY_FORGOTTEN,
             )
 
     def test_area_lifecycle_invariants_fail_closed(self) -> None:
