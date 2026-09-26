@@ -53,7 +53,7 @@ authoritative write layer before protection domains are introduced in MVP-30.
 
 ## Open decisions
 
-Resolved by ADR-0010 in this step:
+Proposed by ADR-0010 in this step; maintainer acceptance remains part of PR review:
 
 1. History implementation: external Git CLI behind an Ada-owned adapter.
 2. Generic identity: UUIDv4-derived opaque IDs; no semantic/time-bearing slugs.
