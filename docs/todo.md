@@ -88,7 +88,8 @@ Implementation note: the baseline uses TOML `+++` front matter so it can be pars
 **Gates before real calendar data (MVP-60, [step plan](plans/MVP-60-real-calendar-provider.md)):**
 
 - [ ] Accept or revise [ADR-0009](decisions/ADR-0009-calendar-provider-integration.md) (IONOS Mail Business via a provider-neutral CalDAV adapter; Ada-owned calendars shared outward). Recurrence expansion (`recurring-ical-events`, LGPL) and the Keychain development credential store were decided on 2026-09-26.
-- [ ] Run the [IONOS CalDAV probe](../research/calendar/README.md) with synthetic calendars and record the results; usable outward sharing to family members is decision-changing.
+- [x] Run the [IONOS CalDAV probe](../research/calendar/README.md) with synthetic calendars and record the results (runs 1–4 on 2026-09-26; see the calendar provider evaluation). Remaining manual check: a Betrachter cannot change or delete shared events from their own device.
+- [ ] After the MVP, decide how people without a mailbox in the IONOS contract get access to Ada's calendars (IONOS offers no external guest passwords and shares only within the contract).
 - [ ] Complete the focused dependency reviews for `icalendar`, `recurring-ical-events` and `x-wr-timezone` and record them, including LGPL distribution obligations, in NOTICE.md before adding the dependencies.
 - [ ] Minimize durable workflow state for real event data (no titles/locations retained after a terminal outcome), as required by ADR-0005.
 

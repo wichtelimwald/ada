@@ -2,8 +2,8 @@
 
 Research helper for ``ionos_caldav_probe.zsh`` (MVP-60). Standard library
 only. It prints structural facts (privileges, supported components, presence
-of change tokens) and synthetic probe fields. Any value that does not carry the
-synthetic ``Ada probe`` / ``Probe place`` marker is redacted.
+of change tokens) and counts/ETags of synthetic probe events, never calendar
+names or other event content.
 """
 
 from __future__ import annotations
@@ -15,10 +15,6 @@ from urllib.parse import unquote, urlsplit
 DAV = "{DAV:}"
 CALDAV = "{urn:ietf:params:xml:ns:caldav}"
 CS = "{http://calendarserver.org/ns/}"
-
-SUMMARY_MARKER = "Ada probe"
-LOCATION_MARKER = "Probe place"
-ANONYMIZED_SUMMARIES = {"Private", "Privat"}
 
 
 def _parse(path: str) -> ET.Element:
@@ -117,32 +113,6 @@ def _events(xml_path: str) -> list[dict[str, str]]:
     return events
 
 
-def events(xml_path: str, label: str) -> None:
-    found = _events(xml_path)
-    print(f"{label} VEVENT components returned: {len(found)}")
-    for index, event in enumerate(found, start=1):
-        summary = event.get("SUMMARY")
-        if summary is None:
-            shown_summary = "absent"
-        elif summary.startswith(SUMMARY_MARKER) or summary in ANONYMIZED_SUMMARIES:
-            shown_summary = repr(summary)
-        else:
-            shown_summary = "<redacted non-probe value>"
-        location = event.get("LOCATION")
-        if location is None:
-            shown_location = "absent"
-        elif location.startswith(LOCATION_MARKER):
-            shown_location = repr(location)
-        else:
-            shown_location = "<redacted non-probe value>"
-        print(
-            f"{label} event#{index}: summary={shown_summary} "
-            f"class={event.get('CLASS', 'absent')} location={shown_location} "
-            f"transp={event.get('TRANSP', 'absent')} "
-            f"rrule={'yes' if 'RRULE' in event else 'no'}"
-        )
-
-
 def count_uid(xml_path: str, uid: str) -> None:
     print(sum(1 for event in _events(xml_path) if event.get("UID") == uid))
 
@@ -162,13 +132,11 @@ def etag_for_uid(xml_path: str, uid: str) -> None:
 def main(argv: list[str]) -> None:
     if len(argv) < 3:
         raise SystemExit(
-            "usage: probe_summarize.py listing|events|count-uid|etag-for-uid FILE ARGS..."
+            "usage: probe_summarize.py listing|count-uid|etag-for-uid FILE ARGS..."
         )
     mode, xml_path, *rest = argv[1:]
     if mode == "listing":
         listing(xml_path, rest)
-    elif mode == "events":
-        events(xml_path, rest[0] if rest else "events")
     elif mode == "count-uid":
         count_uid(xml_path, rest[0])
     elif mode == "etag-for-uid":

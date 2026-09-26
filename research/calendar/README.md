@@ -1,59 +1,52 @@
 # IONOS Mail Business CalDAV probe (MVP-60)
 
-**Status:** runs 1 and 2 against IONOS on 2026-09-26 (results in the
-[evaluation](../../docs/research/calendar-provider-evaluation.md#10-ionos-probe-results));
-run 3 pending. Script changes are smoke-tested end-to-end against a local HTTPS
-fake CalDAV server with synthetic data before each run.
+**Status:** four maintainer runs against IONOS on 2026-09-26 answered the
+questions that shape [ADR-0009](../../docs/decisions/ADR-0009-calendar-provider-integration.md);
+results are in the
+[evaluation](../../docs/research/calendar-provider-evaluation.md#10-ionos-probe-results).
+The probe remains as a **regression check** of Ada's CalDAV assumptions (for
+example after IONOS changes). Script changes are smoke-tested end-to-end
+against a local HTTPS fake CalDAV server with synthetic data before use.
 
-This probe collects the provider facts that
-[ADR-0009](../../docs/decisions/ADR-0009-calendar-provider-integration.md) and
-the [MVP-60 step plan](../../docs/plans/MVP-60-real-calendar-provider.md) treat
-as open. Public Open-Xchange documentation and python-caldav's compatibility
-notes (see [the evaluation](../../docs/research/calendar-provider-evaluation.md))
-describe OX App Suite in general or a self-hosted OX test image. IONOS may
-configure OX differently.
-
-The MVP access model is **Ada-owned calendars**: Ada's own mailbox holds one
-calendar per family member plus one family calendar, and shares them outward.
-The core probe therefore needs only Ada's mailbox. The inbound-sharing probes
-(P5, P6) are optional and need a second mailbox in the same IONOS contract.
+The probe needs only Ada's mailbox and one synthetic probe calendar. Probes for
+inbound sharing, invited guests and anonymous links were used in runs 1–4 and
+then removed: IONOS shares calendars only with mailboxes in the same contract,
+and anonymous links lead to the web UI (see the evaluation).
 
 ## Rules
 
-- Use **synthetic calendars and events only**. Do not point the probe at a
-  calendar that holds real appointments.
-- The output is designed to contain only status codes, structural properties and
-  synthetic `Ada probe` / `Probe place` values. Review it before sharing anyway.
-- Enter the app password **only** at the probe's hidden prompt. Never paste it
-  into chat, an issue, a PR, a file or a shell command line. A password that was
-  pasted anywhere else must be revoked and replaced.
-- Share links are bearer secrets: anyone with the link can read the calendar.
-  The probe reads the link through a hidden prompt; do not post it.
-- Revoke the probe app password afterwards unless it becomes the development
-  credential by explicit decision.
+- Use a **synthetic probe calendar only**. Never point the probe at a calendar
+  that holds real appointments.
+- The output contains status codes, structural calendar properties, sequence
+  numbers, timestamps and counts of synthetic probe events. It never prints
+  credentials, calendar names or other event content. Review it before sharing
+  anyway.
+- The app password is read from the macOS Keychain. Never paste it into chat,
+  an issue, a PR, a file or a command line. A password pasted anywhere else must
+  be revoked and replaced.
 
-## Webmail preparation
+## One-time setup
 
-| Step | Where | Action |
-| --- | --- | --- |
-| W1 | IONOS contract | Dedicated Ada mailbox (the intended Ada identity). |
-| W2 | Ada webmail → My Account → Login & Security | Enable two-step verification. Create an app password named `Ada CalDAV probe`. |
-| W3 | Ada webmail → Calendar | Create calendar `Ada probe`. Copy its CalDAV URL (calendar ⋯ → Properties). |
-| W4 | Ada webmail → Calendar → `Ada probe` → share | Invite one of **your own** external addresses with the role **Betrachter** (viewer, read-only). Open the invitation email and set the guest password if IONOS offers it. Optionally also create an anonymous link (P10). |
-| W5 (optional) | Second mailbox in the **same** contract | Only if such a mailbox exists: create synthetic calendars `Ada probe shared RO` / `Ada probe shared RW`, share them with Ada (viewer / author), and add the synthetic events described for P5. Not needed for the MVP model. |
+1. In Ada's webmail, create the calendar `Ada probe` and copy its CalDAV URL
+   (calendar ⋯ → Properties; it has the form
+   `https://dav.mailbusiness.ionos.de/caldav/<id>`, not the webmail address).
+2. Store the non-secret settings in a local file **outside the repository**
+   (replace the placeholders):
 
-For P5 (optional), the `shared RO` calendar needs, on one date:
-`Ada probe public` (location `Probe place A`), `Ada probe confidential`
-(location `Probe place B`, strongest-but-one privacy option) and
-`Ada probe private` (location `Probe place C`, strongest privacy option).
+   ```bash
+   mkdir -p ~/.config/ada && printf 'ADA_CALDAV_USER=%s\nADA_CALDAV_PROBE_URL=%s\n' '<ada-mailbox-address>' '<caldav-url>' > ~/.config/ada/caldav-probe.conf
+   ```
 
-Record these manual observations with the probe output:
+3. Store the app password in the login Keychain. With `-w` last, `security`
+   prompts for it instead of taking it from the command line:
 
-- **M1:** Does the app-password dialog offer an application type/scope (for example CalDAV only), or only a name?
-- **M2:** Which outward sharing options does webmail offer for Ada's calendars: invite by external address, anonymous link, read-only vs read/write, expiry, PIN? Does an invited guest see anything besides the shared calendar?
-- **M3:** Create one event `Ada probe manual` in the probe calendar via webmail. In Apple Calendar, subscribe **as the invited guest** — with the guest login and guest password, **never Ada's credentials** — either as a calendar subscription or as a CalDAV account on the CalDAV host. Does the event appear? After changing its time in webmail, how long until Apple Calendar shows it? Remove the subscription/account and the event afterwards.
-- **M4:** Did the invited external address receive any email when the probe created, changed or deleted events?
-- **M5:** After the run, is the `Ada probe` calendar in webmail empty? Report any remaining `Ada probe …` event (title only) and delete it manually.
+   ```bash
+   security add-generic-password -s ada-caldav -a '<ada-mailbox-address>' -w
+   ```
+
+   The same Keychain service name is intended for the development adapter
+   (plan decision D2). If the item is missing, the probe asks once with hidden
+   input.
 
 ## Run
 
@@ -61,27 +54,25 @@ Record these manual observations with the probe output:
 zsh research/calendar/ionos_caldav_probe.zsh
 ```
 
-Requirements: macOS zsh, `curl`, `uuidgen`, BSD `date`, Python 3 standard
-library (`ADA_PYTHON` may point to a specific interpreter). Press Enter to skip
-optional inputs. The probe deletes the events it created and prints the cleanup
-status.
+Requirements: macOS zsh, `curl`, `uuidgen`, BSD `date`, `security`, Python 3
+standard library (`ADA_PYTHON` may point to a specific interpreter). Optional
+environment variables: `ADA_PROBE_CONFIG` (other config file),
+`ADA_PROBE_IMAP_HOST` (default `imap.ionos.de`). The probe stops before any
+write if the calendar listing fails, deletes the events it created and prints
+the cleanup status.
 
-## What each result decides
+## What each result checks
 
 | Probe | Question | Decision affected |
 | --- | --- | --- |
-| P1 | Is Ada's calendar listed with write privileges; are change tokens (`getctag`, `sync-token`) offered? | Basic CalDAV usability; later change detection. |
-| P2 | Does `If-None-Match: *` reject a repeated create, and is a duplicate UID rejected? | Create capability: provider-native create-only (`IDEMPOTENT`) vs reconcile-by-GET (`RECONCILABLE`). |
-| P3 | Are UID and resource name preserved; are `X-` properties kept? | Event identity/reconciliation; whether Ada may tag its own events with provenance properties. |
-| P4, P7 | Are updates/deletes ETag-conditional; is a blind overwrite rejected? P4d–P4o diagnose conditional updates on a fresh event (ETag shape, GET vs REPORT ETag, update before/after a blind overwrite, duplicates). | Update/cancel concurrency and reconciliation design. |
-| P8 | Does the server hide events outside a query window? The boundary checks test +11/+13 months and −20/−40 days. | Supported look-ahead/look-back range and user-visible limits. |
-| P9, M1 | Does the app password also grant IMAP? | Credential blast radius (residual risk vs narrower credential). |
-| P10, M2, M3 | Does the outward share deliver current iCalendar data, and how do family members receive it? | Feasibility and UX of the Ada-owned calendar model (read-only subscriptions, refresh latency). |
-| P12 | With the invited guest's own credentials: which calendars are visible, is the probe event readable, are writes and deletes refused for a viewer? | Whether per-person guest access gives provider-enforced read-only separation. |
-| M4 | Do Ada's writes notify guests? | Whether calendar writes can cause unintended email side effects. |
-| P11 | Which iCalendar fields make an update "fresh" for IONOS? See the interpretation below. | How Ada writes updates (SEQUENCE/DTSTAMP handling). |
-| M5 | Did the probe leave events behind? | Whether a blind overwrite created hidden copies (P4 anomaly). |
-| P5, P6 (optional) | Inbound sharing: visibility of confidential/private events; enforcement of read-only shares. | Only for the later "users share their own calendars with Ada" option. |
+| P1 | Is the probe calendar listed with write privileges; are change tokens (`getctag`, `sync-token`) offered? | Basic CalDAV usability; later change detection. |
+| P2 | Does `If-None-Match: *` reject a repeated create, and is a duplicate UID rejected? | Create capability (`IDEMPOTENT` via create-only `PUT`). |
+| P3 | Are UID and resource name preserved; are `X-` properties kept? | Event identity/reconciliation; provenance marker. |
+| P4 | Blind overwrite, stale `If-Match`, conditional updates without `SEQUENCE` changes (P4a–c), and diagnostics on a fresh event (P4d–o: ETag shape, `GET` vs `REPORT` ETag, duplicates). | Update concurrency; ETag normalization. |
+| P11 | Which iCalendar fields make an update acceptable? See below. | How Ada writes updates. |
+| P7 | Are deletes ETag-conditional; is a repeated delete reported as absent? | Cancel semantics. |
+| P8 | Which time ranges do queries cover? | Supported look-ahead/look-back range. |
+| P9 | Does the app password also grant IMAP? | Credential blast radius. |
 
 ### Interpreting P11
 
@@ -96,10 +87,7 @@ and the current ETag.
 | `fresh-dtstamp-no-seq` | a fresh `DTSTAMP` suffices even with a lower `SEQUENCE` | `SEQUENCE` is checked |
 | `proper-1`, `proper-2` | the standard client path works repeatedly | blocking problem: re-open the update design |
 | `proper-wrong-etag` | `If-Match` is not enforced (unexpected) | `If-Match` is enforced (expected) |
-| `proper-no-if-match` | fresh blind overwrites are allowed (consistent with P4a) | `If-Match` is required for fresh writes |
+| `proper-no-if-match` | fresh blind overwrites are allowed | `If-Match` is required for fresh writes |
 
-`P11-clock-skew` should be a few seconds at most; a larger skew makes the
-`DTSTAMP` cases unreliable.
-
-Record the results (redacted as needed) in the MVP-60 PR and summarize the
+Record new results (redacted as needed) in the relevant PR and summarize
 durable conclusions in the evaluation document.

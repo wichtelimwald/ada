@@ -17,11 +17,12 @@ domain semantics. The family gets **one** IONOS mailbox, for Ada.
 
 IONOS Mail Business runs on Open-Xchange App Suite and exposes calendars via
 CalDAV with mailbox credentials or app passwords. Documented OX behavior and
-observations against a self-hosted OX image shape the design: `If-Match`
-concurrency (honored but, per the first IONOS probe run, not required by
-IONOS), no server-side recurrence expansion, no free/busy
-report, bounded query windows, read-only outward sharing to external guests,
-and lossy iCalendar conversion. Details and sources are in the evaluation.
+observations against a self-hosted OX image, checked by four IONOS probe
+runs, shape the design: `If-Match` honored but not required, updates rejected
+when their `SEQUENCE` is stale, no server-side recurrence expansion, no
+free/busy report, bounded query windows, calendar sharing only with mailboxes
+in the same contract, and lossy iCalendar conversion. Details and sources are
+in the evaluation.
 
 ## Decision
 
@@ -36,12 +37,15 @@ calendar provider. Do not use the proprietary OX HTTP API.
   family calendar**. Ada is their owner and regular writer.
 - The maintainer creates these calendars once in webmail. Ada's runtime does
   not create or delete calendars.
-- Each family member is **invited as a guest** with the read-only role
-  (Betrachter) to their own calendar and the family calendar, and uses **their
-  own guest login** in their calendar app. Anonymous share links are not used:
-  on IONOS they lead to the web UI, not to iCalendar (probe run 3). Changes go
-  through Ada or, as an administrative fallback, through the maintainer in
-  webmail. Ada's credentials are never configured on family devices.
+- Ada shares each calendar **read-only (role Betrachter)** with the family
+  member's **own mailbox in the same IONOS contract**. The shared calendar then
+  appears automatically in that person's account and calendar apps (probe run
+  4, M3); nobody subscribes manually. Changes go through Ada or, as an
+  administrative fallback, through the maintainer in webmail. Ada's credentials
+  are never configured on family devices.
+- IONOS offers no external guests with their own password and shares only with
+  mailboxes in the same contract; anonymous share links lead to the web UI,
+  not to iCalendar (probe runs 3–4). Neither is used.
 - Ada authenticates with an **app password of its own mailbox** (two-step
   verification enabled). No family member credentials exist in Ada.
 - The credential is a secret (data class *Secret*): never in Memory, model
@@ -54,9 +58,11 @@ calendar provider. Do not use the proprietary OX HTTP API.
 **Accepted MVP trade-offs:**
 
 - All family calendars live in one provider account. Separation between family
-  members depends on **which calendars each guest is invited to** (provider-
-  enforced roles, pending probe P12) and on **AdaGuard disclosure rules**, not
-  on separate provider accounts.
+  members depends on **which calendars are shared with whom** (provider-
+  enforced roles) and on **AdaGuard disclosure rules**, not on separate
+  provider accounts for the calendars.
+- Only people with a mailbox in the same IONOS contract can see Ada's
+  calendars. Access for anybody else is a post-MVP question.
 - Anyone holding Ada's credential (the Ada runtime, the maintainer) can read
   every family calendar and Ada's mailbox.
 - Ada knows only events in its own calendars. Appointments kept elsewhere
@@ -64,8 +70,8 @@ calendar provider. Do not use the proprietary OX HTTP API.
   they are entered into Ada's calendars.
 
 **Later options** (not MVP): family members share their own calendars **with**
-Ada (inbound sharing; the probe keeps optional checks for it), or separate Ada
-accounts per protection domain (revisit with MVP-30).
+Ada (inbound sharing), separate Ada accounts per protection domain (revisit
+with MVP-30), or another mechanism for people outside the IONOS contract.
 
 ### 3. Provider-neutral boundary; CalDAV as a generic adapter
 
@@ -110,15 +116,25 @@ distribution obligations once they are added.
 ### 6. Action semantics
 
 - **Create:** Ada derives a deterministic, non-semantic UID and resource name
-  from the `OperationId` and writes with `PUT` + `If-None-Match: *`. Recovery
-  reconciles by reading that resource. The declared capability follows probe
-  evidence (`IDEMPOTENT` if a repeated create-only PUT is rejected, otherwise
-  `RECONCILABLE`).
-- **Update/cancel:** read-modify-write with `If-Match`, always sent by Ada
-  because IONOS does not require it. A 412/409 after
-  another party changed the event is reported as a concurrent-change conflict,
-  never overwritten. Ambiguous outcomes are reconciled by re-reading and
-  comparing the Ada-owned fields; unresolved cases stay `ambiguous`.
+  from the `OperationId` and writes with `PUT` + `If-None-Match: *`. IONOS
+  rejects a repeated create-only `PUT` (412) and duplicate UIDs (403), so the
+  capability is `IDEMPOTENT`; a 412 is resolved by reading the resource and
+  confirming it is Ada's. Write responses carry no ETag; Ada reads the resource
+  afterwards.
+- **Update/cancel:** read the current resource (ETag and `SEQUENCE`), then
+  write with `If-Match` (always sent by Ada, because IONOS does not require
+  it; ETags normalized to the quoted form, because `REPORT` returns them
+  unquoted), a **`SEQUENCE` of stored + 1** and a fresh `DTSTAMP`. IONOS
+  rejects a `SEQUENCE` lower than the stored one with 412 and increments the
+  stored value itself (probe run 4, P11). A 412 therefore means that the event
+  changed since Ada read it: it is reported as a concurrent-change conflict,
+  never overwritten. Updates may answer 201 or 204. Ambiguous outcomes are
+  reconciled by re-reading and comparing the Ada-owned fields; unresolved
+  cases stay `ambiguous`.
+- **Query window:** IONOS returns events from at least 40 days back to 13
+  months ahead, but not 3 months back or 18 months ahead (probe runs 2 and 4).
+  Ada queries at most one month back and twelve months ahead and states this
+  limit; Ada's own events stay addressable by resource name outside it.
 - **MVP write scope:** attendee-less, non-recurring events in Ada's configured
   calendars. Recurring series, single occurrences of a series, and events with
   attendees are read-only for Ada in the MVP and fail closed with a clear
@@ -154,14 +170,13 @@ Before this ADR becomes **Accepted**:
    store~~ — decided 2026-09-26 (D1: `recurring-ical-events`; D2: Keychain).
 2. ~~The maintainer confirms the thin Ada-owned adapter over python-caldav
    (section 4)~~ — confirmed 2026-09-26.
-3. The IONOS probe confirms the CalDAV basics on Ada's mailbox (P1-P4, P7;
-   runs 1 and 2 on 2026-09-26 confirmed P1-P3 and P7; P4 showed that IONOS
-   rejects updates it considers stale, which run 3 (P11) must pin down) and
-   that outward sharing delivers the calendars to family members in a usable
-   way with per-person guest access (P12, M3). If outward sharing is unusable,
-   the access topology is re-opened before implementation.
-4. Remaining probe results (P8, P9, M1, M4) are recorded; they tune
-   capabilities and limits but do not by themselves re-open this decision.
+3. ~~The IONOS probe confirms the CalDAV basics on Ada's mailbox and usable
+   outward sharing~~ — runs 1–4 on 2026-09-26 confirmed P1–P3, P7, P8, P9 and
+   the update rule (P11); sharing with a same-contract mailbox appears
+   automatically in that person's calendar apps (M3).
+4. The maintainer confirms that a family member with the Betrachter role
+   cannot change or delete an event of the shared calendar from their own
+   device (M6).
 
 ## Consequences
 
@@ -178,8 +193,10 @@ Negative / residual risks:
 - IONOS app passwords are not CalDAV-scoped (probe run 2, P9): the calendar
   credential also grants access to Ada's mailbox. Ada uses separate app
   passwords per purpose so each can be revoked independently.
-- Read-only subscriptions: family members cannot edit directly in their
-  calendar apps; subscription refresh intervals of their apps delay updates.
+- Read-only sharing: family members cannot edit directly in their calendar
+  apps. Apple Calendar showed changes only after a manual refresh (then almost
+  immediately); automatic refresh depends on each device's fetch settings.
+- Family members need a mailbox in the same IONOS contract.
 - Ada owns a small CalDAV client, including XML and HTTP edge cases.
 - OX's lossy conversion and limited RRULE support may alter or reject events.
 - LGPL dependencies need their distribution obligations handled before any
@@ -187,8 +204,9 @@ Negative / residual risks:
 
 ## Re-open triggers
 
-- The probe shows guest access is unusable for family members or does not
-  enforce read-only separation.
+- The Betrachter role does not prevent changes from family devices (M6).
+- People without a mailbox in the IONOS contract need access to Ada's
+  calendars.
 - Conflict detection must include appointments kept outside Ada's calendars
   (inbound sharing or a second provider adapter).
 - IONOS changes or removes CalDAV/app-password support.

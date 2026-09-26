@@ -219,13 +219,48 @@ Consequence: the outward mechanism for the MVP is **one invited guest per
 family member with the Betrachter role**, not anonymous links. P12 checks guest
 visibility and refused writes with the guest's own credentials.
 
-If conditional updates stay unreliable on IONOS, the fallback to evaluate is
-update as conditional `DELETE` + create-only `PUT` of a new resource inside one
-durable workflow. That would change event identity for subscribers and is
-non-atomic, so it is not adopted before run 2.
+### Run 4 (2026-09-26) and manual observations
+
+P1–P4, P7, P8 and P9 repeated run 2. P11 on a fresh event (stored `SEQUENCE`
+0 after create; the server sets `DTSTAMP` and `LAST-MODIFIED` itself):
+
+| Case | Status | Applied | Stored `SEQUENCE` |
+| --- | --- | --- | --- |
+| proper-1 (fresh `DTSTAMP`, `SEQUENCE` 1, current ETag) | 201 | yes | 0 → 1 |
+| old `DTSTAMP`, no `SEQUENCE` | 412 | no | 1 → 1 |
+| old `DTSTAMP`, `SEQUENCE` stored+1 | 201 | yes | 1 → 2 |
+| fresh `DTSTAMP`, `SEQUENCE` equal | 201 | yes | 2 → 3 |
+| fresh `DTSTAMP`, no `SEQUENCE` | 412 | no | 3 → 3 |
+| proper-2 | 201 | yes | 3 → 4 |
+| proper, wrong ETag | 412 | no | 4 → 4 |
+| proper, no `If-Match` | 201 | yes | 4 → 5 |
+
+Conclusion: IONOS rejects an update whose `SEQUENCE` is **lower** than the
+stored value (412), independent of `DTSTAMP` and of `If-Match`. With an equal
+`SEQUENCE` it accepts and increments the stored value itself; with a higher one
+it stores the sent value. `If-Match` is enforced when sent, but not required.
+This explains runs 1–2: the first update of an event (`SEQUENCE` 0 = stored 0)
+passed, later ones were stale. Ada writes updates with `SEQUENCE` stored + 1
+and always sends `If-Match`; the conditional `DELETE` + create fallback is not
+needed. The clock-skew check failed on a German locale and is fixed.
+
+Manual observations:
+
+- **Sharing:** IONOS offers no guest password and shares only with persons in
+  the same contract. A read-only share with the maintainer's own mailbox
+  appeared **automatically** in their account on iPhone and Mac (no
+  subscription).
+- **Refresh:** after moving the probe event, Apple Calendar showed the change
+  only after a manual refresh, then almost immediately.
+- **M4 confirmed:** no email to Ada; only the share invitation email reached
+  the invited address.
+- P10 again ended in the web UI; P12 (guest login) is impossible on IONOS.
+  Both probes and the inbound-sharing probes were removed from the tool.
 
 ## 11. Evidence still required
 
-See [the probe](../../research/calendar/README.md): the update freshness rule
-(P11), guest access with the guest's own credentials (P12, M3), and,
-optionally, inbound sharing (P5, P6).
+- **M6:** a family member with the Betrachter role cannot move or delete an
+  event of the shared calendar from their own device (manual check by the
+  maintainer).
+- Post-MVP: access for people outside the IONOS contract; inbound sharing if
+  it becomes relevant.

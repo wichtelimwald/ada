@@ -150,9 +150,9 @@ S6-S7 (roadmap `done` only in the last PR).
 
 - **S0 Evidence:** maintainer creates the Ada calendars' probe counterpart and an
   outward share, runs the IONOS probe; results recorded in the PR and the
-  evaluation; capabilities and limits fixed; ADR-0009 accepted. Runs 1 and 2
-  (2026-09-26) are recorded in the evaluation; run 3 must pin down the update
-  freshness rule (P11) and the share-link subscription (P10, M3).
+  evaluation; capabilities and limits fixed; ADR-0009 accepted. Runs 1–4
+  (2026-09-26) are recorded in the evaluation; only the manual read-only check
+  M6 and the maintainer's acceptance remain.
 - **S1 Domain and port:** types above, in-memory adapter updated, shared
   `CalendarPort` contract test suite, architecture-boundary test extended to
   forbid `httpx2`/`icalendar` imports in core/ports. No new dependency.
@@ -163,9 +163,12 @@ S6-S7 (roadmap `done` only in the last PR).
   server (`httpx2` mock transport) that reproduces documented OX behavior.
 - **S3 CalDAV create:** deterministic non-semantic UID/resource name from
   `OperationId`, create-only `PUT`, reconcile by `GET`, read-back comparison to
-  detect lossy provider changes; DBOS crash/retry tests against the fake server.
-- **S4 Update/cancel:** durable workflows, `If-Match`, conflict and
-  reconciliation semantics, Cedar actions/policies (D3).
+  detect lossy provider changes (write responses carry no ETag); DBOS
+  crash/retry tests against the fake server.
+- **S4 Update/cancel:** durable workflows, `If-Match` with quoted-ETag
+  normalization, `SEQUENCE` stored + 1 and fresh `DTSTAMP`, 201/204 as success,
+  412 as concurrent change, reconciliation semantics, Cedar actions/policies
+  (D3). The fake server must reproduce the IONOS `SEQUENCE` rule.
 - **S5 Conflict detection:** busy semantics, occurrences, travel table (D4),
   explicit unknown travel, availability-only inputs.
 - **S6 Operations:** credential source (D2), durable payload retention (D5),
@@ -249,4 +252,9 @@ To be copied to `docs/todo.md` before the implementation PRs merge:
   per protection domain instead of one account holding every family calendar.
 - Read-only import of appointments kept outside Ada's calendars (for example
   ICS feeds) if conflict detection must cover them.
-- Production credential management (MVP-90).
+- Production credential management (MVP-90). The development adapter reads
+  the app password from the Keychain service `ada-caldav` (same item as the
+  probe); a separate app password is used for mail (MVP-70).
+- IONOS shares calendars only with mailboxes in the same contract and offers
+  no external guest passwords: decide after the MVP how people outside the
+  contract get access.
