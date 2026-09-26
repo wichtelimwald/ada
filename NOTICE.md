@@ -48,7 +48,7 @@ For Ada development:
 - **cedarpy 4.12.0** — Apache License 2.0. Community-maintained Python/PyO3 binding used only behind AdaGuard.
 - **Cedar Policy engine 4.12.0** — Apache License 2.0. Embedded by cedarpy as the authorization engine selected by ADR-0004.
 
-- **DBOS 3.0.0** — MIT License. Used behind Ada's durable-action port as the initial durable-execution substrate selected by ADR-0005.
+- **DBOS 3.0.0** — MIT License. Used behind Ada's durable-action port as the initial durable-execution substrate selected by ADR-0005.\n- **Dulwich 1.2.15** — Apache-2.0 OR GPL-2.0-or-later; Ada uses the Apache-2.0 option. Used behind Ada's Memory-history port as the local Git implementation selected by ADR-0009. The reviewed package declares `urllib3>=2.2.2` as its only unconditional runtime dependency; urllib3 is MIT-licensed. Exact resolved transitive versions remain part of release-artifact review.
 
 Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; third-party code is not relicensed as Ada MIT code. Required license and NOTICE material must be preserved when distribution obligations apply.
 
