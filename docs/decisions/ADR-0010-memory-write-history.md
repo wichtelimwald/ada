@@ -79,6 +79,14 @@ Git is GPLv2 and is treated as a separately installed external executable, not
 vendored or redistributed by Ada in this decision. Future packaging/distribution
 must explicitly decide how Git is provisioned and review the resulting artifact.
 
+Evidence used for this implementation choice:
+
+- Git commit/pathspec behavior: https://git-scm.com/docs/git-commit
+- Git licensing/project information: https://git-scm.com/about/free-and-open-source
+- GitPython package metadata: https://pypi.org/project/GitPython/
+- Dulwich package metadata: https://pypi.org/project/dulwich/
+- pygit2 package metadata: https://pypi.org/project/pygit2/
+
 Alternatives considered:
 
 - **GitPython 3.1.x (BSD-3-Clause):** maintained and convenient but still shells
@@ -126,8 +134,11 @@ Network/distributed filesystem semantics and Windows are not accepted by this AD
   executed.
 - Protection domains/encryption are still absent; this remains unsuitable for real
   household Memory until MVP-30.
-- Non-cooperating editors can still modify files between operations; Ada detects
-  stale revisions rather than pretending to provide a cross-application lock.
+- Non-cooperating editors can still modify files between operations. Ada rechecks the
+  expected content revision immediately before replace/delete and verifies the result,
+  but POSIX path replacement is not a true cross-application compare-and-swap. The
+  adapter therefore detects practical stale-write windows and fails closed where it
+  can, without claiming an impossible mandatory lock for ordinary editors.
 - Packaging must revisit the external Git prerequisite.
 
 ## Re-open triggers
