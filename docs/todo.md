@@ -1,5 +1,10 @@
 # Ada backlog
 
+The canonical MVP work-package order, dependencies, and step-selection rules live
+in [the MVP execution roadmap](product/mvp-roadmap.md). This file owns detailed
+backlog/gate items; the roadmap owns which MVP package comes next.
+
+
 ## P0 — Product discovery
 
 - [x] Run the Ada product discovery interview.
@@ -64,8 +69,12 @@ Implementation note: the baseline uses TOML `+++` front matter so it can be pars
 - [ ] Route every model-originated Memory write/promotion through a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling.
 - [ ] Before exposing `remember_explicit` / promotion through any user- or model-facing path, bind `EXPLICIT_USER` to an Ada-owned trusted confirmation event and enforce class-C sensitive-data / class-D secret handling; the file store itself must not infer those facts from caller-supplied flags.
 - [ ] Implement safe established-Memory write/versioning behavior: out-of-band edit capture, path-restricted history commits, same-file concurrency detection/reconciliation, lock/crash recovery, and prompt capture of Ada writes so later manual reverts remain detectable.
+- [ ] Close file-native baseline residuals before any user/model-facing generic Memory write path: make deliberate forget robust when the established file itself is malformed; decide whether forgotten IDs are permanently burned or safely reusable; use opaque/non-sensitive entry IDs or enforce a non-sensitive-ID rule so tombstones do not retain sensitive semantics; define idempotent repeated-forget return semantics.
+- [ ] Harden file access/publication for the supported protected-storage profile: fd-based no-follow reads to close the remaining symlink TOCTOU window; directory durability semantics (including directory fsync / macOS durability behavior); personality bootstrap must be create-only/no-clobber under concurrency; define a create-only fallback for filesystems/providers without hard-link support instead of silently assuming `os.link`.
+
 - [ ] Ensure normal Memory retrieval/learning uses only current state and never consults Git history, snapshots, or backups as active Memory/evidence; historical retention/purge remains a separate operations/privacy policy.
 - [ ] Implement deterministic current/superseded/unresolved retrieval and stale-source handling; direct substring search must not promote superseded text as current truth.
+- [ ] Before generic Memory entries are consumed by retrieval/context assembly, enforce per-area lifecycle/currentness invariants so provisional, contradicted, superseded or otherwise non-current entries cannot be returned as established current Memory.
 - [ ] Ensure operational forgetting removes content from current authoritative retrieval and every reconstructible derived index, and removes/neutralizes pre-forget `learning/` evidence so forgotten knowledge cannot be silently re-promoted; historical purge/backup retention remains a separate explicit operation.
 - [ ] Define and validate the minimum provenance/source-reference and external-document lifecycle needed by the implemented MVP scenarios without creating duplicate hidden truth.
 - [ ] Enforce source ownership: calendar/contact/document facts remain owned by their authoritative source by default; Memory persists references, derived abstractions, or explicitly requested independent copies rather than duplicate current truth.
