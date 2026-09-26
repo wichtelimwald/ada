@@ -72,13 +72,21 @@ The current DBOS-backed calendar path is **synthetic/test-only**. No real calend
 
 ## Current phase
 
+Ada now follows a persistent [MVP execution roadmap](docs/product/mvp-roadmap.md).
+It defines the work-package order, dependencies, parallelizable steps and the
+contract for "next step" / "overnext step" requests. Detailed implementation
+gates remain in the [backlog](docs/todo.md), and each non-trivial package gets a
+step-level plan under [docs/plans/](docs/plans/).
+
+Current execution principles:
+
 1. Keep Ada-owned domain and security boundaries independent from replaceable frameworks.
-2. Build the smallest representative vertical slice from the confirmed scenarios.
+2. Implement the next ready MVP work package, or an explicitly requested later ready package, without bypassing dependencies.
 3. Evaluate missing capabilities independently as **reuse / adapt / build**, with an explicit existing-system and license scan before custom implementation.
 4. Add stronger process/container isolation only when a capability's risk or lifecycle requires it.
 5. Keep authoritative Memory outside the Ada runtime/container.
 
-See the [representative scenarios](docs/product/representative-scenarios.md), [modular core boundaries](docs/architecture/modular-core-boundaries.md), and [backlog](docs/todo.md).
+See the [representative scenarios](docs/product/representative-scenarios.md), [MVP roadmap](docs/product/mvp-roadmap.md), [modular core boundaries](docs/architecture/modular-core-boundaries.md), and [backlog](docs/todo.md).
 
 ## Inspiration and upstream candidates
 
