@@ -33,6 +33,12 @@ class ConfirmationBasis(StrEnum):
     OBSERVED_PATTERN = "observed_pattern"
 
 
+class ForgetResult(StrEnum):
+    FORGOTTEN = "forgotten"
+    ALREADY_FORGOTTEN = "already_forgotten"
+    NOT_FOUND = "not_found"
+
+
 @dataclass(frozen=True, slots=True)
 class MemoryEntry:
     """One inspectable Memory or learning item independent from retrieval/runtime."""
@@ -44,3 +50,11 @@ class MemoryEntry:
     content: str
     confirmation_basis: ConfirmationBasis | None = None
     supports_memory_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class VersionedMemoryEntry:
+    """One current Memory entry plus the revision token read by the caller."""
+
+    entry: MemoryEntry
+    revision: str

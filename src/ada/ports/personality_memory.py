@@ -17,4 +17,4 @@ class PersonalityMemoryPort(Protocol):
         *,
         reason: str,
     ) -> None:
-        """Persist an inspectable personality change with provenance/reason."""
+        """Initialize personality without clobbering an already existing profile."""
