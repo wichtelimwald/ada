@@ -1,8 +1,8 @@
 # Technology evaluation — first real calendar provider (MVP-60)
 
-**Status:** Research; decision proposed in [ADR-0009](../decisions/ADR-0009-calendar-provider-integration.md).
-Provider-specific facts marked *probe* still need evidence from
-[the IONOS probe](../../research/calendar/README.md).
+**Status:** Decided — [ADR-0009](../decisions/ADR-0009-calendar-provider-integration.md) accepted on 2026-09-26.
+Facts marked *probe* in sections 3–4 were answered by the
+[IONOS probe](../../research/calendar/README.md) runs in section 10.
 
 - **Date checked:** 2026-09-26
 - **Step plan:** [MVP-60](../plans/MVP-60-real-calendar-provider.md)
@@ -124,7 +124,7 @@ The hard parts are delegated: `icalendar` parses/serializes RFC 5545 and
 | Transport setup, origin/redirect/size limits, error mapping (not sent vs ambiguous) | 60-100 |
 | `PROPFIND` (calendar listing, privileges, change tokens) and `REPORT calendar-query` request building and multistatus parsing | 120-180 |
 | `GET` / create-only `PUT` / conditional `PUT` / conditional `DELETE` | 80-120 |
-| OX server profile (window clamping, component post-filtering, canonical URL) | 30-60 |
+| Provider-profile handling (window clamping, component post-filtering, canonical URL, entity-tag normalization) | 30-60 |
 | **Sum** | **~300-450** |
 
 Mapping iCalendar data into Ada's read model, the capability/reconciliation
@@ -256,11 +256,31 @@ Manual observations:
   the invited address.
 - P10 again ended in the web UI; P12 (guest login) is impossible on IONOS.
   Both probes and the inbound-sharing probes were removed from the tool.
+- **M6:** moving the shared probe event is not possible from the maintainer's
+  iPhone or Mac (read-only role enforced); the earlier move was done in Ada's
+  webmail.
+
+### IONOS profile data (input for implementation)
+
+These observations become the data of the IONOS CalDAV profile (ADR-0009
+section 2). Items marked *OX notes* come from python-caldav's self-hosted OX
+profile and were not probed on IONOS; the adapter handles them defensively.
+
+| Aspect | IONOS behavior | Profile/adapter handling |
+| --- | --- | --- |
+| Endpoint | `dav.mailbusiness.ionos.de`, collections `/caldav/<base64 of cal://0/N>` | Configured collection URLs; no discovery |
+| Create | create-only `PUT` honored (repeat → 412); duplicate UID → 403; no `ETag` in response | Capability `IDEMPOTENT`; re-read after write |
+| Update | `SEQUENCE` lower than stored → 412; equal accepted and incremented by the server; `If-Match` enforced when sent, not required; success is 201; no `ETag` in response | `SEQUENCE` stored + 1; always `If-Match`; any 2xx is success; re-read after write |
+| Entity tags | `GET` header quoted; `REPORT` `getetag` unquoted | Normalize to the quoted form |
+| Delete | conditional; repeat → 404 | "already absent" semantics |
+| `X-` properties | preserved | Optional non-authoritative marker |
+| Query window | returns at least −40 days … +13 months; not −3 months / +18 months | Profile window −1 month … +12 months |
+| Change tokens | `getctag` and `sync-token` on writable calendars | Available for later incremental sync |
+| Filters / free-busy | *OX notes*: `comp-filter` ignored; free-busy report unsupported | Post-filter components; derive busy time from events |
+| Credentials | app password also grants IMAP; dialog has only a name field | Separate app passwords per purpose |
+| Sharing | read-only role available; only mailboxes in the same contract; no guest passwords; anonymous links lead to the web UI | Share with family members' mailboxes; no anonymous links |
 
 ## 11. Evidence still required
 
-- **M6:** a family member with the Betrachter role cannot move or delete an
-  event of the shared calendar from their own device (manual check by the
-  maintainer).
-- Post-MVP: access for people outside the IONOS contract; inbound sharing if
-  it becomes relevant.
+None for ADR-0009. Post-MVP: access for people outside the IONOS contract;
+inbound sharing if it becomes relevant.

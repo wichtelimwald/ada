@@ -38,7 +38,8 @@ trade-offs.
 
 ## Scope
 
-1. Generic CalDAV adapter with an OX/IONOS server profile behind `CalendarPort`.
+1. Generic CalDAV adapter behind `CalendarPort` with a declarative IONOS provider
+   profile (data from the evaluation, section 10).
 2. Read: list configured calendars, bounded event queries, recurrence expansion,
    availability view separated from details.
 3. Create, update and cancel ordinary events through AdaGuard + durable execution.
@@ -61,12 +62,12 @@ trade-offs.
 
 ## Decisions
 
-D1-D6 were decided by the maintainer on 2026-09-26 as recommended; the thin
-Ada-owned adapter was confirmed the same day.
+D0-D6 were decided by the maintainer on 2026-09-26; the thin Ada-owned adapter
+was confirmed the same day.
 
 | ID | Decision | Result | Status |
 | --- | --- | --- | --- |
-| D0 | Accept ADR-0009 | pending: probe P1-P4, P7, P10, M2, M3 (thin adapter confirmed 2026-09-26) | open |
+| D0 | Accept ADR-0009 | accepted 2026-09-26 after probe runs 1–4 and M6; ADR made provider-neutral (declarative CalDAV profiles instead of provider-specific adapters) | decided |
 | D1 | Recurrence expansion | `recurring-ical-events` (LGPL-3.0-or-later) + `x-wr-timezone`, unmodified | decided |
 | D2 | Development credential store | macOS Keychain via `/usr/bin/security` on the Mac host; owner-only `0600` file only for synthetic accounts in dev containers | decided |
 | D3 | Update/cancel authority | Ada-created events within the grant; other events only with explicit per-action confirmation; Cedar policy decides; Ada records references of events it created | decided |
@@ -150,15 +151,14 @@ S6-S7 (roadmap `done` only in the last PR).
 
 - **S0 Evidence:** maintainer creates the Ada calendars' probe counterpart and an
   outward share, runs the IONOS probe; results recorded in the PR and the
-  evaluation; capabilities and limits fixed; ADR-0009 accepted. Runs 1–4
-  (2026-09-26) are recorded in the evaluation; only the manual read-only check
-  M6 and the maintainer's acceptance remain.
+  evaluation; capabilities and limits fixed; ADR-0009 accepted. **Done
+  2026-09-26** (runs 1–4, M6).
 - **S1 Domain and port:** types above, in-memory adapter updated, shared
   `CalendarPort` contract test suite, architecture-boundary test extended to
   forbid `httpx2`/`icalendar` imports in core/ports. No new dependency.
 - **S2 CalDAV read path:** transport hardening, `PROPFIND` listing/privileges,
   bounded `calendar-query` with window clamping and component post-filtering,
-  canonical-URL adoption, iCalendar mapping, recurrence expansion (D1),
+  canonical-URL adoption, entity-tag normalization, iCalendar mapping, recurrence expansion (D1),
   all-day/time-zone/floating-time handling. Tests against an in-process fake
   server (`httpx2` mock transport) that reproduces documented OX behavior.
 - **S3 CalDAV create:** deterministic non-semantic UID/resource name from
