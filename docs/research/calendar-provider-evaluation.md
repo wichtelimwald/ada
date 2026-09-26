@@ -200,6 +200,25 @@ P1–P3, P4a–c and P7 repeated run 1. No event from run 1 was left behind (M5)
 | P10 | Anonymous share link with `?ical=true` answers **302** (not followed in run 2). | Run 3 follows HTTPS redirects anonymously and checks for iCalendar output. |
 | M2 | A read-only share link could be created. | Further options (invitation, expiry) still to report. |
 
+### Run 3 (2026-09-26) and manual observations
+
+The CalDAV URL prompt received the **webmail address** instead of the CalDAV
+collection URL, so P1–P8 and P11 returned 404/302 and are **not evaluable**. The
+probe now rejects non-CalDAV URLs and stops before any write if P1 fails.
+
+| Item | Result | Conclusion |
+| --- | --- | --- |
+| P9 | IMAP login succeeded again. | Confirms run 2. |
+| P10 | Anonymous link: 302 to the **web UI**; after following, HTML (also with `Accept: text/calendar` and a calendar-client User-Agent); no iCalendar. | Anonymous links are **not usable** as calendar subscriptions on IONOS. |
+| M1 | The app-password dialog has only a name field. | No scope choice; matches P9. |
+| M2 | Invitations offer roles **Betrachter** (read), **Überarbeiter** (read/write), **Autor** (read/write/delete), plus granular folder/read/write/delete permissions (own vs all objects). | Per-person, provider-enforced roles are available for outward sharing. |
+| M3 | Subscribing asks for a password. | Family members need their **own guest credentials**; Ada's credentials must never be used on family devices (they grant Ada's whole mailbox, P9). |
+| M4 | No email reached Ada; the invited address received the invitation email (maintainer's report; interpretation to be confirmed). | No unintended event notifications observed so far. |
+
+Consequence: the outward mechanism for the MVP is **one invited guest per
+family member with the Betrachter role**, not anonymous links. P12 checks guest
+visibility and refused writes with the guest's own credentials.
+
 If conditional updates stay unreliable on IONOS, the fallback to evaluate is
 update as conditional `DELETE` + create-only `PUT` of a new resource inside one
 durable workflow. That would change event identity for subscribers and is
@@ -208,6 +227,5 @@ non-atomic, so it is not adopted before run 2.
 ## 11. Evidence still required
 
 See [the probe](../../research/calendar/README.md): the update freshness rule
-(P11), whether the share link delivers iCalendar and works as a subscription
-(P10, M3), app-password dialog (M1), remaining sharing options (M2),
-notification side effects (M4), and, optionally, inbound sharing (P5, P6).
+(P11), guest access with the guest's own credentials (P12, M3), and,
+optionally, inbound sharing (P5, P6).

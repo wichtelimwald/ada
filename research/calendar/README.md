@@ -39,7 +39,7 @@ The core probe therefore needs only Ada's mailbox. The inbound-sharing probes
 | W1 | IONOS contract | Dedicated Ada mailbox (the intended Ada identity). |
 | W2 | Ada webmail → My Account → Login & Security | Enable two-step verification. Create an app password named `Ada CalDAV probe`. |
 | W3 | Ada webmail → Calendar | Create calendar `Ada probe`. Copy its CalDAV URL (calendar ⋯ → Properties). |
-| W4 | Ada webmail → Calendar → `Ada probe` → share | Share the calendar outward the way family members would receive it: a read-only link and, if offered, an invitation to one of **your own** external addresses. Copy the link for the probe's hidden prompt. Optionally subscribe to it on your own iPhone/Mac. |
+| W4 | Ada webmail → Calendar → `Ada probe` → share | Invite one of **your own** external addresses with the role **Betrachter** (viewer, read-only). Open the invitation email and set the guest password if IONOS offers it. Optionally also create an anonymous link (P10). |
 | W5 (optional) | Second mailbox in the **same** contract | Only if such a mailbox exists: create synthetic calendars `Ada probe shared RO` / `Ada probe shared RW`, share them with Ada (viewer / author), and add the synthetic events described for P5. Not needed for the MVP model. |
 
 For P5 (optional), the `shared RO` calendar needs, on one date:
@@ -51,7 +51,7 @@ Record these manual observations with the probe output:
 
 - **M1:** Does the app-password dialog offer an application type/scope (for example CalDAV only), or only a name?
 - **M2:** Which outward sharing options does webmail offer for Ada's calendars: invite by external address, anonymous link, read-only vs read/write, expiry, PIN? Does an invited guest see anything besides the shared calendar?
-- **M3:** Create one event `Ada probe manual` in the probe calendar via webmail. Subscribe to the share link in Apple Calendar (File → New Calendar Subscription; try the link as given and with `?ical=true`). Does the event appear? After changing its time in webmail, how long until the subscription shows it? Delete the event and the subscription afterwards.
+- **M3:** Create one event `Ada probe manual` in the probe calendar via webmail. In Apple Calendar, subscribe **as the invited guest** — with the guest login and guest password, **never Ada's credentials** — either as a calendar subscription or as a CalDAV account on the CalDAV host. Does the event appear? After changing its time in webmail, how long until Apple Calendar shows it? Remove the subscription/account and the event afterwards.
 - **M4:** Did the invited external address receive any email when the probe created, changed or deleted events?
 - **M5:** After the run, is the `Ada probe` calendar in webmail empty? Report any remaining `Ada probe …` event (title only) and delete it manually.
 
@@ -77,6 +77,7 @@ status.
 | P8 | Does the server hide events outside a query window? The boundary checks test +11/+13 months and −20/−40 days. | Supported look-ahead/look-back range and user-visible limits. |
 | P9, M1 | Does the app password also grant IMAP? | Credential blast radius (residual risk vs narrower credential). |
 | P10, M2, M3 | Does the outward share deliver current iCalendar data, and how do family members receive it? | Feasibility and UX of the Ada-owned calendar model (read-only subscriptions, refresh latency). |
+| P12 | With the invited guest's own credentials: which calendars are visible, is the probe event readable, are writes and deletes refused for a viewer? | Whether per-person guest access gives provider-enforced read-only separation. |
 | M4 | Do Ada's writes notify guests? | Whether calendar writes can cause unintended email side effects. |
 | P11 | Which iCalendar fields make an update "fresh" for IONOS? See the interpretation below. | How Ada writes updates (SEQUENCE/DTSTAMP handling). |
 | M5 | Did the probe leave events behind? | Whether a blind overwrite created hidden copies (P4 anomaly). |

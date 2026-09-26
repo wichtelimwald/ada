@@ -36,9 +36,12 @@ calendar provider. Do not use the proprietary OX HTTP API.
   family calendar**. Ada is their owner and regular writer.
 - The maintainer creates these calendars once in webmail. Ada's runtime does
   not create or delete calendars.
-- Family members **subscribe** to the calendars shared with them (outward
-  sharing; read-only per OX documentation). Changes go through Ada or, as an
-  administrative fallback, through the maintainer in webmail.
+- Each family member is **invited as a guest** with the read-only role
+  (Betrachter) to their own calendar and the family calendar, and uses **their
+  own guest login** in their calendar app. Anonymous share links are not used:
+  on IONOS they lead to the web UI, not to iCalendar (probe run 3). Changes go
+  through Ada or, as an administrative fallback, through the maintainer in
+  webmail. Ada's credentials are never configured on family devices.
 - Ada authenticates with an **app password of its own mailbox** (two-step
   verification enabled). No family member credentials exist in Ada.
 - The credential is a secret (data class *Secret*): never in Memory, model
@@ -51,11 +54,11 @@ calendar provider. Do not use the proprietary OX HTTP API.
 **Accepted MVP trade-offs:**
 
 - All family calendars live in one provider account. Separation between family
-  members depends on **which share links/invitations each person receives**
-  and on **AdaGuard disclosure rules**, not on separate provider accounts.
+  members depends on **which calendars each guest is invited to** (provider-
+  enforced roles, pending probe P12) and on **AdaGuard disclosure rules**, not
+  on separate provider accounts.
 - Anyone holding Ada's credential (the Ada runtime, the maintainer) can read
-  every family calendar.
-- Share links are bearer secrets; a forwarded link discloses that calendar.
+  every family calendar and Ada's mailbox.
 - Ada knows only events in its own calendars. Appointments kept elsewhere
   (work or personal calendars) do not take part in conflict detection unless
   they are entered into Ada's calendars.
@@ -155,8 +158,8 @@ Before this ADR becomes **Accepted**:
    runs 1 and 2 on 2026-09-26 confirmed P1-P3 and P7; P4 showed that IONOS
    rejects updates it considers stale, which run 3 (P11) must pin down) and
    that outward sharing delivers the calendars to family members in a usable
-   way (P10, M2, M3). If outward sharing is unusable, the access topology is
-   re-opened before implementation.
+   way with per-person guest access (P12, M3). If outward sharing is unusable,
+   the access topology is re-opened before implementation.
 4. Remaining probe results (P8, P9, M1, M4) are recorded; they tune
    capabilities and limits but do not by themselves re-open this decision.
 
@@ -184,7 +187,8 @@ Negative / residual risks:
 
 ## Re-open triggers
 
-- The probe shows outward sharing is unusable for family members.
+- The probe shows guest access is unusable for family members or does not
+  enforce read-only separation.
 - Conflict detection must include appointments kept outside Ada's calendars
   (inbound sharing or a second provider adapter).
 - IONOS changes or removes CalDAV/app-password support.

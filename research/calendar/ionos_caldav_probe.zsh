@@ -25,6 +25,9 @@ read -r "ADA_USER?Ada mailbox address: "
 read -rs "ADA_PASS?Ada app password (input hidden): "; print
 read -r "PROBE_URL?CalDAV URL of the Ada-owned probe calendar: "
 read -rs "SHARE_LINK?Outward share/subscription link of the probe calendar (optional, hidden; Enter to skip): "; print
+read -r "GUEST_USER?Guest login of a person invited to the probe calendar, for P12 (optional; Enter to skip): "
+GUEST_PASS=""
+[[ -n $GUEST_USER ]] && { read -rs "GUEST_PASS?Guest password (input hidden): "; print }
 print "Inbound-sharing probes (calendars shared WITH Ada by another mailbox) are optional; Enter skips them."
 read -r "SHARED_RO_URL?CalDAV URL of a synthetic calendar shared READ-ONLY with Ada (optional): "
 read -r "SHARED_RW_URL?CalDAV URL of a synthetic calendar shared READ/WRITE with Ada (optional): "
@@ -38,14 +41,17 @@ IMAP_HOST=${IMAP_HOST:-imap.ionos.de}
 [[ -n $SHARED_RO_URL && $SHARED_RO_URL != */ ]] && SHARED_RO_URL=$SHARED_RO_URL/
 [[ -n $SHARED_RW_URL && $SHARED_RW_URL != */ ]] && SHARED_RW_URL=$SHARED_RW_URL/
 for url in $PROBE_URL $SHARED_RO_URL $SHARED_RW_URL; do
-  [[ $url == https://*/ ]] || { print -u2 "CalDAV URLs must start with https://"; exit 1 }
+  if [[ $url != https://*/caldav/*/ || $url == *[\#\?]* ]]; then
+    print -u2 "Not a CalDAV URL: expected https://<host>/caldav/<calendar-id> (calendar ⋯ → Properties), not the webmail address"
+    exit 1
+  fi
 done
 [[ -z $PROBE_URL ]] && { print -u2 "the probe calendar URL is required"; exit 1 }
 [[ -z $SHARED_RO_URL || $SHARED_DAY == <19000101-29991231> ]] || { print -u2 "date must be YYYYMMDD"; exit 1 }
 [[ -z $SHARE_LINK || $SHARE_LINK == https://* ]] || { print -u2 "the share link must start with https://"; exit 1 }
 [[ $IMAP_HOST == *[^A-Za-z0-9.-]* ]] && { print -u2 "IMAP host must be a hostname such as imap.ionos.de"; exit 1 }
 # curl --config strings treat quote and backslash specially.
-if [[ $ADA_PASS == *[\"\\]* || $ADA_USER == *[\"\\]* ]]; then
+if [[ $ADA_PASS == *[\"\\]* || $ADA_USER == *[\"\\]* || $GUEST_PASS == *[\"\\]* || $GUEST_USER == *[\"\\]* ]]; then
   print -u2 "credentials containing quote or backslash are not supported by this probe"
   exit 1
 fi
@@ -60,6 +66,9 @@ dav() {
     curl --silent --show-error --proto '=https' --max-redirs 0 --max-time 30 --config - "$@"
 }
 http_code() { dav --output /dev/null --write-out '%{http_code}' "$@" }
+# Run a probe helper with the invited guest's credentials instead of Ada's
+# (zsh dynamic scoping: dav() sees these locals).
+as_guest() { local ADA_USER=$GUEST_USER ADA_PASS=$GUEST_PASS; "$@" }
 report() { print -r -- "$1: $2 (expected: $3)" }
 new_event_id() { print -r -- "ada-probe-${(L)$(uuidgen)}" }
 
@@ -120,7 +129,7 @@ current_etag() { # url -> quoted ETag or empty
 }
 
 etag_shape() { # etag -> shape description; never prints the value
-  local v=$1 weak=no quoted=no
+  local v=${1:-} weak=no quoted=no
   [[ -z $v ]] && { print -r -- "absent"; return }
   [[ $v == W/* ]] && weak=yes
   [[ ${v#W/} == \"*\" ]] && quoted=yes
@@ -161,6 +170,7 @@ EOF
 code=$(dav --output "$WORK/home.xml" --write-out '%{http_code}' -X PROPFIND -H 'Depth: 1' \
   -H 'Content-Type: application/xml; charset=utf-8' --data-binary "@$WORK/propfind.xml" "$HOME_URL")
 report P1-status "$code" "207"
+[[ $code == 207 ]] || { print -u2 "P1 failed: check the CalDAV URL and the app password; stopping before any write"; exit 1 }
 typeset -a LABELS=("probe=$PROBE_URL")
 [[ -n $SHARED_RO_URL ]] && LABELS+=("shared-ro=$SHARED_RO_URL")
 [[ -n $SHARED_RW_URL ]] && LABELS+=("shared-rw=$SHARED_RW_URL")
@@ -195,7 +205,7 @@ for v in 1 2 3 4 5 6; do
 done
 report P4d-create "$(put_new $URL_F "$WORK/f1.ics")" "201"
 e1=$(current_etag $URL_F)
-report P4e-get-etag-shape "$(etag_shape $e1)" "quoted, not weak"
+report P4e-get-etag-shape "$(etag_shape "$e1")" "quoted, not weak"
 report P4f-update-with-get-etag "$(put_if_match $URL_F "$WORK/f2.ics" "$e1")" "204 or 201"
 report P4g-etag-on-update-response "$(grep -qi '^etag:' "$WORK/last-update.hdr" && print present || print absent)" "informational"
 e2=$(current_etag $URL_F)
@@ -204,7 +214,7 @@ report P4i-second-update "$(put_if_match $URL_F "$WORK/f3.ics" "$e2")" "204 or 2
 e3=$(current_etag $URL_F)
 code=$(query_range $PROBE_URL ${NEAR_DAY}T000000Z ${NEAR_DAY}T235959Z "$WORK/f.xml")
 r3=$([[ $code == 207 ]] && $PY "$SUMMARIZE" etag-for-uid "$WORK/f.xml" $EVT_F)
-report P4j-report-etag-equals-get-etag "$([[ -n $r3 && $r3 == $e3 ]] && print yes || print "no (report etag $(etag_shape $r3))")" "yes"
+report P4j-report-etag-equals-get-etag "$([[ -n $r3 && $r3 == $e3 ]] && print yes || print "no (report etag $(etag_shape "$r3"))")" "yes"
 report P4k-update-with-report-etag "$(put_if_match $URL_F "$WORK/f4.ics" "${r3:-missing}")" "204 or 201"
 report P4l-blind-overwrite "$(http_code -X PUT -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/f5.ics" $URL_F)" "409 = If-Match required; 201/204 = not required"
 e5=$(current_etag $URL_F)
@@ -239,6 +249,22 @@ sleep 2
 p11 proper-no-if-match fresh plus1 none
 stored_state $URL_G
 report P11-stored-final "sequence=${S_SEQ:-absent} dtstamp=${S_DTSTAMP:-absent} last-modified=${S_LASTMOD:-absent}" "informational"
+
+print "== P12 invited-guest view (optional)"
+if [[ -n $GUEST_USER ]]; then
+  code=$(as_guest dav --output "$WORK/guest-home.xml" --write-out '%{http_code}' -X PROPFIND -H 'Depth: 1' \
+    -H 'Content-Type: application/xml; charset=utf-8' --data-binary "@$WORK/propfind.xml" "$HOME_URL")
+  report P12a-guest-listing "$code" "207"
+  [[ $code == 207 ]] && $PY "$SUMMARIZE" listing "$WORK/guest-home.xml" "probe=$PROBE_URL" | sed -e 's/^P1/P12b/' -e 's/the Ada account/the guest/'
+  code=$(as_guest query_range $PROBE_URL ${NEAR_DAY}T000000Z ${NEAR_DAY}T235959Z "$WORK/guest-q.xml")
+  report P12c-guest-sees-probe-event "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/guest-q.xml" $EVT_A || print "status $code")" "1"
+  EVT_H=$(new_event_id)
+  ics $EVT_H "Ada probe guest write" ${NEAR_DAY}T180000Z ${NEAR_DAY}T190000Z > "$WORK/h.ics"
+  report P12d-guest-create "$(as_guest put_new ${PROBE_URL}${EVT_H}.ics "$WORK/h.ics")" "403 for a viewer (Betrachter)"
+  report P12e-guest-delete-ada-event "$(as_guest http_code -X DELETE ${PROBE_URL}${EVT_A}.ics)" "403 for a viewer"
+else
+  print "skipped (no guest login given)"
+fi
 
 print "== P10 outward share link (anonymous subscription view)"
 if [[ -n $SHARE_LINK ]]; then
