@@ -85,6 +85,13 @@ Implementation note: the baseline uses TOML `+++` front matter so it can be pars
 - [ ] Guard robustness follow-up: reject invalid `AuthenticationAssurance` types as `invalid_request` rather than raising during context construction.
 - [ ] Implement ADR-0007 context-aware interpretation behind Ada-owned types/ports: trusted `InterpretationContext`, raw temporal expressions, and explicit/context-derived/defaulted derivation evidence.
 - [ ] Close ADR-0007 resolver adoption gates before adding a production temporal dependency: safe/reproducible Quickadd JSON artifact and license provenance (or an alternative resolver), full dependency lock, target container/Linux validation, source-span attribution, determinism, thread safety, footprint, and independent review.
+**Gates before real calendar data (MVP-60, [step plan](plans/MVP-60-real-calendar-provider.md)):**
+
+- [ ] Accept or revise [ADR-0009](decisions/ADR-0009-calendar-provider-integration.md) (IONOS Mail Business via a provider-neutral CalDAV adapter), including the recurrence-expansion copyleft decision and the development credential store.
+- [ ] Run the [IONOS CalDAV probe](../research/calendar/README.md) with synthetic calendars and record the results; shared-calendar visibility/enforcement for the Ada mailbox is decision-changing.
+- [ ] Complete the focused dependency review for `icalendar` (and `recurring-ical-events` if adopted) and record it in NOTICE.md before adding the dependency.
+- [ ] Minimize durable workflow state for real event data (no titles/locations retained after a terminal outcome), as required by ADR-0005.
+
 - [ ] Add Dependabot configuration only after package ecosystems actually exist.
 - [ ] Revisit ProjectAtlas vs Graphify only when repository size/complexity justifies repository indexing.
 

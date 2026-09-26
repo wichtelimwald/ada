@@ -70,6 +70,8 @@ This table is intentionally short and user-facing. Detailed trade-offs, versions
 
 The current DBOS-backed calendar path is **synthetic/test-only**. No real calendar account or personal event data is connected yet. Before a production provider is added, Ada must review how sensitive event payloads are stored in durable workflow state and minimize or reference them appropriately.
 
+**Proposed, not yet accepted or implemented:** [ADR-0009](docs/decisions/ADR-0009-calendar-provider-integration.md) proposes IONOS Mail Business as the first real calendar provider, reached through standard CalDAV by a small Ada-owned adapter. Ada would use its **own** mailbox; family members would share only the calendars they choose with it, as read-only or writable, and could revoke that sharing at any time. Ada would never store a family member's password. Events that their owner marks as private stay invisible to Ada, so Ada cannot consider them when checking for conflicts. Other providers remain possible through separate adapters.
+
 ## Current phase
 
 Ada now follows a persistent [MVP execution roadmap](docs/product/mvp-roadmap.md).
