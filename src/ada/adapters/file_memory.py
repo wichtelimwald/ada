@@ -429,6 +429,12 @@ class FileMemoryStore:
                     area="learning",
                 )
                 if learning_entry.lifecycle is MemoryLifecycle.FORGOTTEN:
+                    if memory_entry is None:
+                        return ForgetResult.ALREADY_FORGOTTEN
+                    self._cleanup_established_after_tombstone(
+                        entry_id,
+                        memory_path,
+                    )
                     return ForgetResult.ALREADY_FORGOTTEN
 
             if memory_entry is None and learning_entry is None:
@@ -455,32 +461,10 @@ class FileMemoryStore:
                 create_only=not self._path_exists(learning_path),
             )
             if self._path_exists(memory_path):
-                try:
-                    self._unlink_regular(memory_path)
-                except FileMemoryError as exc:
-                    # The tombstone already makes the identity forgotten in
-                    # current semantics. Preserve/capture that exact partial
-                    # state and report it explicitly instead of returning an
-                    # ambiguous generic failure.
-                    partial = self._snapshot_current_files()
-                    try:
-                        self._history.capture_snapshot(
-                            partial,
-                            reason=(
-                                f"Capture partial forget requiring cleanup "
-                                f"{entry_id}"
-                            ),
-                        )
-                    except MemoryHistoryError as history_exc:
-                        raise FileMemoryRecoveryRequiredError(
-                            f"Memory {entry_id!r} is forgotten in current "
-                            "semantics, established-file cleanup failed, and "
-                            "the partial state could not be captured in history"
-                        ) from history_exc
-                    raise FileMemoryRecoveryRequiredError(
-                        f"Memory {entry_id!r} is forgotten in current semantics, "
-                        "but established-file cleanup failed; recovery is required"
-                    ) from exc
+                self._cleanup_established_after_tombstone(
+                    entry_id,
+                    memory_path,
+                )
 
             desired = dict(before)
             desired[f"learning/{entry_id}.md"] = tombstone
@@ -490,6 +474,38 @@ class FileMemoryStore:
                 reason=f"Forget Memory {entry_id}",
             )
             return ForgetResult.FORGOTTEN
+
+    def _cleanup_established_after_tombstone(
+        self,
+        entry_id: str,
+        memory_path: Path,
+    ) -> None:
+        try:
+            self._unlink_regular(memory_path)
+        except FileMemoryError as exc:
+            # The tombstone already makes the identity forgotten in current
+            # semantics. Preserve/capture that exact partial state and report
+            # it explicitly instead of returning an ambiguous generic failure.
+            partial = self._snapshot_current_files()
+            try:
+                self._history.capture_snapshot(
+                    partial,
+                    reason=(
+                        f"Capture partial forget requiring cleanup "
+                        f"{entry_id}"
+                    ),
+                )
+            except MemoryHistoryError as history_exc:
+                raise FileMemoryRecoveryRequiredError(
+                    f"Memory {entry_id!r} is forgotten in current semantics, "
+                    "established-file cleanup failed, and the partial state "
+                    "could not be captured in history"
+                ) from history_exc
+            raise FileMemoryRecoveryRequiredError(
+                f"Memory {entry_id!r} is forgotten in current semantics, "
+                "but established-file cleanup failed; retry forget after "
+                "repairing the storage error"
+            ) from exc
 
     def load_memory_entry(
         self,
