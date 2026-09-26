@@ -2,7 +2,7 @@
 # MVP-60 IONOS Mail Business CalDAV conformance probe.
 #
 # Synthetic data only. Read research/calendar/README.md first: it lists the
-# webmail preparation steps (W1-W5) and what the output means.
+# webmail preparation steps and what the output means.
 #
 # The probe prints HTTP status codes, header presence, structural calendar
 # properties and synthetic probe fields. It does not print calendar display
@@ -24,16 +24,25 @@ done
 read -r "ADA_USER?Ada mailbox address: "
 read -rs "ADA_PASS?Ada app password (input hidden): "; print
 read -r "PROBE_URL?CalDAV URL of the Ada-owned probe calendar: "
-read -r "SHARED_RO_URL?CalDAV URL of the synthetic calendar shared READ-ONLY with Ada: "
-read -r "SHARED_RW_URL?CalDAV URL of the synthetic calendar shared READ/WRITE with Ada: "
-read -r "SHARED_DAY?Date of the synthetic events in the read-only calendar (YYYYMMDD): "
+read -rs "SHARE_LINK?Outward share/subscription link of the probe calendar (optional, hidden; Enter to skip): "; print
+print "Inbound-sharing probes (calendars shared WITH Ada by another mailbox) are optional; Enter skips them."
+read -r "SHARED_RO_URL?CalDAV URL of a synthetic calendar shared READ-ONLY with Ada (optional): "
+read -r "SHARED_RW_URL?CalDAV URL of a synthetic calendar shared READ/WRITE with Ada (optional): "
+SHARED_DAY=""
+[[ -n $SHARED_RO_URL ]] && read -r "SHARED_DAY?Date of the synthetic events in the read-only calendar (YYYYMMDD): "
 read -r "IMAP_HOST?IMAP host for the credential-scope check [imap.ionos.de]: "
 IMAP_HOST=${IMAP_HOST:-imap.ionos.de}
 
+# Webmail shows collection URLs without a trailing slash; normalize.
+[[ -n $PROBE_URL && $PROBE_URL != */ ]] && PROBE_URL=$PROBE_URL/
+[[ -n $SHARED_RO_URL && $SHARED_RO_URL != */ ]] && SHARED_RO_URL=$SHARED_RO_URL/
+[[ -n $SHARED_RW_URL && $SHARED_RW_URL != */ ]] && SHARED_RW_URL=$SHARED_RW_URL/
 for url in $PROBE_URL $SHARED_RO_URL $SHARED_RW_URL; do
-  [[ $url == https://*/ ]] || { print -u2 "CalDAV URLs must start with https:// and end with /"; exit 1 }
+  [[ $url == https://*/ ]] || { print -u2 "CalDAV URLs must start with https://"; exit 1 }
 done
-[[ $SHARED_DAY == <19000101-29991231> ]] || { print -u2 "date must be YYYYMMDD"; exit 1 }
+[[ -z $PROBE_URL ]] && { print -u2 "the probe calendar URL is required"; exit 1 }
+[[ -z $SHARED_RO_URL || $SHARED_DAY == <19000101-29991231> ]] || { print -u2 "date must be YYYYMMDD"; exit 1 }
+[[ -z $SHARE_LINK || $SHARE_LINK == https://* ]] || { print -u2 "the share link must start with https://"; exit 1 }
 # curl --config strings treat quote and backslash specially.
 if [[ $ADA_PASS == *[\"\\]* || $ADA_USER == *[\"\\]* ]]; then
   print -u2 "credentials containing quote or backslash are not supported by this probe"
@@ -42,7 +51,7 @@ fi
 
 WORK=$(mktemp -d -t ada-caldav-probe) || exit 1
 trap 'rm -rf -- "$WORK"' EXIT
-typeset -a CREATED=()
+: > "$WORK/created"  # put_new runs in command substitutions; track via file
 
 # Credentials reach curl through stdin (--config -), never through argv.
 dav() {
@@ -63,7 +72,7 @@ put_new() { # url file -> status; records created resources for cleanup
   code=$(dav --dump-header "$WORK/last-put.hdr" --output /dev/null --write-out '%{http_code}' \
     -X PUT -H 'If-None-Match: *' -H 'Content-Type: text/calendar; charset=utf-8' \
     --data-binary "@$2" "$1")
-  [[ $code == 201 || $code == 204 ]] && CREATED+=("$1")
+  [[ $code == 201 || $code == 204 ]] && print -r -- "$1" >> "$WORK/created"
   print -r -- "$code"
 }
 
@@ -101,8 +110,10 @@ EOF
 code=$(dav --output "$WORK/home.xml" --write-out '%{http_code}' -X PROPFIND -H 'Depth: 1' \
   -H 'Content-Type: application/xml; charset=utf-8' --data-binary "@$WORK/propfind.xml" "$HOME_URL")
 report P1-status "$code" "207"
-[[ $code == 207 ]] && $PY "$SUMMARIZE" listing "$WORK/home.xml" \
-  "probe=$PROBE_URL" "shared-ro=$SHARED_RO_URL" "shared-rw=$SHARED_RW_URL"
+typeset -a LABELS=("probe=$PROBE_URL")
+[[ -n $SHARED_RO_URL ]] && LABELS+=("shared-ro=$SHARED_RO_URL")
+[[ -n $SHARED_RW_URL ]] && LABELS+=("shared-rw=$SHARED_RW_URL")
+[[ $code == 207 ]] && $PY "$SUMMARIZE" listing "$WORK/home.xml" $LABELS
 
 print "== P2 create-only semantics"
 EVT_A=$(new_event_id)
@@ -126,18 +137,42 @@ report P4b-stale-if-match "$(http_code -X PUT -H 'If-Match: "ada-stale-etag"' -H
 etag=$(current_etag ${PROBE_URL}${EVT_A}.ics)
 report P4c-matching-if-match "$(http_code -X PUT -H "If-Match: $etag" -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/a2.ics" ${PROBE_URL}${EVT_A}.ics)" "204 or 201"
 
-print "== P5 classification visibility in the read-only shared calendar"
-start_day=$(date -u -j -v-1d -f %Y%m%d $SHARED_DAY +%Y%m%d)
-end_day=$(date -u -j -v+2d -f %Y%m%d $SHARED_DAY +%Y%m%d)
-code=$(query_range $SHARED_RO_URL ${start_day}T000000Z ${end_day}T000000Z "$WORK/ro.xml")
-report P5-status "$code" "207"
-[[ $code == 207 ]] && $PY "$SUMMARIZE" events "$WORK/ro.xml" P5
+print "== P10 outward share link (anonymous subscription view)"
+if [[ -n $SHARE_LINK ]]; then
+  [[ $SHARE_LINK == *\?* ]] && ical_link="$SHARE_LINK&ical=true" || ical_link="$SHARE_LINK?ical=true"
+  code=$(curl --silent --show-error --proto '=https' --max-redirs 0 --max-time 30 \
+    --output "$WORK/share.ics" --write-out '%{http_code}' "$ical_link")
+  report P10a-share-link-get "$code" "200 (iCalendar)"
+  report P10b-share-link-type "$(head -c 15 "$WORK/share.ics" 2>/dev/null | tr -d '\r\n')" "BEGIN:VCALENDAR"
+  report P10c-new-event-visible "$(grep -c "^UID:$EVT_A" "$WORK/share.ics" 2>/dev/null)" "1 = event created seconds ago is already in the feed"
+else
+  print "skipped (no share link given)"
+fi
 
-print "== P6 provider-side permissions"
+print "== P5 classification visibility in a calendar shared with Ada (optional)"
+if [[ -n $SHARED_RO_URL ]]; then
+  start_day=$(date -u -j -v-1d -f %Y%m%d $SHARED_DAY +%Y%m%d)
+  end_day=$(date -u -j -v+2d -f %Y%m%d $SHARED_DAY +%Y%m%d)
+  code=$(query_range $SHARED_RO_URL ${start_day}T000000Z ${end_day}T000000Z "$WORK/ro.xml")
+  report P5-status "$code" "207"
+  [[ $code == 207 ]] && $PY "$SUMMARIZE" events "$WORK/ro.xml" P5
+else
+  print "skipped (no inbound share given)"
+fi
+
+print "== P6 provider-side permissions on calendars shared with Ada (optional)"
 EVT_B=$(new_event_id)
 ics $EVT_B "Ada probe B" ${NEAR_DAY}T120000Z ${NEAR_DAY}T130000Z > "$WORK/b.ics"
-report P6a-write-read-only-share "$(put_new ${SHARED_RO_URL}${EVT_B}.ics "$WORK/b.ics")" "403"
-report P6b-write-read-write-share "$(put_new ${SHARED_RW_URL}${EVT_B}.ics "$WORK/b.ics")" "201"
+if [[ -n $SHARED_RO_URL ]]; then
+  report P6a-write-read-only-share "$(put_new ${SHARED_RO_URL}${EVT_B}.ics "$WORK/b.ics")" "403"
+else
+  print "P6a skipped"
+fi
+if [[ -n $SHARED_RW_URL ]]; then
+  report P6b-write-read-write-share "$(put_new ${SHARED_RW_URL}${EVT_B}.ics "$WORK/b.ics")" "201"
+else
+  print "P6b skipped"
+fi
 
 print "== P7 conditional delete"
 report P7a-stale-delete "$(http_code -X DELETE -H 'If-Match: "ada-stale-etag"' ${PROBE_URL}${EVT_A}.ics)" "412"
@@ -161,10 +196,10 @@ print "== P9 credential scope"
 print -r -- "user = \"$ADA_USER:$ADA_PASS\"" |
   curl --silent --proto '=imaps' --max-time 30 --config - --output /dev/null "imaps://$IMAP_HOST/"
 rc=$?
-report P9-imap-login-with-app-password "curl exit $rc" "67 = IMAP denied (narrow credential), 0 = IMAP allowed (broad credential)"
+report P9-imap-login-with-app-password "curl exit $rc" "67 = IMAP login denied (narrow credential), 0 = IMAP allowed (broad credential), other = inconclusive"
 
 print "== Cleanup"
-for url in $CREATED; do
+for url in ${(f)"$(<"$WORK/created")"}; do
   etag=$(current_etag $url)
   if [[ -n $etag ]]; then
     report "cleanup ${url:t}" "$(http_code -X DELETE -H "If-Match: $etag" $url)" "204"

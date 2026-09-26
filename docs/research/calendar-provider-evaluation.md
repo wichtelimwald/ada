@@ -16,7 +16,8 @@ travel time, and never claim or duplicate a real-world effect it cannot prove
 
 The maintainer selected **IONOS Mail Business** as the first provider
 (2026-09-26) and asked that other providers remain addable later through the
-modular adapter architecture.
+modular adapter architecture. The family gets one IONOS mailbox, for Ada, and
+the maintainer chose the **Ada-owned calendar** access model (section 4).
 
 ## 2. Constraints
 
@@ -45,7 +46,9 @@ modular adapter architecture.
 | Each calendar has an individual CalDAV URL, shown in webmail → Calendar → ⋯ → Properties; clients authenticate with the full mailbox address and password. | [IONOS: sync calendar with macOS](https://www.ionos.com/help/email/managing-mail-business/syncing-mail-business-calendar-with-mac-os-x/) | High |
 | Mail Business supports two-step verification; app passwords are then required for clients. The documented dialog asks only for an app **name**. | [IONOS: 2FA and app passwords](https://www.ionos.com/help/email/using-webmail/email-activate-and-configure-two-step-verification/) | High for existence; scope *probe* (M1, P9) |
 | OX App Suite itself supports **scoped** application passwords (CalDAV-only scopes `dav`, `read_caldav`, `write_caldav`). Whether IONOS exposes that choice is unknown. | [OX application passwords](https://documentation.open-xchange.com/appsuite/security/application_passwords.html), [OX 8.20 docs](https://documentation.open-xchange.com/8.20/middleware/login_and_sessions/application_passwords.html) | *probe* |
-| OX publishes all calendar folders of a user via CalDAV; whether IONOS includes calendars **shared with** the user is not documented. | [OX CalDAV/CardDAV](https://documentation.open-xchange.com/latest/middleware/miscellaneous/caldav_carddav.html) | *probe* (P1, M3) |
+| OX publishes all calendar folders of a user via CalDAV; whether IONOS includes calendars **shared with** the user is not documented. | [OX CalDAV/CardDAV](https://documentation.open-xchange.com/latest/middleware/miscellaneous/caldav_carddav.html) | *probe* (optional P5/P6) |
+| The Mail Business CalDAV host is `dav.mailbusiness.ionos.de`; calendar URLs use OX's opaque form `/caldav/<base64 of cal://0/N>`. | Ada mailbox webmail, observed by the maintainer 2026-09-26 | High |
+| OX can share calendar folders with external people as invited guests or through anonymous links; external calendar shares are documented as read-only, anonymous links can carry an expiry, and `?ical=true` returns iCalendar for subscriptions. Guests do not see other folders. Whether IONOS enables this for Mail Business is not documented. | [OX sharing and guest mode](https://documentation.open-xchange.com/7.10.5/middleware/miscellaneous/sharing_and_guest_mode.html) | *probe* (P10, M2, M3) |
 
 ### OX App Suite CalDAV behavior relevant to Ada
 
@@ -58,7 +61,7 @@ and the OX profile in python-caldav 3.3.1 `caldav/compatibility_hints.py`
 
 | Behavior | Consequence for Ada |
 | --- | --- |
-| `CONFIDENTIAL` events appear to non-attending viewers of a shared folder as anonymous blocks with summary "Private"; `PRIVATE` events are not exposed to them at all and do not count in free/busy. | Owners control disclosure at the source. Ada receives busy-only data for confidential events and nothing for private ones. Ada cannot detect conflicts with `PRIVATE` events it cannot see; this must be user-visible. |
+| `CONFIDENTIAL` events appear to non-attending viewers of a shared folder as anonymous blocks with summary "Private"; `PRIVATE` events are not exposed to them at all and do not count in free/busy. | Relevant only for inbound sharing (a later option): the owner would control disclosure at the source, and Ada could not see private events. In the Ada-owned model, Ada owns every event and AdaGuard enforces disclosure. |
 | Updates require `If-Match`; a blind overwrite is rejected with 409. | Optimistic concurrency is enforced by the provider. Ada must always read-modify-write with ETags. |
 | The object resource name is preserved; the collection also has an opaque canonical URL (`cal://0/NNN`, base64 path) besides the requested alias. | Ada addresses events by `<canonical collection URL>/<resource name>`, adopting the canonical URL reported by the server. |
 | Server-side recurrence expansion is unsupported; time-range queries do find recurring events whose occurrences fall in range (within the window). | Ada must expand recurrences client-side. |
@@ -72,10 +75,11 @@ and the OX profile in python-caldav 3.3.1 `caldav/compatibility_hints.py`
 
 | Option | Description | Assessment |
 | --- | --- | --- |
-| **A1 Ada-owned mailbox + provider-side sharing** | Ada gets its own IONOS mailbox. Family members share selected calendars with it as read-only or write. Ada uses an app password of **its own** mailbox. | **Recommended.** No family credentials in Ada; per-calendar rights are enforced and revocable by each owner; confidential/private semantics apply at the source; matches the discovery idea of a dedicated Ada identity and serves MVP-70. Requires P1/P6 confirmation. Residual risk: one Ada credential reads every calendar shared with Ada. |
+| **A0 Ada-owned calendars shared outward** | Ada's single mailbox holds one calendar per family member plus one family calendar (created once in webmail). Ada is the owner and regular writer; family members subscribe to the calendars shared with them. | **Selected for the MVP by the maintainer (2026-09-26).** Needs only one mailbox; Ada keeps full control; single writer keeps concurrency simple; no family credentials. Trade-offs: all family calendars in one account; separation between members depends on share distribution and AdaGuard; share links are bearer secrets; subscriptions are read-only and refresh on the client's schedule; Ada cannot see appointments kept elsewhere. Requires P10/M2/M3 confirmation. |
+| A1 Inbound sharing to Ada's mailbox | Family members with their own mailboxes in the same contract share selected calendars with Ada as read-only or write. | Later option. Owners keep control and source-side confidential/private semantics apply, but every member needs a paid mailbox. The probe keeps optional checks (P5, P6). |
 | A2 Per-member app passwords | Ada stores an app password for each family member's mailbox. | Rejected: Ada would hold family members' credentials, likely with mailbox-wide scope (P9), and would see private events. |
 | A3 macOS EventKit via Calendar.app | IONOS accounts configured in macOS; Ada reads/writes through EventKit. | Rejected for MVP: calendar permission covers every account in Calendar.app, requires a native host process (not container-compatible, ADR-0003), and hides provider outcome evidence behind macOS sync. |
-| A4 ICS subscription URLs | Read-only secret feeds. | Not sufficient: no writes, bearer-URL secrets, polling latency. Possible later read-only source for external calendars. |
+| A4 Ada reads external ICS feeds | Read-only secret feeds of calendars kept elsewhere. | Not sufficient on its own: no writes, bearer-URL secrets, polling latency. Possible later read-only source for appointments kept outside Ada's calendars. |
 
 ## 5. Protocol alternatives
 
@@ -98,7 +102,38 @@ components.
 | icalendar | 7.3.0 / 2026-08-19 | BSD-2-Clause (`LICENSE.rst`, Plone Foundation) | `python-dateutil` (Apache-2.0/BSD dual), `six` (MIT), `tzdata` (Apache-2.0) | **Recommended** for RFC 5545 parsing/serialization (folding, escaping, VTIMEZONE). Writing a custom iCalendar parser is rejected. |
 | vobject | 0.9.9 / 2024-12-16 | Apache-2.0 | `pytz`, `six` | Alternative parser; less active; no advantage. |
 
-### Recurrence expansion (decision needed)
+### Is python-caldav the only option?
+
+For Python, effectively yes: it is the only maintained, full-featured CalDAV
+client found (PyPI/GitHub search 2026-09-26).
+
+| Other candidate | License / state | Fit |
+| --- | --- | --- |
+| aiocaldav 0.5.1 | GPL, last release 2018 | Unmaintained. |
+| webdav4 0.11.0 | MIT, active | Generic WebDAV file access; no CalDAV `REPORT`/iCalendar semantics. |
+| go-webdav (Go), tsdav (TypeScript), libdav 0.11.0 (Rust) | MIT, MIT, ISC; active | Would need a sidecar process in another language: a second runtime, build chain and IPC boundary for a small protocol subset. |
+| Upstream change | — | Asking python-caldav/icalendar-searcher to make the AGPL dependency optional or relicense it is possible, but its outcome and timing are outside Ada's control. Re-open trigger in ADR-0009. |
+
+### Size of the Ada-owned subset (estimate)
+
+The hard parts are delegated: `icalendar` parses/serializes RFC 5545 and
+`recurring-ical-events` expands recurrences. Ada writes the HTTP/XML glue:
+
+| Part | Estimated production lines |
+| --- | ---: |
+| Transport setup, origin/redirect/size limits, error mapping (not sent vs ambiguous) | 60-100 |
+| `PROPFIND` (calendar listing, privileges, change tokens) and `REPORT calendar-query` request building and multistatus parsing | 120-180 |
+| `GET` / create-only `PUT` / conditional `PUT` / conditional `DELETE` | 80-120 |
+| OX server profile (window clamping, component post-filtering, canonical URL) | 30-60 |
+| **Sum** | **~300-450** |
+
+Mapping iCalendar data into Ada's read model, the capability/reconciliation
+semantics and the contract/fake-server tests are needed with or without
+python-caldav. Using python-caldav would replace roughly the rows above, in
+exchange for an AGPL transitive dependency and a second HTTP stack that Ada
+would also have to review and keep proxy-independent.
+
+### Recurrence expansion (decided: R1, maintainer 2026-09-26)
 
 OX does not expand recurrences server-side, so Ada must.
 
@@ -108,8 +143,8 @@ OX does not expand recurrences server-side, so Ada must.
 | R2 Ada-owned expansion on `python-dateutil` `rrule` | Apache-2.0/BSD | No copyleft, but Ada would own override/exception/DST correctness — a classic source of silent calendar bugs. |
 | R3 No expansion; treat any recurring series in range as "possible conflict" | — | Fails the conflict-detection DoD for ordinary weekly family events. |
 
-Recommendation: R1, subject to the maintainer's copyleft decision; R2 only if
-LGPL is unacceptable, with a dedicated recurrence test corpus.
+Decision: R1. R2 remains the fallback if the LGPL obligations later prove
+unacceptable for a distribution mode.
 
 ## 7. Transport and parsing security
 
@@ -124,7 +159,7 @@ LGPL is unacceptable, with a dedicated recurrence test corpus.
 
 | Option | Egress | Assessment |
 | --- | --- | --- |
-| **T1 Configured approximate durations between registered places** | none | **Recommended for MVP.** Deterministic, local, visibly approximate; unknown pairs yield "travel time unknown" instead of zero. |
+| **T1 Configured approximate durations between registered places** | none | **Selected for MVP (plan decision D4).** Deterministic, local, visibly approximate; unknown pairs yield "travel time unknown" instead of zero. |
 | T2 Self-hosted routing engine (OSRM, Valhalla, GraphHopper) on OpenStreetMap data | none after data download | Later candidate if T1 is too laborious. Engine licenses (OSRM BSD-2-Clause and GraphHopper Apache-2.0 per GitHub; Valhalla not re-verified) and **OSM data under ODbL** (attribution, share-alike for derived databases), plus memory/disk cost on the M1/16 GB target, need their own review. |
 | T3 Cloud routing APIs | addresses to a third party | Not an MVP default; would require explicit, informed egress consent. |
 
@@ -133,14 +168,13 @@ LGPL is unacceptable, with a dedicated recurrence test corpus.
 Production secret management belongs to MVP-90. MVP-60 needs a safe
 development path for the Ada app password:
 
-- **S1 macOS Keychain** via `/usr/bin/security` (no new dependency): encrypted at rest, not in environment/argv/logs; host-only.
+- **S1 macOS Keychain** via `/usr/bin/security` (no new dependency): encrypted at rest, not in environment/argv/logs; host-only. **Selected (plan decision D2).**
 - **S2 owner-only file** (`0600`, regular file, no symlink, outside repository and Memory root): portable to containers; plaintext on a FileVault-protected disk.
 - Environment variables and command-line arguments are rejected (child-process inheritance, process listings, shell history).
 
 ## 10. Evidence still required
 
-See [the probe](../../research/calendar/README.md): shared-calendar visibility
-and enforcement (P1/P6/M3), create-only semantics (P2), identity/X-property
-preservation (P3), conditional writes (P4/P7), classification visibility
-(P5/M2), query window (P8), credential scope (P9/M1), and notification side
-effects (M4).
+See [the probe](../../research/calendar/README.md): CalDAV basics on Ada's
+mailbox (P1-P4, P7), outward sharing and subscription (P10, M2, M3), query
+window (P8), credential scope (P9/M1), notification side effects (M4), and,
+optionally, inbound sharing (P5, P6).

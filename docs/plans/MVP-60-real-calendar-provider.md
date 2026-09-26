@@ -13,6 +13,11 @@ approximate travel time, and never duplicates or invents a real-world outcome.
 The first provider is **IONOS Mail Business** (maintainer decision,
 2026-09-26); the architecture stays open for further providers.
 
+**Access model (maintainer decision, 2026-09-26):** Ada's single IONOS mailbox
+owns one calendar per family member plus one family calendar and shares them
+outward; family members subscribe. See ADR-0009 section 2 for the accepted MVP
+trade-offs.
+
 ## Current state / evidence
 
 - `CalendarPort` ([ports/calendar.py](../../src/ada/ports/calendar.py)) supports
@@ -54,16 +59,19 @@ The first provider is **IONOS Mail Business** (maintainer decision,
 - Production secret management, packaging, pause/resume (MVP-90).
 - Memory integration of calendar facts (source-owned; MVP-40/80).
 
-## Open decisions
+## Decisions
 
-| ID | Decision | Options | Recommendation | Owner |
-| --- | --- | --- | --- | --- |
-| D0 | Accept ADR-0009 | accept / revise | accept after D1, D2 and probe P1/P6/M3 | maintainer |
-| D1 | Recurrence expansion | R1 `recurring-ical-events` (LGPL-3.0-or-later) / R2 Ada-owned on `python-dateutil` | R1 | maintainer (copyleft gate) |
-| D2 | Development credential store | S1 macOS Keychain via `/usr/bin/security` / S2 owner-only `0600` file | S1 on the Mac host (encrypted at rest, not copied in plaintext into backups); S2 only for synthetic accounts in dev containers | maintainer |
-| D3 | Update/cancel authority | any ordinary event in a writable calendar / only Ada-created events / Ada-created within grant, others with explicit per-action confirmation | third option; Cedar policy decides, Ada records created event references | maintainer (product) |
-| D4 | Travel-time source | T1 configured place-pair durations / T2 self-hosted routing / T3 cloud API | T1 | maintainer |
-| D5 | Durable payload retention | purge workflow after terminal outcome (`DBOS.delete_workflow`, SQLite `secure_delete`) keeping a minimal non-sensitive operation → event-reference record / separate private payload store | purge + minimal record; revisit with MVP-30 encryption | implementation, reviewed |
+D1-D5 were decided by the maintainer on 2026-09-26 as recommended.
+
+| ID | Decision | Result | Status |
+| --- | --- | --- | --- |
+| D0 | Accept ADR-0009 | pending: maintainer confirmation of the thin adapter; probe P1-P4, P7, P10, M2, M3 | open |
+| D1 | Recurrence expansion | `recurring-ical-events` (LGPL-3.0-or-later) + `x-wr-timezone`, unmodified | decided |
+| D2 | Development credential store | macOS Keychain via `/usr/bin/security` on the Mac host; owner-only `0600` file only for synthetic accounts in dev containers | decided |
+| D3 | Update/cancel authority | Ada-created events within the grant; other events only with explicit per-action confirmation; Cedar policy decides; Ada records references of events it created | decided |
+| D4 | Travel-time source | configured approximate durations between registered places; unknown pairs reported as unknown | decided |
+| D5 | Durable payload retention | purge workflow after terminal outcome (`DBOS.delete_workflow`, SQLite `secure_delete`), keeping a minimal non-sensitive operation → event-reference record (also serves D3); revisit with MVP-30 encryption | decided |
+| D6 | Who is busy for a family-calendar event | MVP proposal: a family-calendar event counts as busy for every family member unless participants are recorded; participant tagging later | open (product, needed in S5) |
 
 ## Reuse / dependency evidence
 
@@ -76,22 +84,24 @@ See the evaluation. Summary:
 - Reject python-caldav 3.x (hard AGPL-3.0-or-later transitive dependency
   `icalendar-searcher`, second HTTP/QUIC stack); reuse its documented OX
   behavior as test evidence only.
-- D1 determines whether `recurring-ical-events` + `x-wr-timezone` (LGPL) are
-  added.
+- Add `recurring-ical-events` + `x-wr-timezone` (LGPL, D1) with their
+  NOTICE.md entry and distribution obligations.
 
 ## Security / privacy / authority
 
-- **Identities:** Ada's own IONOS mailbox; family members share calendars with
-  it. The Ada app password is class *Secret* (never in Memory, prompts, logs,
-  env, argv, fixtures, DBOS state).
+- **Identities:** Ada's own IONOS mailbox owns all family calendars; family
+  members receive outward shares. The Ada app password is class *Secret*
+  (never in Memory, prompts, logs, env, argv, fixtures, DBOS state).
 - **Authority:** every create/update/cancel passes AdaGuard with the action and
   resource derived from the typed proposal. Configured calendar access modes
   are cross-checked against provider-reported privileges at startup; a mismatch
   fails closed.
-- **Disclosure:** conflict checks use the availability view. Details are
-  disclosed only through `calendar.disclose.detail`. Confidential events arrive
-  anonymized from the provider; private events are invisible and cannot be
-  considered — user-visible limitation.
+- **Disclosure:** Ada sees every event in its calendars. Conflict checks use the
+  availability view; details are disclosed only through
+  `calendar.disclose.detail`, keyed by the calendar's configured audience.
+  Share links are distributed per person and treated as bearer secrets.
+  Appointments outside Ada's calendars are unknown to Ada — user-visible
+  limitation.
 - **Egress:** HTTPS to the configured provider origin only; `trust_env=False`;
   no redirects; timeouts; response-size cap; bounded time ranges.
 - **Untrusted content:** server XML (DOCTYPE rejected) and event text are data.
@@ -101,8 +111,8 @@ See the evaluation. Summary:
   conflict, never overwrite; provider unavailable → reported, no stale data.
 - **Durable state:** D5; SQLite free pages can retain deleted rows unless
   `secure_delete`/VACUUM is applied.
-- **Residual risk:** one Ada credential reads every calendar shared with Ada
-  (ADR-0009 consequences).
+- **Residual risk:** one Ada credential and one provider account hold every
+  family calendar (accepted MVP trade-off, ADR-0009 section 2).
 
 ## Interfaces and data ownership
 
@@ -112,9 +122,11 @@ Ada-owned (provider-neutral) additions; names are indicative:
   audience (person or family), configured access mode (read/write).
 - `EventRef`: calendar key + provider resource name; `EventVersion`: opaque
   provider version (ETag).
-- Read model: `CalendarEvent` gains `version`, `visibility` (`full` /
-  `busy_only`), `busy` (from `TRANSP`/`STATUS`), `all_day`, `recurring`,
-  `has_attendees`; occurrences are expanded into concrete intervals.
+- Read model: `CalendarEvent` gains `version`, `busy` (from
+  `TRANSP`/`STATUS`), `all_day`, `recurring`, `has_attendees`; occurrences are
+  expanded into concrete intervals. An availability view (times + calendar
+  audience only) is derived for conflict checks. A `visibility` marker for
+  provider-anonymized events is added only if inbound sharing is implemented.
 - Proposals: `UpdateCalendarEventProposal(event_ref, base_version, changes)` and
   `CancelCalendarEventProposal(event_ref, base_version)`. The approved base
   version is part of the action binding, so a replay after a human edit
@@ -135,8 +147,9 @@ calendar mapping and travel durations. Nothing is written to Memory.
 Each slice is independently testable. Suggested PR grouping: S1-S3, S4-S5,
 S6-S7 (roadmap `done` only in the last PR).
 
-- **S0 Evidence:** maintainer runs the IONOS probe; results recorded in the PR
-  and the evaluation; capabilities and limits fixed; ADR-0009 accepted.
+- **S0 Evidence:** maintainer creates the Ada calendars' probe counterpart and an
+  outward share, runs the IONOS probe; results recorded in the PR and the
+  evaluation; capabilities and limits fixed; ADR-0009 accepted.
 - **S1 Domain and port:** types above, in-memory adapter updated, shared
   `CalendarPort` contract test suite, architecture-boundary test extended to
   forbid `httpx2`/`icalendar` imports in core/ports. No new dependency.
@@ -175,17 +188,19 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
    the human edit; a replayed update never overwrites a newer version.
 5. A cancel removes exactly the intended event; a repeated cancel reports the
    event as already absent, not as a fresh effect.
-6. Writes to a read-only share fail closed before or at the provider and are
-   reported as not performed.
+6. Writes to a calendar configured as not writable fail closed before any
+   provider request and are reported as not performed.
 7. Conflict detection finds an overlapping event, a weekly recurring
    occurrence, and a travel-time conflict from configured durations; an unknown
-   place pair is reported as unknown; a confidential event counts as busy
-   without exposing details.
-8. No credential, event title or location appears in logs; ambient proxy
+   place pair is reported as unknown; another person's event counts as busy
+   without disclosing its details to an audience that may not see them.
+8. An event created or changed by Ada appears in an outward subscription (P10
+   evidence; client refresh latency documented, not asserted).
+9. No credential, event title or location appears in logs; ambient proxy
    variables are ignored; no request leaves for another origin.
-9. Durable state no longer holds event titles/locations after a terminal
-   outcome (D5).
-10. Recurring series, occurrences and events with attendees are refused for
+10. Durable state no longer holds event titles/locations after a terminal
+    outcome (D5).
+11. Recurring series, occurrences and events with attendees are refused for
     writes with a clear explanation.
 
 ## Validation
@@ -226,5 +241,9 @@ To be copied to `docs/todo.md` before the implementation PRs merge:
 - Writing recurring events and attendee/invitation handling (with MVP-70).
 - Self-hosted routing engine evaluation if configured travel durations are insufficient.
 - Offline calendar cache with explicit staleness.
-- Align calendar access with protection domains / Memory Broker (MVP-30).
+- Align calendar access with protection domains / Memory Broker (MVP-30):
+  inbound sharing of family members' own calendars or separate Ada accounts
+  per protection domain instead of one account holding every family calendar.
+- Read-only import of appointments kept outside Ada's calendars (for example
+  ICS feeds) if conflict detection must cover them.
 - Production credential management (MVP-90).
