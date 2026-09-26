@@ -318,6 +318,7 @@ class FileMemoryTests(unittest.TestCase):
     def test_forgotten_id_is_never_reused(self) -> None:
         old_uuid = UUID("11111111-1111-4111-8111-111111111111")
         new_uuid = UUID("22222222-2222-4222-8222-222222222222")
+        temp_uuid = UUID("33333333-3333-4333-8333-333333333333")
 
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
@@ -336,7 +337,7 @@ class FileMemoryTests(unittest.TestCase):
 
             with patch(
                 "ada.adapters.file_memory.uuid4",
-                side_effect=[old_uuid, new_uuid],
+                side_effect=[old_uuid, new_uuid, temp_uuid],
             ):
                 second = store.remember_explicit(
                     kind=MemoryKind.FACT,
