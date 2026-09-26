@@ -3,7 +3,7 @@
 Status: planning
 Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-00 (done)
-Owner PR: research/ADR PR for this plan (see GitHub); implementation PRs follow ADR acceptance
+Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR); implementation PRs follow ADR acceptance
 
 ## Goal
 
