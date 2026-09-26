@@ -535,6 +535,38 @@ class FileMemoryTests(unittest.TestCase):
             staged = _git(temp, "diff", "--cached", "--name-only")
             self.assertEqual(staged, "unrelated.txt")
 
+    def test_existing_foreign_git_repository_is_refused(self) -> None:
+        with TemporaryDirectory() as temp:
+            subprocess.run(
+                ["git", "-C", temp, "init", "--quiet"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            with self.assertRaisesRegex(
+                FileMemoryError,
+                "pre-existing Git repository",
+            ):
+                FileMemoryStore(temp)
+
+    def test_ada_owned_history_can_be_reopened(self) -> None:
+        with TemporaryDirectory() as temp:
+            first_store = FileMemoryStore(temp)
+            entry = first_store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Persist across adapter restart.",
+            )
+
+            second_store = FileMemoryStore(temp)
+            current = second_store.load_memory_entry(entry.entry_id)
+
+            self.assertIsNotNone(current)
+            assert current is not None
+            self.assertEqual(current.content, "Persist across adapter restart.")
+            marker = Path(temp) / ".git" / "ada-memory-history-v1"
+            self.assertTrue(marker.is_file())
+
     def test_git_lock_failure_stops_before_current_memory_write(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
