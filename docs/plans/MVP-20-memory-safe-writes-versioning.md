@@ -90,7 +90,8 @@ revisit how Git is provisioned before a consumer release.
 - Forgotten/superseded content may remain in Git history; permanent purge is a
   separate explicit operation.
 - Normal load APIs read only current files.
-- External Git commands run with global/system config disabled, literal pathspecs,
+- External Git commands run pinned to the root's own `.git`, with global/system
+  config and user-level ignore/attributes files disabled, literal pathspecs,
   fixed synthetic commit identity and no credential/network operation.
 - Ada writes are serialized with a local lock; unexplained Git lock failures stop
   the operation and are never auto-deleted.

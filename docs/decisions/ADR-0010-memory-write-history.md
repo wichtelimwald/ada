@@ -70,10 +70,15 @@ Reasons:
 - It adds no Python dependency or native Python extension.
 - The adapter can be replaced later without changing Memory semantics.
 
-The adapter disables global/system Git configuration, uses literal pathspecs, a
-fixed non-authenticating Ada history identity, and no remote/network commands.
-Unexpected Git/index lock failures stop the operation; Ada never deletes an
-unexplained Git lock.
+The adapter disables global/system Git configuration and user-level Git
+ignore/attributes files, pins every command to the Memory root's own `.git` so a
+missing history never falls back to an enclosing repository, uses literal
+pathspecs, a fixed non-authenticating Ada history identity, and no remote/network
+commands. It records only non-hidden Markdown files so OS/editor artifacts such
+as AppleDouble `._*.md` files stay out of history. An existing Git `index.lock`
+stops the operation before an Ada write is published; other Git/lock failures
+after publication are reported as an explicit ambiguous outcome. Ada never
+deletes an unexplained Git lock.
 
 Git is GPLv2 and is treated as a separately installed external executable, not
 vendored or redistributed by Ada in this decision. Future packaging/distribution
@@ -122,7 +127,8 @@ Network/distributed filesystem semantics and Windows are not accepted by this AD
 ### Positive
 
 - Current Memory remains human-readable and independent of Git internals.
-- Human corrections cannot be silently replaced by a stale Ada correction.
+- Human edits present at Ada's final revision check cannot be silently replaced
+  by a stale Ada correction.
 - Recovery history is inspectable with standard Git tooling.
 - No new Python dependency is required.
 - The implementation remains replaceable before consumer packaging.
@@ -139,6 +145,14 @@ Network/distributed filesystem semantics and Windows are not accepted by this AD
   but POSIX path replacement is not a true cross-application compare-and-swap. The
   adapter therefore detects practical stale-write windows and fails closed where it
   can, without claiming an impossible mandatory lock for ordinary editors.
+  Concretely, a human save (in-place or rename) that lands after the final revision
+  check but before Ada's replace/delete is overwritten without a history entry and
+  Ada still reports success; later edits are detected and reported as conflicts.
+- Repo-local Git configuration and attributes under `<root>/.git` are trusted. Any
+  principal that can write there can make Git execute commands as Ada (for example
+  via `core.fsmonitor`). MVP-20 assumes only the owning OS user can write the Memory
+  root; protection domains must not leave history metadata writable by untrusted
+  vault editors or sync tools.
 - Packaging must revisit the external Git prerequisite.
 
 ## Re-open triggers
