@@ -949,6 +949,7 @@ class FileMemoryStore:
             if remove_partial:
                 try:
                     os.unlink(path.name, dir_fd=directory_fd)
+                    self._sync_directory_fd(directory_fd)
                 except FileNotFoundError:
                     pass
 
