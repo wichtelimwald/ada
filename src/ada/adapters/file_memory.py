@@ -90,12 +90,14 @@ class FileMemoryStore:
             )
 
         self.root = expanded.resolve()
+        self._ensure_directory(self.root)
+        self._history = GitMemoryHistory(self.root)
+        self._history_call(self._history.validate_existing_repository)
+
         self.memory_dir = self.root / "memory"
         self.learning_dir = self.root / "learning"
-        self._ensure_directory(self.root)
         self._ensure_directory(self.memory_dir)
         self._ensure_directory(self.learning_dir)
-        self._history = GitMemoryHistory(self.root)
 
         with self._write_lock():
             self._history_call(self._history.ensure_initialized)
