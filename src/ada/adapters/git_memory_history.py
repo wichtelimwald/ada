@@ -32,6 +32,22 @@ class GitMemoryHistory:
             )
         self._git = git
 
+    def validate_existing_repository(self) -> None:
+        """Reject foreign/pre-existing Git metadata without mutating the root."""
+
+        git_dir = self.root / ".git"
+        if git_dir.is_symlink():
+            raise GitMemoryHistoryError(
+                f"Memory Git directory must not be a symlink: {git_dir}"
+            )
+        if not git_dir.exists():
+            return
+        if not git_dir.is_dir():
+            raise GitMemoryHistoryError(
+                f"Memory Git path is not a directory: {git_dir}"
+            )
+        self._require_ownership_marker(git_dir)
+
     def ensure_initialized(self) -> None:
         git_dir = self.root / ".git"
         if git_dir.is_symlink():
