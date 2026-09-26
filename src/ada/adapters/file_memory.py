@@ -897,6 +897,7 @@ class FileMemoryStore:
                     path,
                 )
                 if current_revision != expected_revision:
+                    self._capture_external_changes()
                     raise MemoryConflictError(
                         "Memory file changed immediately before publication "
                         f"and will not be overwritten: {path}"
@@ -1053,6 +1054,7 @@ class FileMemoryStore:
                     path,
                 )
                 if current_revision != expected_revision:
+                    self._capture_external_changes()
                     raise MemoryConflictError(
                         "Memory file changed immediately before deletion "
                         f"and will not be removed: {path}"
