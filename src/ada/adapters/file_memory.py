@@ -294,6 +294,13 @@ class FileMemoryStore:
 
         with self._write_lock():
             self._capture_external_changes()
+            if (
+                self._path_exists(learning_path)
+                and self._is_forgotten_tombstone(learning_path)
+            ):
+                raise FileMemoryError(
+                    f"learning entry {entry_id!r} is not promotable in its current state"
+                )
             if self._path_exists(memory_path):
                 raise FileMemoryError(
                     f"established Memory {entry_id!r} already exists; promotion will not overwrite it"
@@ -433,28 +440,30 @@ class FileMemoryStore:
                 if self._path_exists(memory_path)
                 else None
             )
-            learning_snapshot = (
-                self._read_entry(learning_path, area="learning")
-                if self._path_exists(learning_path)
-                else None
-            )
+            learning_exists = self._path_exists(learning_path)
+            learning_revision: str | None = None
+            learning_is_tombstone = False
+            if learning_exists:
+                _learning_text, learning_revision = self._read_text_file(
+                    learning_path
+                )
+                try:
+                    learning_is_tombstone = self._is_forgotten_tombstone(
+                        learning_path
+                    )
+                except FileMemoryError:
+                    # Forget is allowed to neutralize malformed non-authoritative
+                    # learning evidence. Established Memory above remains strict.
+                    learning_is_tombstone = False
+
             memory_entry = (
                 memory_snapshot[0] if memory_snapshot is not None else None
             )
             memory_revision = (
                 memory_snapshot[1] if memory_snapshot is not None else None
             )
-            learning_entry = (
-                learning_snapshot[0] if learning_snapshot is not None else None
-            )
-            learning_revision = (
-                learning_snapshot[1] if learning_snapshot is not None else None
-            )
 
-            if (
-                learning_entry is not None
-                and learning_entry.lifecycle is MemoryLifecycle.FORGOTTEN
-            ):
+            if learning_is_tombstone:
                 if memory_entry is None:
                     return ForgetResult.ALREADY_FORGOTTEN
                 self._unlink_durable(
@@ -470,22 +479,13 @@ class FileMemoryStore:
                 )
                 return ForgetResult.FORGOTTEN
 
-            if memory_entry is None and learning_entry is None:
+            if memory_entry is None and not learning_exists:
                 return ForgetResult.NOT_FOUND
 
-            source = memory_entry or learning_entry
-            assert source is not None
-            forgotten = MemoryEntry(
-                entry_id=entry_id,
-                kind=source.kind,
-                evidence_origin=source.evidence_origin,
-                lifecycle=MemoryLifecycle.FORGOTTEN,
-                content=_FORGOTTEN_BODY,
-            )
-            tombstone_revision = self._write_entry(
+            tombstone_revision = self._write_forget_tombstone(
                 learning_path,
-                forgotten,
-                create_only=learning_entry is None,
+                entry_id,
+                create_only=not learning_exists,
                 expected_revision=learning_revision,
             )
             self._verify_revision(learning_path, tombstone_revision)
@@ -526,13 +526,11 @@ class FileMemoryStore:
         self._validate_entry_id(entry_id)
 
         learning_path = self.learning_dir / f"{entry_id}.md"
-        if self._path_exists(learning_path):
-            learning, _revision = self._read_entry(
-                learning_path,
-                area="learning",
-            )
-            if learning.lifecycle is MemoryLifecycle.FORGOTTEN:
-                return None
+        if (
+            self._path_exists(learning_path)
+            and self._is_forgotten_tombstone(learning_path)
+        ):
+            return None
 
         path = self.memory_dir / f"{entry_id}.md"
         if not self._path_exists(path):
@@ -569,6 +567,8 @@ class FileMemoryStore:
         self._validate_entry_id(entry_id)
         path = self.learning_dir / f"{entry_id}.md"
         if not self._path_exists(path):
+            return None
+        if self._is_forgotten_tombstone(path):
             return None
         entry, revision = self._read_entry(path, area="learning")
         if not include_inactive:
@@ -634,6 +634,28 @@ class FileMemoryStore:
             except GitMemoryHistoryError as exc:
                 raise FileMemoryError(str(exc)) from exc
         return False
+
+    def _write_forget_tombstone(
+        self,
+        path: Path,
+        entry_id: str,
+        *,
+        create_only: bool,
+        expected_revision: str | None,
+    ) -> str:
+        self._validate_entry_id(entry_id)
+        metadata: dict[str, Any] = {
+            "schema_version": 1,
+            "entry_id": entry_id,
+            "lifecycle": MemoryLifecycle.FORGOTTEN.value,
+        }
+        return self._write_markdown(
+            path,
+            metadata,
+            f"{_FORGOTTEN_BODY}\n",
+            create_only=create_only,
+            expected_revision=expected_revision,
+        )
 
     def _write_entry(
         self,
@@ -752,23 +774,35 @@ class FileMemoryStore:
             MemoryLifecycle.PROVISIONAL,
             MemoryLifecycle.CONTRADICTED,
             MemoryLifecycle.SUPERSEDED,
-            MemoryLifecycle.FORGOTTEN,
         }:
             raise ValueError(
                 f"lifecycle {entry.lifecycle.value!r} is invalid in learning"
             )
         if entry.confirmation_basis is not None:
             raise ValueError("learning evidence cannot carry confirmation basis")
-        if (
-            entry.lifecycle is MemoryLifecycle.FORGOTTEN
-            and (
-                entry.content != _FORGOTTEN_BODY
-                or entry.supports_memory_id is not None
-            )
-        ):
-            raise ValueError(
-                "forgotten learning tombstone must contain no retained evidence"
-            )
+
+    def _is_forgotten_tombstone(self, path: Path) -> bool:
+        metadata, body, _revision = self._read_markdown(path)
+        lifecycle = metadata.get("lifecycle")
+        if lifecycle != MemoryLifecycle.FORGOTTEN.value:
+            return False
+
+        try:
+            if self._require_int(metadata, "schema_version") != 1:
+                raise ValueError("unsupported Memory tombstone schema")
+            entry_id = self._require_str(metadata, "entry_id")
+            self._validate_entry_id(entry_id)
+            if entry_id != path.stem:
+                raise ValueError("tombstone id does not match file")
+            if set(metadata) != {"schema_version", "entry_id", "lifecycle"}:
+                raise ValueError("tombstone contains unexpected metadata")
+            if body.strip() != _FORGOTTEN_BODY:
+                raise ValueError("tombstone contains unexpected content")
+        except (KeyError, TypeError, ValueError) as exc:
+            raise FileMemoryError(
+                f"invalid forgotten Memory tombstone in {path}"
+            ) from exc
+        return True
 
     def _area_for_path(self, path: Path) -> str:
         if path.parent == self.memory_dir:
