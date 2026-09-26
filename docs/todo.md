@@ -47,9 +47,14 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [x] Add package/dependency management appropriate to the selected stack.
 - [x] Add local validation commands.
 - [x] Re-validate real local multi-turn chat on target hardware; final qwen3.5:9b run passed 50 tests and the local-chat acceptance flow, enabling ADR-0006 acceptance.
-- [ ] Implement ADR-0008's accepted file-native Memory baseline and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile; existing Memory wins; personality changes are inspectable/reversible.
-- [ ] From the first Memory slice, preserve separate dimensions for durable Memory kind (`preference` / `fact` / `routine` / `episode`), evidence origin (`explicit_statement` / `observed_fact` / `behavioral_observation` / `hypothesis`), and lifecycle/maturity; promotion into established Memory is explicit and inspectable.
+- [x] Implement ADR-0008's current-file Memory baseline and wire `PersonalityMemoryPort`: empty Memory seeds once from the distribution profile, existing/current manually edited Memory wins, and the active personality is directly inspectable in Markdown.
+- [ ] Make established-Memory/personality changes safely reversible through the accepted versioning/edit-capture mechanism; current-file manual editing alone is not treated as historical rollback.
+- [x] From the first Memory slice, preserve separate dimensions for durable Memory kind (`preference` / `fact` / `routine` / `episode`), evidence origin (`explicit_statement` / `observed_fact` / `behavioral_observation` / `hypothesis`), and lifecycle/maturity; promotion into established Memory is explicit and inspectable.
 - [ ] Implement directory/lifecycle semantics: `learning/` is the only Memory area with automatic expiry/compaction/removal and contains observed facts, behavioral observations, hypotheses and non-durable extracts/summaries; `memory/` is never automatically removed/forgotten, but `confirmed/observed_pattern` entries may transition non-destructively to `stale`; explicit-user-confirmed knowledge never stales merely through time.
+
+The current file-native baseline is intentionally development-only and requires an explicit `--memory-root` / `ADA_MEMORY_ROOT`. It does **not** yet provide the Memory Broker, enforceable protection domains, encryption, safe Git/versioning concurrency, automatic retention/staleness, or derived retrieval. Do not place real household Memory in it until the gates below are closed.
+
+Implementation note: the baseline uses TOML `+++` front matter so it can be parsed with Python's stdlib `tomllib` and avoid another dependency. This is **not** a settled long-term human-editing format decision: Obsidian does not expose TOML front matter as Properties, so YAML/another representation must be reconsidered before the household Memory format is finalized.
 
 **Gates before real household Memory (ADR-0008):**
 
@@ -57,6 +62,7 @@ Create separate evidence-based evaluations only for capabilities required by the
 - [ ] Implement and validate the host-side Memory Broker, including trusted actor/audience/authorization binding and fail-closed request scope; prove that normal/model-driven/accidental application paths cannot read unrelated domains, and document/test the accepted residual risk that a fully compromised Ada runtime can forge trusted broker context while the broker itself is trusted across the domains it serves.
 - [ ] Demonstrate enforceable per-person/shared protection domains and scope-partitioned retrieval/indexes behind the broker; folders under one readable OS principal are insufficient.
 - [ ] Route every model-originated Memory write/promotion through a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling.
+- [ ] Before exposing `remember_explicit` / promotion through any user- or model-facing path, bind `EXPLICIT_USER` to an Ada-owned trusted confirmation event and enforce class-C sensitive-data / class-D secret handling; the file store itself must not infer those facts from caller-supplied flags.
 - [ ] Implement safe established-Memory write/versioning behavior: out-of-band edit capture, path-restricted history commits, same-file concurrency detection/reconciliation, lock/crash recovery, and prompt capture of Ada writes so later manual reverts remain detectable.
 - [ ] Ensure normal Memory retrieval/learning uses only current state and never consults Git history, snapshots, or backups as active Memory/evidence; historical retention/purge remains a separate operations/privacy policy.
 - [ ] Implement deterministic current/superseded/unresolved retrieval and stale-source handling; direct substring search must not promote superseded text as current truth.

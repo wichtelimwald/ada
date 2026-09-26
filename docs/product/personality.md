@@ -106,12 +106,17 @@ Within ADR-0008's accepted boundaries, the implementation must still define:
 
 ## Current implementation state
 
-PR #22 introduces:
+The implementation now includes:
 
 - the replaceable TOML bootstrap seed;
 - the Ada-owned `PersonalityProfile` schema;
 - `PersonalityMemoryPort`;
-- bootstrap semantics: seed empty Memory once, existing Memory wins;
-- model instructions rendered from a `PersonalityProfile`.
+- a development-only file-native adapter with seed-once semantics;
+- current manually edited `memory/personality.md` winning on the next read;
+- model instructions rendered from the current `PersonalityProfile`.
 
-Until the accepted authoritative Memory architecture is implemented and wired, the development local-chat path may still fall back directly to the bootstrap seed. That fallback is temporary and must be removed once Memory is wired.
+The local-chat default intentionally keeps using the packaged seed unless an
+explicit development `--memory-root` / `ADA_MEMORY_ROOT` is configured.
+That fallback remains until broker-mediated protected household Memory becomes
+the supported default; merely implementing the file adapter is not sufficient
+to make unprotected Memory implicit.

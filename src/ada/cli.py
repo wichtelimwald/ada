@@ -9,6 +9,8 @@ import sys
 from collections.abc import Callable
 
 from ada import __version__
+from ada.adapters.file_memory import FileMemoryError, FileMemoryStore
+from ada.bootstrap.personality import bootstrap_personality_memory
 from ada.application.calendar_drafts import render_calendar_draft_response
 from ada.application.local_chat_safety import render_conversation_only_reply
 from ada.core.actions import CreateCalendarEventDraft
@@ -82,7 +84,12 @@ def _chat_loop(
             )
 
 
-def _chat(*, model: str, ollama_url: str) -> int:
+def _chat(
+    *,
+    model: str,
+    ollama_url: str,
+    memory_root: str | None = None,
+) -> int:
     from ada.adapters.local_ollama import (
         LocalModelConfigurationError,
         LocalModelUnavailableError,
@@ -92,10 +99,26 @@ def _chat(*, model: str, ollama_url: str) -> int:
     )
 
     config = LocalOllamaConfig(model=model, base_url=ollama_url)
+    normalized_memory_root = (
+        memory_root.strip()
+        if isinstance(memory_root, str) and memory_root.strip()
+        else None
+    )
     try:
+        personality = None
+        if normalized_memory_root is not None:
+            memory = FileMemoryStore(normalized_memory_root)
+            personality = bootstrap_personality_memory(memory)
+
         check_local_ollama_ready(config)
-        runtime = build_local_ollama_runtime(config)
+        runtime = build_local_ollama_runtime(
+            config,
+            personality=personality,
+        )
     except (LocalModelConfigurationError, LocalModelUnavailableError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except FileMemoryError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
@@ -146,6 +169,14 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         help="Loopback Ollama OpenAI-compatible /v1 endpoint.",
     )
+    chat.add_argument(
+        "--memory-root",
+        default=os.getenv("ADA_MEMORY_ROOT") or None,
+        help=(
+            "Development-only file-native Memory root; do not use real household "
+            "data until protected domains are implemented."
+        ),
+    )
     return parser
 
 
@@ -160,6 +191,7 @@ def main() -> None:
             _chat(
                 model=args.model,
                 ollama_url=args.ollama_url,
+                memory_root=args.memory_root,
             )
         )
 

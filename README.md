@@ -2,7 +2,7 @@
 
 Ada is a local-first, privacy-first personal AI assistant project named after Ada Lovelace.
 
-> **Status:** Initial implementation foundation. PydanticAI is the first replaceable agent-runtime adapter, Ada starts as a Python-first container-first modular monolith, Cedar is implemented behind AdaGuard, and DBOS is the accepted durable-execution substrate behind Ada-owned action/outcome semantics.
+> **Status:** Initial implementation foundation. PydanticAI is the first replaceable agent-runtime adapter, Ada starts as a Python-first container-first modular monolith, Cedar is implemented behind AdaGuard, DBOS is the accepted durable-execution substrate behind Ada-owned action/outcome semantics, and the first development-only file-native Memory baseline is implemented behind Ada-owned types/ports.
 
 ## Vision
 
@@ -14,7 +14,7 @@ Ada is a modern assistant inspired by Ada Lovelace, especially the combination o
 
 The **distribution seed** is a real package asset at `src/ada/bootstrap/default_personality.toml`, so it can be replaced by a fork/distribution without changing Ada's trust architecture.
 
-The intended lifecycle is: **empty Memory -> seed once -> active personality lives in user-controlled Memory**. From then on, personality may gradually learn and evolve while remaining inspectable, editable, reversible, and separate from permissions/privacy/action truth.
+The intended lifecycle is: **empty Memory -> seed once -> active personality lives in user-controlled Memory**. From then on, personality may gradually learn and evolve while remaining inspectable, editable, and—once safe versioning/edit capture is implemented—reversible, while staying separate from permissions/privacy/action truth.
 
 See [personality model and lifecycle](docs/product/personality.md).
 
@@ -46,7 +46,7 @@ Ada's architecture is deliberately designed so that the AI model is **not** the 
 
 The accepted [Memory architecture](docs/decisions/ADR-0008-memory-architecture.md) is file-native and Markdown-first: current human-editable files are authoritative, private/shared Memory must map to enforceable protection domains, and automatic learning preserves separate dimensions for what knowledge is (for example a preference/fact/routine), how it arose (explicit statement, observed fact, behavioral observation, hypothesis), and its lifecycle/maturity. Promotion into established Memory crosses an Ada-owned validation boundary. **Only `learning/` expires, compacts, or disappears automatically**: observed facts, behavioral observations, hypotheses and non-durable extracts/summaries live there until promoted or compacted. Established `memory/` never disappears automatically; observation-derived `confirmed/observed_pattern` knowledge may be marked `stale` non-destructively, while explicit facts/preferences never become stale merely through time. Facts already owned by calendar/contact/document systems stay source-owned by default. Original documents/raw artifacts live outside Memory in **independently configurable source stores/providers per protection domain**; there is no required central Ada source tree. Existing stable originals are referenced. Directly received files are persisted only when the user asks or retained durable Memory/evidence needs a resolvable original; otherwise they remain session-only, and without a configured destination durable persistence fails closed. Forgetting Memory never changes or deletes an original. Derived RAG/search indexes are rebuildable caches rather than independent truth. Claim/source/lifecycle information stays inspectable without a second drifting claim store, and Memory never grants permission or substitutes for action truth.
 
-The MVP baseline starts with current-file reads and the simplest sufficient local search. Protected vault access is mediated by a **host-side Memory Broker**: Ada requests only the domain(s) needed for the current authorized task instead of holding standing access to every household vault. If RAG/FTS/vector/graph retrieval is added, it remains an automatically rebuildable scoped cache: candidate hits are resolved back to their current authoritative owner (Memory Markdown or the source-owned provider via the broker), lifecycle/maturity/scope are checked, and unavailable-source cached values are only last-known/unverified context. Git-style per-protection-domain history is the leading versioning-adapter candidate once safe edit capture/concurrency/recovery are implemented; Git identity is not authentication. ReMe, LangMem, Hindsight and similar frameworks are optional derived components that must earn their added runtime and maintenance cost. A [synthetic control](research/memory/control/README.md) demonstrates useful baseline behavior and failure modes, but enforceable vault isolation, safe concurrent writes, section-aware current/superseded retrieval, representative recall, and operational forgetting still require implementation validation. The architecture is accepted; the production Memory service is not yet implemented.
+The MVP baseline starts with current-file reads and the simplest sufficient local search. Protected vault access is mediated by a **host-side Memory Broker**: Ada requests only the domain(s) needed for the current authorized task instead of holding standing access to every household vault. If RAG/FTS/vector/graph retrieval is added, it remains an automatically rebuildable scoped cache: candidate hits are resolved back to their current authoritative owner (Memory Markdown or the source-owned provider via the broker), lifecycle/maturity/scope are checked, and unavailable-source cached values are only last-known/unverified context. Git-style per-protection-domain history is the leading versioning-adapter candidate once safe edit capture/concurrency/recovery are implemented; Git identity is not authentication. ReMe, LangMem, Hindsight and similar frameworks are optional derived components that must earn their added runtime and maintenance cost. A [synthetic control](research/memory/control/README.md) demonstrates useful baseline behavior and failure modes, but enforceable vault isolation, safe concurrent writes, section-aware current/superseded retrieval, representative recall, and operational forgetting still require implementation validation. The architecture is accepted. A development-only current-file baseline now implements ordinary Markdown Memory/learning files, seed-once personality loading, explicit-vs-observed evidence separation, conservative explicit promotion, and current-state forgetting. The Memory Broker, enforceable household protection domains, encryption, safe Git/versioning concurrency, automatic retention/staleness, and derived retrieval remain unimplemented, so this baseline is **not** approved for real household Memory.
 
 Some of these protections are already implemented; others are architecture rules being implemented incrementally. The project documents accepted decisions separately from work that is still under evaluation.
 
@@ -136,7 +136,7 @@ model requests. This first chat path runs with the macOS user's permissions;
 it is not isolated by a runtime container. Containerized local chat needs a
 separately reviewed, restricted Ollama connection before it is supported.
 
-Until the accepted authoritative Memory architecture is implemented and wired, this development chat temporarily falls back to the packaged personality seed. Once Memory is wired, the seed is used only when Memory has no personality yet; existing Memory always wins.
+By default this development chat still uses the packaged personality seed. To exercise the new file-native baseline deliberately, pass an explicit development Memory root; Ada seeds `memory/personality.md` once and then current file contents win, including manual edits. This path is not a protected household vault yet.
 
 Inside the chat:
 
@@ -148,6 +148,14 @@ The model and endpoint remain configurable:
 ```bash
 ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
 ```
+
+Development-only file-native Memory can be exercised explicitly:
+
+```bash
+ada chat --memory-root ~/ada-memory-dev
+```
+
+Do not use that unprotected root for real household data. Broker-mediated protection domains, encryption, and safe Git/versioning are separate MVP gates.
 
 This first chat milestone does not execute calendar actions. Calendar-create requests are represented as a **non-executable typed draft**. Ada-owned deterministic logic decides which fields are required and checks whether the draft's date, times, and target calendar occur in supported forms in the **current user message**. This is a conservative text check, not proof of user intent: it cannot reliably assign values to different events or interpret corrections and negations. A complete draft is neither authorization nor an executable proposal. Any future conversion into a proposal must address those limits and follow the AdaGuard + durable-action path.
 
