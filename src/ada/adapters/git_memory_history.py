@@ -127,10 +127,16 @@ class GitMemoryHistory:
                 "Memory Git ownership marker is invalid; refusing repository"
             )
 
-    def capture_external_changes(self) -> bool:
-        """Capture all current Memory-area edits already present in the worktree."""
+    def capture_external_changes(
+        self,
+        *,
+        message: str = "Capture external Memory edit",
+    ) -> bool:
+        """Capture current Markdown edits without staging editor/temp artifacts."""
 
-        paths = ("memory", "learning")
+        paths = self._memory_markdown_paths()
+        if not paths:
+            return False
         self._run("add", "-A", "--", *paths)
         if not self._has_staged_changes(paths):
             return False
@@ -139,11 +145,40 @@ class GitMemoryHistory:
             "--only",
             "--no-gpg-sign",
             "-m",
-            "Capture external Memory edit",
+            message,
             "--",
             *paths,
         )
         return True
+
+    def _memory_markdown_paths(self) -> tuple[str, ...]:
+        paths: set[str] = set()
+
+        for root_name in sorted(self._OWNED_ROOTS):
+            directory = self.root / root_name
+            try:
+                with os.scandir(directory) as entries:
+                    for entry in entries:
+                        if entry.name.endswith(".md"):
+                            paths.add(f"{root_name}/{entry.name}")
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise GitMemoryHistoryError(
+                    f"cannot scan Memory history area: {directory}"
+                ) from exc
+
+        tracked = self._run(
+            "ls-files",
+            "-z",
+            "--",
+            *sorted(self._OWNED_ROOTS),
+        )
+        for path in tracked.stdout.split("\0"):
+            if path and path.endswith(".md"):
+                paths.add(self._validate_owned_path(path))
+
+        return tuple(sorted(paths))
 
     def capture_ada_write(
         self,
