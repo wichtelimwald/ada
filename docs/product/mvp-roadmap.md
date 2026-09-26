@@ -141,9 +141,9 @@ authoritative write/versioning layer before adding real protection domains.
 **Required concept/implementation plan must cover at least:**
 
 - explicit correction vs create semantics;
-- forget behavior when current established files are malformed;
-- forgotten-ID reuse semantics;
-- opaque/non-sensitive entry identifiers and tombstone metadata;
+- malformed established Memory is an **integrity error**, not a silent-forget case: preserve the file, fail visibly, and require either explicit repair or a separately authorized force-forget recovery path; do not infer a filesystem failure from a parse error alone;
+- entry IDs are immutable and **never reused**, including after forgetting;
+- generic Memory entries use opaque, non-semantic identifiers (privacy-first random IDs; avoid time-bearing/semantic slugs). References and tombstones use only that identity. Human readability comes from current Markdown content/derived display text, not the ID;
 - area/lifecycle validity before data can become current context;
 - out-of-band human edit capture;
 - Git-style per-domain history while keeping only current head/state semantically
@@ -153,7 +153,7 @@ authoritative write/versioning layer before adding real protection domains.
 - crash durability including file + directory persistence semantics;
 - fd-based/no-follow file access appropriate to the supported platform;
 - create-only behavior on storage without hard-link support;
-- idempotent/repeated forget semantics.
+- idempotent/repeated forget semantics, including an explicit already-forgotten result rather than treating it as a fresh state change.
 
 **DoD:** deterministic tests prove no silent overwrite, stale re-promotion,
 history rehydration, lost human correction, or ambiguous write outcome for the
