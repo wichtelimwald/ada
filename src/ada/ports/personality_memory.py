@@ -11,10 +11,10 @@ class PersonalityMemoryPort(Protocol):
     def load_personality(self) -> PersonalityProfile | None:
         """Return the active personality, or None when Memory is empty."""
 
-    def save_personality(
+    def create_personality_if_absent(
         self,
         profile: PersonalityProfile,
         *,
         reason: str,
-    ) -> None:
-        """Persist an inspectable personality change with provenance/reason."""
+    ) -> bool:
+        """Create the initial profile without overwriting a concurrent winner."""
