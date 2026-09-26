@@ -147,8 +147,8 @@ Before this ADR becomes **Accepted**:
 
 1. ~~The maintainer decides recurrence expansion and the development credential
    store~~ — decided 2026-09-26 (D1: `recurring-ical-events`; D2: Keychain).
-2. The maintainer confirms the thin Ada-owned adapter over python-caldav
-   (section 4).
+2. ~~The maintainer confirms the thin Ada-owned adapter over python-caldav
+   (section 4)~~ — confirmed 2026-09-26.
 3. The IONOS probe confirms the CalDAV basics on Ada's mailbox (P1-P4, P7) and
    that outward sharing delivers the calendars to family members in a usable
    way (P10, M2, M3). If outward sharing is unusable, the access topology is

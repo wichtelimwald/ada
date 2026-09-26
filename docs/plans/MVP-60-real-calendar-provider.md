@@ -61,17 +61,18 @@ trade-offs.
 
 ## Decisions
 
-D1-D5 were decided by the maintainer on 2026-09-26 as recommended.
+D1-D6 were decided by the maintainer on 2026-09-26 as recommended; the thin
+Ada-owned adapter was confirmed the same day.
 
 | ID | Decision | Result | Status |
 | --- | --- | --- | --- |
-| D0 | Accept ADR-0009 | pending: maintainer confirmation of the thin adapter; probe P1-P4, P7, P10, M2, M3 | open |
+| D0 | Accept ADR-0009 | pending: probe P1-P4, P7, P10, M2, M3 (thin adapter confirmed 2026-09-26) | open |
 | D1 | Recurrence expansion | `recurring-ical-events` (LGPL-3.0-or-later) + `x-wr-timezone`, unmodified | decided |
 | D2 | Development credential store | macOS Keychain via `/usr/bin/security` on the Mac host; owner-only `0600` file only for synthetic accounts in dev containers | decided |
 | D3 | Update/cancel authority | Ada-created events within the grant; other events only with explicit per-action confirmation; Cedar policy decides; Ada records references of events it created | decided |
 | D4 | Travel-time source | configured approximate durations between registered places; unknown pairs reported as unknown | decided |
 | D5 | Durable payload retention | purge workflow after terminal outcome (`DBOS.delete_workflow`, SQLite `secure_delete`), keeping a minimal non-sensitive operation → event-reference record (also serves D3); revisit with MVP-30 encryption | decided |
-| D6 | Who is busy for a family-calendar event | MVP proposal: a family-calendar event counts as busy for every family member unless participants are recorded; participant tagging later | open (product, needed in S5) |
+| D6 | Who is busy for a family-calendar event | a family-calendar event counts as busy for every family member; participant tagging is a later refinement | decided |
 
 ## Reuse / dependency evidence
 
