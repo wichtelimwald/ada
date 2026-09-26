@@ -159,7 +159,10 @@ class GitMemoryHistory:
             try:
                 with os.scandir(directory) as entries:
                     for entry in entries:
-                        if entry.name.endswith(".md"):
+                        if (
+                            entry.name.endswith(".md")
+                            and not entry.is_dir(follow_symlinks=False)
+                        ):
                             paths.add(f"{root_name}/{entry.name}")
             except FileNotFoundError:
                 continue
