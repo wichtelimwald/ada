@@ -3,7 +3,7 @@
 Status: implementation
 Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-10
-Owner PR: pending
+Owner PR: #41
 
 ## Goal
 
