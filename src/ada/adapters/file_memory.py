@@ -415,6 +415,13 @@ class FileMemoryStore:
     def _read_markdown(self, path: Path) -> tuple[dict[str, Any], str]:
         self._reject_symlink(path)
         try:
+            mode = path.stat(follow_symlinks=False).st_mode
+        except OSError as exc:
+            raise FileMemoryError(f"cannot stat Memory file {path}") from exc
+        if not stat.S_ISREG(mode):
+            raise FileMemoryError(f"Memory file must be a regular file: {path}")
+
+        try:
             text = path.read_text(encoding="utf-8").replace("\r\n", "\n")
         except OSError as exc:
             raise FileMemoryError(f"cannot read Memory file {path}") from exc
@@ -439,16 +446,30 @@ class FileMemoryStore:
         path: Path,
         metadata: dict[str, Any],
         body: str,
+        *,
+        create_only: bool = False,
     ) -> None:
         self._reject_symlink(path)
         header = "\n".join(
             f"{key} = {self._toml_value(value)}"
             for key, value in metadata.items()
         )
+        try:
+            tomllib.loads(header)
+        except tomllib.TOMLDecodeError as exc:
+            raise FileMemoryError(
+                f"refusing to write invalid TOML front matter for {path}"
+            ) from exc
         text = f"+++\n{header}\n+++\n\n{body.rstrip()}\n"
-        self._atomic_write(path, text)
+        self._atomic_write(path, text, create_only=create_only)
 
-    def _atomic_write(self, path: Path, text: str) -> None:
+    def _atomic_write(
+        self,
+        path: Path,
+        text: str,
+        *,
+        create_only: bool = False,
+    ) -> None:
         self._ensure_directory(path.parent)
         temp_name: str | None = None
         try:
@@ -460,11 +481,23 @@ class FileMemoryStore:
                 suffix=".tmp",
                 delete=False,
             ) as handle:
+                temp_name = handle.name
                 handle.write(text)
                 handle.flush()
-                temp_name = handle.name
-            Path(temp_name).replace(path)
-        except OSError as exc:
+                os.fsync(handle.fileno())
+
+            if create_only:
+                try:
+                    os.link(temp_name, path)
+                except FileExistsError as exc:
+                    raise FileMemoryError(
+                        f"Memory file already exists and will not be overwritten: {path}"
+                    ) from exc
+            else:
+                Path(temp_name).replace(path)
+        except (OSError, UnicodeError) as exc:
+            if isinstance(exc, FileMemoryError):
+                raise
             raise FileMemoryError(f"cannot write Memory file {path}") from exc
         finally:
             if temp_name is not None:
@@ -487,22 +520,55 @@ class FileMemoryStore:
         raise TypeError(f"unsupported TOML metadata value: {type(value).__name__}")
 
     @staticmethod
+    def _require_int(metadata: dict[str, Any], key: str) -> int:
+        value = metadata[key]
+        if type(value) is not int:
+            raise TypeError(f"{key} must be an integer")
+        return value
+
+    @staticmethod
+    def _require_str(
+        metadata: dict[str, Any],
+        key: str,
+    ) -> str:
+        value = metadata[key]
+        if not isinstance(value, str):
+            raise TypeError(f"{key} must be a string")
+        value = value.strip()
+        if not value:
+            raise ValueError(f"{key} must not be empty")
+        return value
+
+    @staticmethod
     def _string_tuple(
         metadata: dict[str, Any],
         key: str,
     ) -> tuple[str, ...]:
         value = metadata[key]
-        if not isinstance(value, list) or not all(
-            isinstance(item, str) for item in value
+        if not isinstance(value, list) or not value or not all(
+            isinstance(item, str) and item.strip() for item in value
         ):
-            raise TypeError(f"{key} must be an array of strings")
-        return tuple(value)
+            raise TypeError(f"{key} must be a non-empty array of non-empty strings")
+        return tuple(item.strip() for item in value)
+
+    def _require_unused_entry_id(self, entry_id: str) -> None:
+        if (
+            (self.memory_dir / f"{entry_id}.md").exists()
+            or (self.learning_dir / f"{entry_id}.md").exists()
+        ):
+            raise FileMemoryError(
+                f"entry id {entry_id!r} already exists and will not be overwritten"
+            )
 
     @staticmethod
     def _validate_entry_id(entry_id: str) -> None:
         if _ENTRY_ID.fullmatch(entry_id) is None:
             raise ValueError(
                 "Memory entry id must be a lowercase safe slug of at most 64 characters"
+            )
+        if entry_id in _RESERVED_ENTRY_IDS:
+            raise ValueError(
+                f"Memory entry id {entry_id!r} is reserved for Ada-owned state"
             )
 
     @staticmethod
@@ -517,7 +583,7 @@ class FileMemoryStore:
         if path.is_symlink():
             raise FileMemoryError(f"Memory directory must not be a symlink: {path}")
         try:
-            path.mkdir(parents=True, exist_ok=True)
+            path.mkdir(mode=0o700, parents=True, exist_ok=True)
         except OSError as exc:
             raise FileMemoryError(f"cannot create Memory directory {path}") from exc
         if not path.is_dir():
