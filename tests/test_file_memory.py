@@ -9,7 +9,9 @@ from dulwich.repo import Repo
 from ada.adapters.dulwich_memory_history import MemoryHistoryError
 from ada.adapters.file_memory import (
     FileMemoryConflictError,
+    FileMemoryError,
     FileMemoryHistoryPendingError,
+    FileMemoryRecoveryRequiredError,
     FileMemoryStore,
 )
 from ada.bootstrap.personality import (
@@ -36,6 +38,7 @@ class _FakeHistory:
         self.capture_count = 0
         self.fail_on_capture = fail_on_capture
         self.snapshots: list[dict[str, bytes]] = []
+        self.reasons: list[str] = []
         self.seen: set[str] = set()
 
     def capture_snapshot(
@@ -49,6 +52,7 @@ class _FakeHistory:
             raise MemoryHistoryError("synthetic history failure")
         current = dict(snapshot)
         self.snapshots.append(current)
+        self.reasons.append(reason)
         for path in current:
             if path.startswith(("memory/m_", "learning/m_")):
                 self.seen.add(Path(path).stem)
@@ -314,6 +318,48 @@ class FileMemoryTests(unittest.TestCase):
             self.assertEqual(
                 store.forget("m_" + "6" * 32),
                 ForgetResult.NOT_FOUND,
+            )
+
+    def test_forget_cleanup_failure_reports_active_forget_state(self) -> None:
+        with TemporaryDirectory() as temp:
+            history = _FakeHistory()
+            store = FileMemoryStore(
+                temp,
+                history=history,
+                id_factory=_ids("6" * 32),
+            )
+            entry = store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Synthetic fact requiring cleanup.",
+            )
+            original_unlink = store._unlink_regular
+
+            def fail_unlink(path: Path) -> None:
+                raise FileMemoryError("synthetic unlink failure")
+
+            store._unlink_regular = fail_unlink  # type: ignore[method-assign]
+            try:
+                with self.assertRaisesRegex(
+                    FileMemoryRecoveryRequiredError,
+                    "forgotten in current semantics",
+                ):
+                    store.forget(entry.entry_id)
+            finally:
+                store._unlink_regular = original_unlink  # type: ignore[method-assign]
+
+            self.assertIsNone(store.load_memory_entry(entry.entry_id))
+            self.assertTrue(
+                (Path(temp) / "memory" / f"{entry.entry_id}.md").exists()
+            )
+            tombstone = (
+                Path(temp) / "learning" / f"{entry.entry_id}.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn("[forgotten]", tombstone)
+            self.assertTrue(
+                any(
+                    "Capture partial forget requiring cleanup" in reason
+                    for reason in self._history_reasons(history)
+                )
             )
 
     def test_malformed_established_memory_is_never_destroyed_by_forget(
@@ -596,6 +642,10 @@ class FileMemoryTests(unittest.TestCase):
                 item.commit.message.decode("utf-8").strip()
                 for item in repo.get_walker(include=[head])
             ]
+
+    @staticmethod
+    def _history_reasons(history: _FakeHistory) -> list[str]:
+        return list(history.reasons)
 
     @classmethod
     def _latest_history_message(cls, root: str) -> str:
