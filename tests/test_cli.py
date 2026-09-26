@@ -187,6 +187,36 @@ class CliTests(unittest.TestCase):
         self.assertEqual(personality.display_name, "Ada")
         runtime.aclose.assert_awaited_once_with()
 
+    def test_chat_without_memory_root_creates_no_memory_dirs(self) -> None:
+        runtime = FakeChatRuntime()
+        runtime.aclose = AsyncMock()
+
+        with TemporaryDirectory() as temp:
+            previous = Path.cwd()
+            os.chdir(temp)
+            try:
+                with (
+                    patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+                    patch(
+                        "ada.adapters.local_ollama.build_local_ollama_runtime",
+                        return_value=runtime,
+                    ),
+                    patch("ada.cli._chat_loop", return_value=0),
+                ):
+                    result = _chat(
+                        model="qwen3.5:9b",
+                        ollama_url="http://localhost:11434/v1",
+                        memory_root=None,
+                    )
+            finally:
+                os.chdir(previous)
+
+            self.assertEqual(result, 0)
+            self.assertFalse((Path(temp) / "memory").exists())
+            self.assertFalse((Path(temp) / "learning").exists())
+
+        runtime.aclose.assert_awaited_once_with()
+
     def test_blank_memory_root_is_treated_as_disabled(self) -> None:
         runtime = FakeChatRuntime()
         runtime.aclose = AsyncMock()
