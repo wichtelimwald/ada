@@ -503,17 +503,16 @@ class FileMemoryStore:
             )
             self._verify_revision(learning_path, tombstone_revision)
 
+            changed_paths = (learning_path,)
             if memory_entry is not None:
                 self._unlink_durable(
                     memory_path,
                     expected_revision=memory_revision,
                 )
+                changed_paths = (memory_path, learning_path)
 
             self._capture_ada_write(
-                (
-                    self._history_path(memory_path),
-                    self._history_path(learning_path),
-                ),
+                tuple(self._history_path(path) for path in changed_paths),
                 reason="forget current Memory",
                 expected_revisions=((learning_path, tombstone_revision),),
                 expected_absent=(memory_path,),

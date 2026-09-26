@@ -481,6 +481,30 @@ class FileMemoryTests(unittest.TestCase):
             self.assertEqual(log[0], "Capture external Memory edit")
             self.assertIn("Ada Memory: correct explicit Memory", log[1:])
 
+    def test_forget_unpromoted_learning_evidence_records_history(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            observed = store.record_learning(
+                kind=MemoryKind.FACT,
+                evidence_origin=EvidenceOrigin.OBSERVED_FACT,
+                content="Unpromoted synthetic evidence.",
+            )
+
+            self.assertEqual(
+                store.forget(observed.entry_id),
+                ForgetResult.FORGOTTEN,
+            )
+
+            self.assertIsNone(store.load_learning_entry(observed.entry_id))
+            log = _git(
+                temp,
+                "log",
+                "--format=%s",
+                "--",
+                f"learning/{observed.entry_id}.md",
+            ).splitlines()
+            self.assertEqual(log[0], "Ada Memory: forget current Memory")
+
     def test_forget_neutralizes_malformed_learning_evidence(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
