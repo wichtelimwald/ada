@@ -207,6 +207,229 @@ class FileMemoryTests(unittest.TestCase):
                 MemoryLifecycle.FORGOTTEN,
             )
 
+    def test_existing_entries_are_never_silently_overwritten(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            store.remember_explicit(
+                entry_id="reply-style",
+                kind=MemoryKind.PREFERENCE,
+                content="Prefer concise answers.",
+            )
+            path = Path(temp) / "memory" / "reply-style.md"
+            path.write_text(
+                path.read_text(encoding="utf-8").replace(
+                    "Prefer concise answers.",
+                    "Manual correction wins.",
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "will not be overwritten"):
+                store.remember_explicit(
+                    entry_id="reply-style",
+                    kind=MemoryKind.PREFERENCE,
+                    content="Second write.",
+                )
+
+            current = store.load_memory_entry("reply-style")
+            self.assertIsNotNone(current)
+            assert current is not None
+            self.assertEqual(current.content, "Manual correction wins.")
+
+    def test_promotion_never_clobbers_existing_memory_or_reuses_evidence(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            store.record_learning(
+                entry_id="detail-pattern",
+                kind=MemoryKind.PREFERENCE,
+                evidence_origin=EvidenceOrigin.BEHAVIORAL_OBSERVATION,
+                content="Observed wording.",
+            )
+            store.promote_learning(
+                "detail-pattern",
+                confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+            )
+
+            memory_path = Path(temp) / "memory" / "detail-pattern.md"
+            memory_path.write_text(
+                memory_path.read_text(encoding="utf-8").replace(
+                    "Observed wording.",
+                    "Manual correction.",
+                ),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(RuntimeError, "already exists"):
+                store.promote_learning(
+                    "detail-pattern",
+                    confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+                )
+
+            current = store.load_memory_entry("detail-pattern")
+            self.assertIsNotNone(current)
+            assert current is not None
+            self.assertEqual(current.content, "Manual correction.")
+
+            retained = store.load_learning_entry(
+                "detail-pattern",
+                include_inactive=True,
+            )
+            self.assertIsNotNone(retained)
+            assert retained is not None
+            self.assertEqual(retained.lifecycle, MemoryLifecycle.OBSERVED)
+            self.assertEqual(retained.supports_memory_id, "detail-pattern")
+            self.assertIsNone(store.load_learning_entry("detail-pattern"))
+
+    def test_personality_name_is_reserved_from_generic_entry_api(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            bootstrap_personality_memory(store)
+
+            for operation in (
+                lambda: store.remember_explicit(
+                    entry_id="personality",
+                    kind=MemoryKind.FACT,
+                    content="unsafe",
+                ),
+                lambda: store.load_memory_entry("personality"),
+                lambda: store.forget("personality"),
+            ):
+                with self.subTest(operation=operation):
+                    with self.assertRaisesRegex(ValueError, "reserved"):
+                        operation()
+
+            self.assertIsNotNone(store.load_personality())
+
+    def test_scalar_front_matter_types_fail_closed(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            bootstrap_personality_memory(store)
+            path = Path(temp) / "memory" / "personality.md"
+            original = path.read_text(encoding="utf-8")
+
+            for old, new in (
+                ('display_name = "Ada"', 'display_name = ["Mira"]'),
+                ("schema_version = 1", "schema_version = true"),
+                ("schema_version = 1", "schema_version = 1.9"),
+            ):
+                with self.subTest(new=new):
+                    path.write_text(original.replace(old, new), encoding="utf-8")
+                    with self.assertRaisesRegex(
+                        RuntimeError,
+                        "invalid personality Memory metadata",
+                    ):
+                        store.load_personality()
+
+    def test_forget_creates_content_free_tombstone_and_blocks_repromotion(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            original_text = "Sensitive synthetic observation."
+            store.record_learning(
+                entry_id="sensitive-note",
+                kind=MemoryKind.FACT,
+                evidence_origin=EvidenceOrigin.OBSERVED_FACT,
+                content=original_text,
+            )
+            store.promote_learning(
+                "sensitive-note",
+                confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+            )
+
+            self.assertTrue(store.forget("sensitive-note"))
+
+            tombstone_path = Path(temp) / "learning" / "sensitive-note.md"
+            tombstone_text = tombstone_path.read_text(encoding="utf-8")
+            self.assertNotIn(original_text, tombstone_text)
+            self.assertIn("[forgotten]", tombstone_text)
+            self.assertIsNone(store.load_learning_entry("sensitive-note"))
+
+            with self.assertRaisesRegex(RuntimeError, "not promotable"):
+                store.promote_learning(
+                    "sensitive-note",
+                    confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+                )
+
+    def test_malformed_learning_evidence_does_not_block_forget(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            store.record_learning(
+                entry_id="detail-pattern",
+                kind=MemoryKind.PREFERENCE,
+                evidence_origin=EvidenceOrigin.BEHAVIORAL_OBSERVATION,
+                content="Observed wording.",
+            )
+            store.promote_learning(
+                "detail-pattern",
+                confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+            )
+            learning_path = Path(temp) / "learning" / "detail-pattern.md"
+            learning_path.write_text("not front matter", encoding="utf-8")
+
+            self.assertTrue(store.forget("detail-pattern"))
+            self.assertIsNone(store.load_memory_entry("detail-pattern"))
+            tombstone = learning_path.read_text(encoding="utf-8")
+            self.assertIn('lifecycle = "forgotten"', tombstone)
+            self.assertNotIn("Observed wording.", tombstone)
+
+    def test_symlinked_memory_paths_are_rejected(self) -> None:
+        with TemporaryDirectory() as temp, TemporaryDirectory() as outside:
+            root = Path(temp)
+            store = FileMemoryStore(root)
+            target = Path(outside) / "outside.md"
+            target.write_text("outside", encoding="utf-8")
+            link = root / "memory" / "linked.md"
+            link.symlink_to(target)
+
+            with self.assertRaisesRegex(RuntimeError, "symlink"):
+                store.load_memory_entry("linked")
+
+        with TemporaryDirectory() as temp, TemporaryDirectory() as outside:
+            root = Path(temp)
+            memory_dir = root / "memory"
+            memory_dir.symlink_to(Path(outside), target_is_directory=True)
+
+            with self.assertRaisesRegex(RuntimeError, "symlink"):
+                FileMemoryStore(root)
+
+    def test_entry_header_identity_and_malformed_entries_fail_closed(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            store.remember_explicit(
+                entry_id="reply-style",
+                kind=MemoryKind.PREFERENCE,
+                content="Prefer concise answers.",
+            )
+            path = Path(temp) / "memory" / "reply-style.md"
+            original = path.read_text(encoding="utf-8")
+
+            path.write_text(
+                original.replace(
+                    'entry_id = "reply-style"',
+                    'entry_id = "other-id"',
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "does not match file"):
+                store.load_memory_entry("reply-style")
+
+            path.write_text(
+                original.replace(
+                    'kind = "preference"',
+                    'kind = "not-a-kind"',
+                ),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(RuntimeError, "invalid Memory entry metadata"):
+                store.load_memory_entry("reply-style")
+
+            path.write_text("not TOML front matter", encoding="utf-8")
+            with self.assertRaisesRegex(RuntimeError, "missing TOML front matter"):
+                store.load_memory_entry("reply-style")
+
+    def test_reserved_and_blank_roots_fail_closed(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "must not be blank"):
+            FileMemoryStore("")
+
     def test_current_file_state_does_not_rehydrate_from_history_like_data(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
