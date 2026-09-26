@@ -20,6 +20,8 @@ class GitMemoryHistory:
     """
 
     _OWNED_ROOTS = frozenset({"memory", "learning"})
+    _OWNERSHIP_MARKER = "ada-memory-history-v1"
+    _OWNERSHIP_CONTENT = "Ada file-native Memory history v1\n"
 
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -48,6 +50,9 @@ class GitMemoryHistory:
                     "--quiet",
                     extra_env={"GIT_TEMPLATE_DIR": template},
                 )
+            self._create_ownership_marker(git_dir)
+        else:
+            self._require_ownership_marker(git_dir)
 
         head = self._run(
             "rev-parse",
@@ -62,6 +67,48 @@ class GitMemoryHistory:
                 "--no-gpg-sign",
                 "-m",
                 "Initialize Ada Memory history",
+            )
+
+    def _create_ownership_marker(self, git_dir: Path) -> None:
+        marker = git_dir / self._OWNERSHIP_MARKER
+        try:
+            with marker.open("x", encoding="utf-8") as handle:
+                handle.write(self._OWNERSHIP_CONTENT)
+                handle.flush()
+                os.fsync(handle.fileno())
+            directory_fd = os.open(
+                git_dir,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW,
+            )
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+        except (FileExistsError, OSError) as exc:
+            raise GitMemoryHistoryError(
+                "cannot establish Ada ownership of the Memory Git repository"
+            ) from exc
+
+    def _require_ownership_marker(self, git_dir: Path) -> None:
+        marker = git_dir / self._OWNERSHIP_MARKER
+        if marker.is_symlink():
+            raise GitMemoryHistoryError(
+                f"Memory Git ownership marker must not be a symlink: {marker}"
+            )
+        try:
+            content = marker.read_text(encoding="utf-8")
+        except FileNotFoundError as exc:
+            raise GitMemoryHistoryError(
+                "refusing to use a pre-existing Git repository that was not "
+                "initialized by Ada Memory"
+            ) from exc
+        except (OSError, UnicodeError) as exc:
+            raise GitMemoryHistoryError(
+                "cannot verify Ada ownership of the Memory Git repository"
+            ) from exc
+        if content != self._OWNERSHIP_CONTENT:
+            raise GitMemoryHistoryError(
+                "Memory Git ownership marker is invalid; refusing repository"
             )
 
     def capture_external_changes(self) -> bool:
