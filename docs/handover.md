@@ -18,7 +18,8 @@ Start by reading:
 2. docs/handover.md
 3. .github/skills/project-continuity.md
 4. .github/skills/maintainer-collaboration.md
-5. only the task-relevant canonical documents referenced there.
+5. docs/product/mvp-roadmap.md when the task is about MVP progress or "next step";
+6. only the task-relevant canonical documents referenced there.
 
 Before changing anything, verify the current repository and GitHub state rather than trusting an old chat:
 - default-branch head and current working branch/worktree if available;
@@ -28,7 +29,7 @@ Before changing anything, verify the current repository and GitHub state rather 
 
 If no concrete current task was supplied, reconstruct the active work thread from current GitHub state: inspect recent open PRs, prioritize in-progress non-draft work over draft backlog, then cross-check docs/todo.md. Do not encode a current PR number in this handover. If more than one candidate is genuinely active, state the ambiguity instead of guessing.
 
-Use docs/todo.md for backlog/priorities, ADRs for architecture decisions, README/docs/product for product status, and the active PR for implementation/review/validation state. Do not recreate these facts in a second summary.
+Use docs/product/mvp-roadmap.md for MVP work-package order, dependencies and "next/overnext step" selection; use docs/todo.md for detailed backlog/gates, ADRs for architecture decisions, README/docs/product for product status, and the active PR for implementation/review/validation state. Step-level execution plans live under docs/plans/. Do not recreate these facts in a second summary.
 
 Continue from the latest verified state. Do not restart settled research without new decision-relevant evidence. Preserve existing user work and follow the repository branch/PR rules. Never merge without the maintainer's explicit authorization; review or CI is not merge authorization.
 
@@ -45,7 +46,9 @@ Chat with the maintainer in German unless asked otherwise; repository and GitHub
 | Session continuity process | `.github/skills/project-continuity.md` |
 | Maintainer collaboration preferences | `.github/skills/maintainer-collaboration.md` |
 | Product direction and user-facing status | `README.md`, `docs/product/` |
-| Backlog and priorities | `docs/todo.md` |
+| MVP execution order, dependencies, completion state | `docs/product/mvp-roadmap.md` |
+| Step-level execution plans | `docs/plans/` |
+| Detailed backlog and gates | `docs/todo.md` |
 | Architecture decisions and status | `docs/decisions/` |
 | Architecture boundaries | `docs/architecture/` |
 | Security and privacy | `PRIVACY.md`, `SECURITY.md`, `docs/security/`, `.github/skills/security-privacy.md` |
@@ -74,7 +77,9 @@ Progress is persisted by updating the **owner of the fact**, not by continuously
 Examples:
 
 - implementation, current blocker, review finding, or commit-specific test result -> relevant PR;
-- backlog/priority change -> `docs/todo.md`;
+- MVP work-package order/status/dependency change -> `docs/product/mvp-roadmap.md`;
+- step execution detail -> the matching file under `docs/plans/`;
+- detailed backlog/gate change -> `docs/todo.md`;
 - accepted/revised architecture decision -> ADR and, when user-relevant, `README.md`;
 - product-scope change -> `docs/product/` and relevant backlog entry;
 - security/privacy boundary change -> threat/privacy documentation;
