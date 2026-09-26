@@ -84,6 +84,10 @@ availability, bundled native libraries, and applicable LGPL conditions
 that distribution mode. Model artifacts remain separately installed as
 described above.
 
+## External Memory-history prerequisite
+
+- **Git CLI** — the MVP-20 development Memory history adapter interoperates with a separately installed Git executable. The Git project is distributed under GPLv2. Ada does not vendor, bundle, or redistribute Git, and Git history is not an authentication or authorization boundary. Any future Ada installer/image that includes Git requires a separate artifact-level license/distribution review before publication. See [ADR-0010](docs/decisions/ADR-0010-memory-write-history.md).
+
 ## External local-model baseline
 
 The first local-chat profile is designed to interoperate with separately installed software/model artifacts that are **not vendored or redistributed by Ada**:

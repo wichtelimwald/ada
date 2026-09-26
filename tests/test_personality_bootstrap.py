@@ -15,19 +15,22 @@ from ada.core.personality import (
 class FakePersonalityMemory:
     def __init__(self) -> None:
         self.profile: PersonalityProfile | None = None
-        self.saves: list[tuple[PersonalityProfile, str]] = []
+        self.creates: list[tuple[PersonalityProfile, str]] = []
 
     def load_personality(self) -> PersonalityProfile | None:
         return self.profile
 
-    def save_personality(
+    def create_personality_if_absent(
         self,
         profile: PersonalityProfile,
         *,
         reason: str,
-    ) -> None:
+    ) -> bool:
+        if self.profile is not None:
+            return False
         self.profile = profile
-        self.saves.append((profile, reason))
+        self.creates.append((profile, reason))
+        return True
 
 
 class PersonalityBootstrapTests(unittest.TestCase):
@@ -50,8 +53,8 @@ class PersonalityBootstrapTests(unittest.TestCase):
         second = bootstrap_personality_memory(memory)
 
         self.assertEqual(first, second)
-        self.assertEqual(len(memory.saves), 1)
-        self.assertIn("bootstrap", memory.saves[0][1])
+        self.assertEqual(len(memory.creates), 1)
+        self.assertIn("bootstrap", memory.creates[0][1])
 
     def test_existing_memory_wins_over_repository_seed(self) -> None:
         custom = PersonalityProfile(
@@ -70,7 +73,7 @@ class PersonalityBootstrapTests(unittest.TestCase):
         active = bootstrap_personality_memory(memory)
 
         self.assertEqual(active, custom)
-        self.assertEqual(memory.saves, [])
+        self.assertEqual(memory.creates, [])
 
     def test_rendered_personality_never_claims_unconfirmed_actions(self) -> None:
         instructions = render_personality_instructions(

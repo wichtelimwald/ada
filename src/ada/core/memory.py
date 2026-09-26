@@ -33,6 +33,12 @@ class ConfirmationBasis(StrEnum):
     OBSERVED_PATTERN = "observed_pattern"
 
 
+class ForgetResult(StrEnum):
+    FORGOTTEN = "forgotten"
+    ALREADY_FORGOTTEN = "already_forgotten"
+    NOT_FOUND = "not_found"
+
+
 @dataclass(frozen=True, slots=True)
 class MemoryEntry:
     """One inspectable Memory or learning item independent from retrieval/runtime."""
