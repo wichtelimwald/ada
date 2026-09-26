@@ -159,13 +159,13 @@ class DulwichMemoryHistory:
                 repo.object_store.add_object(blob)
                 area_tree.add(
                     name.encode("utf-8"),
-                    stat.S_IFREG | 0o600,
+                    0o100644,
                     blob.id,
                 )
             repo.object_store.add_object(area_tree)
             root_tree.add(
                 area.encode("ascii"),
-                stat.S_IFDIR,
+                0o040000,
                 area_tree.id,
             )
 
