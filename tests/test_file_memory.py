@@ -427,6 +427,60 @@ class FileMemoryTests(unittest.TestCase):
                 (Path(temp) / "learning" / f"{entry.entry_id}.md").exists()
             )
 
+    def test_edit_during_history_capture_is_not_clean_success(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            original = store.remember_explicit(
+                kind=MemoryKind.PREFERENCE,
+                content="Before history race.",
+            )
+            snapshot = store.load_memory_snapshot(original.entry_id)
+            self.assertIsNotNone(snapshot)
+            assert snapshot is not None
+            path = Path(temp) / "memory" / f"{original.entry_id}.md"
+            original_capture = store._history.capture_ada_write
+
+            def capture_then_edit(paths, *, reason):
+                result = original_capture(paths, reason=reason)
+                if reason == "correct explicit Memory":
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "Ada correction.",
+                            "Human edit during history capture.",
+                        ),
+                        encoding="utf-8",
+                    )
+                return result
+
+            with patch.object(
+                store._history,
+                "capture_ada_write",
+                side_effect=capture_then_edit,
+            ):
+                with self.assertRaises(MemoryConflictError):
+                    store.correct_explicit(
+                        original.entry_id,
+                        content="Ada correction.",
+                        expected_revision=snapshot.revision,
+                    )
+
+            current = store.load_memory_entry(original.entry_id)
+            self.assertIsNotNone(current)
+            assert current is not None
+            self.assertEqual(
+                current.content,
+                "Human edit during history capture.",
+            )
+            log = _git(
+                temp,
+                "log",
+                "--format=%s",
+                "--",
+                f"memory/{original.entry_id}.md",
+            ).splitlines()
+            self.assertEqual(log[0], "Capture external Memory edit")
+            self.assertIn("Ada Memory: correct explicit Memory", log[1:])
+
     def test_forget_neutralizes_malformed_learning_evidence(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)
