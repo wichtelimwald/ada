@@ -117,9 +117,14 @@ class FileMemoryStore:
         kind: MemoryKind,
         content: str,
     ) -> MemoryEntry:
-        """Establish one explicit user statement directly as confirmed Memory."""
+        """Establish one trusted application-confirmed explicit user statement.
+
+        This is not a model tool. Callers must already have established that the
+        user explicitly supplied the statement in trusted application context.
+        """
 
         self._validate_entry_id(entry_id)
+        self._require_unused_entry_id(entry_id)
         entry = MemoryEntry(
             entry_id=entry_id,
             kind=kind,
@@ -128,7 +133,11 @@ class FileMemoryStore:
             content=self._validate_content(content),
             confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
         )
-        self._write_entry(self.memory_dir / f"{entry_id}.md", entry)
+        self._write_entry(
+            self.memory_dir / f"{entry_id}.md",
+            entry,
+            create_only=True,
+        )
         return entry
 
     def record_learning(
@@ -146,10 +155,7 @@ class FileMemoryStore:
             raise ValueError(
                 "explicit statements belong in established Memory, not learning"
             )
-        if (self.memory_dir / f"{entry_id}.md").exists():
-            raise FileMemoryError(
-                f"entry id {entry_id!r} already exists in established Memory"
-            )
+        self._require_unused_entry_id(entry_id)
 
         lifecycle = (
             MemoryLifecycle.PROVISIONAL
@@ -163,7 +169,11 @@ class FileMemoryStore:
             lifecycle=lifecycle,
             content=self._validate_content(content),
         )
-        self._write_entry(self.learning_dir / f"{entry_id}.md", entry)
+        self._write_entry(
+            self.learning_dir / f"{entry_id}.md",
+            entry,
+            create_only=True,
+        )
         return entry
 
     def promote_learning(
@@ -172,10 +182,11 @@ class FileMemoryStore:
         *,
         confirmation_basis: ConfirmationBasis,
     ) -> MemoryEntry:
-        """Promote evidence through the first conservative Ada-owned rule.
+        """Promote evidence through a trusted Ada application confirmation.
 
-        The baseline permits explicit-user confirmation only. Automatic
-        observation-pattern promotion remains a later validation-policy slice.
+        This is not a model tool. The baseline accepts only an Ada-owned
+        explicit-user confirmation path; sensitivity/class-C/D validation is
+        still a later gate before any user/model-facing write path is exposed.
         """
 
         self._validate_entry_id(entry_id)
@@ -184,9 +195,19 @@ class FileMemoryStore:
                 "the baseline only permits explicit-user-confirmed promotion"
             )
 
+        memory_path = self.memory_dir / f"{entry_id}.md"
+        if memory_path.exists():
+            raise FileMemoryError(
+                f"established Memory {entry_id!r} already exists; promotion will not overwrite it"
+            )
+
         evidence = self.load_learning_entry(entry_id, include_inactive=True)
         if evidence is None:
             raise FileMemoryError(f"learning entry {entry_id!r} does not exist")
+        if evidence.supports_memory_id is not None:
+            raise FileMemoryError(
+                f"learning entry {entry_id!r} already supports established Memory"
+            )
         if evidence.lifecycle in {
             MemoryLifecycle.FORGOTTEN,
             MemoryLifecycle.SUPERSEDED,
@@ -207,13 +228,20 @@ class FileMemoryStore:
             entry_id=evidence.entry_id,
             kind=evidence.kind,
             evidence_origin=evidence.evidence_origin,
-            lifecycle=MemoryLifecycle.CONFIRMED,
+            lifecycle=evidence.lifecycle,
             content=evidence.content,
-            confirmation_basis=confirmation_basis,
+            confirmation_basis=None,
             supports_memory_id=established.entry_id,
         )
-        self._write_entry(self.memory_dir / f"{entry_id}.md", established)
-        self._write_entry(self.learning_dir / f"{entry_id}.md", retained_evidence)
+        self._write_entry(
+            memory_path,
+            established,
+            create_only=True,
+        )
+        self._write_entry(
+            self.learning_dir / f"{entry_id}.md",
+            retained_evidence,
+        )
         return established
 
     def forget(self, entry_id: str) -> bool:
