@@ -1,9 +1,9 @@
 # MVP-20 — Memory semantics, safe writes and versioning
 
-Status: implementation
+Status: validation
 Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-10
-Owner PR: pending
+Owner PR: #40
 
 ## Goal
 
