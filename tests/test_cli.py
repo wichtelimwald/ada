@@ -4,6 +4,8 @@ import asyncio
 from io import StringIO
 from tempfile import TemporaryDirectory
 import json
+import os
+from pathlib import Path
 import subprocess
 import sys
 import unittest
@@ -184,6 +186,42 @@ class CliTests(unittest.TestCase):
         self.assertIsNotNone(personality)
         self.assertEqual(personality.display_name, "Ada")
         runtime.aclose.assert_awaited_once_with()
+
+    def test_blank_memory_root_is_treated_as_disabled(self) -> None:
+        runtime = FakeChatRuntime()
+        runtime.aclose = AsyncMock()
+
+        with TemporaryDirectory() as temp:
+            previous = Path.cwd()
+            os.chdir(temp)
+            try:
+                with (
+                    patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+                    patch(
+                        "ada.adapters.local_ollama.build_local_ollama_runtime",
+                        return_value=runtime,
+                    ),
+                    patch("ada.cli._chat_loop", return_value=0),
+                ):
+                    result = _chat(
+                        model="qwen3.5:9b",
+                        ollama_url="http://localhost:11434/v1",
+                        memory_root="   ",
+                    )
+            finally:
+                os.chdir(previous)
+
+            self.assertEqual(result, 0)
+            self.assertFalse((Path(temp) / "memory").exists())
+            self.assertFalse((Path(temp) / "learning").exists())
+
+        runtime.aclose.assert_awaited_once_with()
+
+    def test_empty_memory_root_environment_parses_as_none(self) -> None:
+        with patch.dict(os.environ, {"ADA_MEMORY_ROOT": ""}, clear=False):
+            args = build_parser().parse_args(["chat"])
+
+        self.assertIsNone(args.memory_root)
 
     def test_chat_defaults_to_qwen35_9b(self) -> None:
         with patch("ada.cli.os.getenv", side_effect=lambda key, default=None: default):
