@@ -158,7 +158,7 @@ The model and endpoint remain configurable:
 ada chat --model qwen3.5:9b --ollama-url http://localhost:11434/v1
 ```
 
-Development-only file-native Memory can be exercised explicitly. This path now requires a separately installed `git` CLI; Ada creates a local history repository inside the configured Memory root, but normal Memory reads use only the current Markdown files.
+Development-only file-native Memory can be exercised explicitly. This path now requires a separately installed `git` CLI and a **dedicated Memory root**. Ada creates and marks its own local history repository inside that root; it refuses to reuse a pre-existing foreign Git repository. Normal Memory reads use only the current Markdown files.
 
 ```bash
 ada chat --memory-root ~/ada-memory-dev
