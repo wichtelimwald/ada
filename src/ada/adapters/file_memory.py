@@ -67,6 +67,10 @@ class FileMemoryHistoryPendingError(FileMemoryError):
     """Current Memory changed, but its history revision could not be captured."""
 
 
+class FileMemoryRecoveryRequiredError(FileMemoryError):
+    """A Memory state change is active, but deterministic cleanup is incomplete."""
+
+
 class FileMemoryStore:
     """Human-readable current Memory with Git-style recovery history.
 
@@ -451,7 +455,32 @@ class FileMemoryStore:
                 create_only=not self._path_exists(learning_path),
             )
             if self._path_exists(memory_path):
-                self._unlink_regular(memory_path)
+                try:
+                    self._unlink_regular(memory_path)
+                except FileMemoryError as exc:
+                    # The tombstone already makes the identity forgotten in
+                    # current semantics. Preserve/capture that exact partial
+                    # state and report it explicitly instead of returning an
+                    # ambiguous generic failure.
+                    partial = self._snapshot_current_files()
+                    try:
+                        self._history.capture_snapshot(
+                            partial,
+                            reason=(
+                                f"Capture partial forget requiring cleanup "
+                                f"{entry_id}"
+                            ),
+                        )
+                    except MemoryHistoryError as history_exc:
+                        raise FileMemoryRecoveryRequiredError(
+                            f"Memory {entry_id!r} is forgotten in current "
+                            "semantics, established-file cleanup failed, and "
+                            "the partial state could not be captured in history"
+                        ) from history_exc
+                    raise FileMemoryRecoveryRequiredError(
+                        f"Memory {entry_id!r} is forgotten in current semantics, "
+                        "but established-file cleanup failed; recovery is required"
+                    ) from exc
 
             desired = dict(before)
             desired[f"learning/{entry_id}.md"] = tombstone
@@ -783,17 +812,25 @@ class FileMemoryStore:
             ("memory", self.memory_dir),
             ("learning", self.learning_dir),
         ):
+            dir_fd = self._open_directory(directory)
             try:
-                entries = list(os.scandir(directory))
-            except OSError as exc:
-                raise FileMemoryError(
-                    f"cannot scan Memory directory {directory}"
-                ) from exc
-            for item in entries:
-                if not item.name.endswith(".md"):
-                    continue
-                path = directory / item.name
-                snapshot[f"{area}/{item.name}"] = self._read_bytes(path)
+                try:
+                    names = os.listdir(dir_fd)
+                except OSError as exc:
+                    raise FileMemoryError(
+                        f"cannot scan Memory directory {directory}"
+                    ) from exc
+                for name in names:
+                    if not name.endswith(".md"):
+                        continue
+                    path = directory / name
+                    snapshot[f"{area}/{name}"] = self._read_bytes_from_dir_fd(
+                        dir_fd,
+                        name,
+                        display_path=path,
+                    )
+            finally:
+                os.close(dir_fd)
         return snapshot
 
     @contextmanager
@@ -828,11 +865,27 @@ class FileMemoryStore:
 
     def _read_bytes(self, path: Path) -> bytes:
         dir_fd = self._open_directory(path.parent)
+        try:
+            return self._read_bytes_from_dir_fd(
+                dir_fd,
+                path.name,
+                display_path=path,
+            )
+        finally:
+            os.close(dir_fd)
+
+    @staticmethod
+    def _read_bytes_from_dir_fd(
+        dir_fd: int,
+        name: str,
+        *,
+        display_path: Path,
+    ) -> bytes:
         fd: int | None = None
         try:
             try:
                 fd = os.open(
-                    path.name,
+                    name,
                     os.O_RDONLY | os.O_NOFOLLOW,
                     dir_fd=dir_fd,
                 )
@@ -841,21 +894,21 @@ class FileMemoryStore:
             except OSError as exc:
                 if exc.errno == errno.ELOOP:
                     raise FileMemoryError(
-                        f"Memory file must not be a symlink: {path}"
+                        f"Memory file must not be a symlink: {display_path}"
                     ) from exc
                 raise FileMemoryError(
-                    f"cannot open Memory file {path}"
+                    f"cannot open Memory file {display_path}"
                 ) from exc
 
             try:
                 mode = os.fstat(fd).st_mode
             except OSError as exc:
                 raise FileMemoryError(
-                    f"cannot stat Memory file {path}"
+                    f"cannot stat Memory file {display_path}"
                 ) from exc
             if not stat.S_ISREG(mode):
                 raise FileMemoryError(
-                    f"Memory file must be a regular file: {path}"
+                    f"Memory file must be a regular file: {display_path}"
                 )
 
             with os.fdopen(fd, "rb", closefd=True) as handle:
@@ -863,16 +916,15 @@ class FileMemoryStore:
                 return handle.read()
         except FileNotFoundError as exc:
             raise FileMemoryConflictError(
-                f"Memory file changed while being read: {path}"
+                f"Memory file changed while being read: {display_path}"
             ) from exc
         except OSError as exc:
             raise FileMemoryError(
-                f"cannot read Memory file {path}"
+                f"cannot read Memory file {display_path}"
             ) from exc
         finally:
             if fd is not None:
                 os.close(fd)
-            os.close(dir_fd)
 
     def _write_bytes(
         self,
@@ -1035,23 +1087,31 @@ class FileMemoryStore:
 
     @staticmethod
     def _path_exists(path: Path) -> bool:
+        dir_fd = FileMemoryStore._open_directory(path.parent)
         try:
-            mode = os.stat(path, follow_symlinks=False).st_mode
-        except FileNotFoundError:
-            return False
-        except OSError as exc:
-            raise FileMemoryError(
-                f"cannot stat Memory path {path}"
-            ) from exc
-        if stat.S_ISLNK(mode):
-            raise FileMemoryError(
-                f"Memory file must not be a symlink: {path}"
-            )
-        if not stat.S_ISREG(mode):
-            raise FileMemoryError(
-                f"Memory path is not a regular file: {path}"
-            )
-        return True
+            try:
+                mode = os.stat(
+                    path.name,
+                    dir_fd=dir_fd,
+                    follow_symlinks=False,
+                ).st_mode
+            except FileNotFoundError:
+                return False
+            except OSError as exc:
+                raise FileMemoryError(
+                    f"cannot stat Memory path {path}"
+                ) from exc
+            if stat.S_ISLNK(mode):
+                raise FileMemoryError(
+                    f"Memory file must not be a symlink: {path}"
+                )
+            if not stat.S_ISREG(mode):
+                raise FileMemoryError(
+                    f"Memory path is not a regular file: {path}"
+                )
+            return True
+        finally:
+            os.close(dir_fd)
 
     @staticmethod
     def _revision(content: bytes) -> str:
