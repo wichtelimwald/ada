@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from pathlib import Path
-import stat
 import time
 
 from dulwich.object_store import tree_lookup_path
