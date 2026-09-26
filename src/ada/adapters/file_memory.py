@@ -183,7 +183,12 @@ class FileMemoryStore:
                 expected_revision,
                 path,
             )
-            revision = self._write_markdown(path, metadata, body)
+            revision = self._write_markdown(
+                path,
+                metadata,
+                body,
+                expected_revision=expected_revision,
+            )
             self._verify_revision(path, revision)
             self._capture_ada_write(
                 (self._history_path(path),),
@@ -338,6 +343,7 @@ class FileMemoryStore:
                 learning_revision = self._write_entry(
                     learning_path,
                     retained_evidence,
+                    expected_revision=evidence_snapshot.revision,
                 )
                 self._verify_revision(learning_path, learning_revision)
             except FileMemoryError as exc:
@@ -396,7 +402,11 @@ class FileMemoryStore:
                 content=self._validate_content(content),
                 confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
             )
-            revision = self._write_entry(path, corrected)
+            revision = self._write_entry(
+                path,
+                corrected,
+                expected_revision=expected_revision,
+            )
             self._verify_revision(path, revision)
             self._capture_ada_write(
                 (self._history_path(path),),
@@ -413,15 +423,27 @@ class FileMemoryStore:
 
         with self._write_lock():
             self._capture_external_changes()
-            memory_entry = (
-                self._read_entry(memory_path, area="memory")[0]
+            memory_snapshot = (
+                self._read_entry(memory_path, area="memory")
                 if self._path_exists(memory_path)
                 else None
             )
-            learning_entry = (
-                self._read_entry(learning_path, area="learning")[0]
+            learning_snapshot = (
+                self._read_entry(learning_path, area="learning")
                 if self._path_exists(learning_path)
                 else None
+            )
+            memory_entry = (
+                memory_snapshot[0] if memory_snapshot is not None else None
+            )
+            memory_revision = (
+                memory_snapshot[1] if memory_snapshot is not None else None
+            )
+            learning_entry = (
+                learning_snapshot[0] if learning_snapshot is not None else None
+            )
+            learning_revision = (
+                learning_snapshot[1] if learning_snapshot is not None else None
             )
 
             if (
@@ -430,7 +452,10 @@ class FileMemoryStore:
             ):
                 if memory_entry is None:
                     return ForgetResult.ALREADY_FORGOTTEN
-                self._unlink_durable(memory_path)
+                self._unlink_durable(
+                    memory_path,
+                    expected_revision=memory_revision,
+                )
                 self._capture_ada_write(
                     (
                         self._history_path(memory_path),
@@ -456,11 +481,15 @@ class FileMemoryStore:
                 learning_path,
                 forgotten,
                 create_only=learning_entry is None,
+                expected_revision=learning_revision,
             )
             self._verify_revision(learning_path, tombstone_revision)
 
             if memory_entry is not None:
-                self._unlink_durable(memory_path)
+                self._unlink_durable(
+                    memory_path,
+                    expected_revision=memory_revision,
+                )
 
             self._capture_ada_write(
                 (
@@ -607,6 +636,7 @@ class FileMemoryStore:
         entry: MemoryEntry,
         *,
         create_only: bool = False,
+        expected_revision: str | None = None,
     ) -> str:
         area = self._area_for_path(path)
         self._validate_area_entry(entry, area=area)
@@ -626,6 +656,7 @@ class FileMemoryStore:
             metadata,
             f"{entry.content}\n",
             create_only=create_only,
+            expected_revision=expected_revision,
         )
 
     def _read_entry(
@@ -771,6 +802,7 @@ class FileMemoryStore:
         body: str,
         *,
         create_only: bool = False,
+        expected_revision: str | None = None,
     ) -> str:
         header = "\n".join(
             f"{key} = {self._toml_value(value)}"
@@ -787,6 +819,7 @@ class FileMemoryStore:
             path,
             text.encode("utf-8"),
             create_only=create_only,
+            expected_revision=expected_revision,
         )
 
     def _atomic_write(
@@ -795,6 +828,7 @@ class FileMemoryStore:
         data: bytes,
         *,
         create_only: bool,
+        expected_revision: str | None,
     ) -> str:
         self._ensure_directory(path.parent)
         directory_fd = self._open_directory_fd(path.parent)
@@ -817,6 +851,17 @@ class FileMemoryStore:
                 self._sync_file_fd(temp_fd)
             finally:
                 os.close(temp_fd)
+
+            if expected_revision is not None:
+                current_revision = self._revision_in_directory(
+                    directory_fd,
+                    path,
+                )
+                if current_revision != expected_revision:
+                    raise MemoryConflictError(
+                        "Memory file changed immediately before publication "
+                        f"and will not be overwritten: {path}"
+                    )
 
             if create_only:
                 try:
@@ -953,10 +998,25 @@ class FileMemoryStore:
             ) from exc
         return text, sha256(raw).hexdigest()
 
-    def _unlink_durable(self, path: Path) -> None:
+    def _unlink_durable(
+        self,
+        path: Path,
+        *,
+        expected_revision: str | None = None,
+    ) -> None:
         directory_fd = self._open_directory_fd(path.parent)
         try:
             self._assert_regular_entry(directory_fd, path)
+            if expected_revision is not None:
+                current_revision = self._revision_in_directory(
+                    directory_fd,
+                    path,
+                )
+                if current_revision != expected_revision:
+                    raise MemoryConflictError(
+                        "Memory file changed immediately before deletion "
+                        f"and will not be removed: {path}"
+                    )
             os.unlink(path.name, dir_fd=directory_fd)
             self._sync_directory_fd(directory_fd)
         except FileMemoryError:
@@ -967,6 +1027,45 @@ class FileMemoryStore:
             ) from exc
         finally:
             os.close(directory_fd)
+
+    def _revision_in_directory(
+        self,
+        directory_fd: int,
+        path: Path,
+    ) -> str:
+        try:
+            fd = os.open(
+                path.name,
+                os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW,
+                dir_fd=directory_fd,
+            )
+        except FileNotFoundError as exc:
+            raise MemoryConflictError(
+                f"Memory file disappeared before publication: {path}"
+            ) from exc
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise FileMemoryError(
+                    f"Memory file must not be a symlink: {path}"
+                ) from exc
+            raise FileMemoryError(
+                f"cannot reopen Memory file for revision check: {path}"
+            ) from exc
+
+        try:
+            if not stat.S_ISREG(os.fstat(fd).st_mode):
+                raise FileMemoryError(
+                    f"Memory file must be a regular file: {path}"
+                )
+            digest = sha256()
+            while True:
+                chunk = os.read(fd, 1024 * 1024)
+                if not chunk:
+                    break
+                digest.update(chunk)
+            return digest.hexdigest()
+        finally:
+            os.close(fd)
 
     def _path_exists(self, path: Path) -> bool:
         directory_fd = self._open_directory_fd(path.parent)
