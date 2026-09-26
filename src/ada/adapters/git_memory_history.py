@@ -134,6 +134,13 @@ class GitMemoryHistory:
     ) -> bool:
         """Capture current Markdown edits without staging editor/temp artifacts."""
 
+        # `git add` only notices a foreign index lock when there is something to
+        # add, so check explicitly before any Ada write is published.
+        if os.path.lexists(self.root / ".git" / "index.lock"):
+            raise GitMemoryHistoryError(
+                "Memory Git index.lock exists; another Git process may be "
+                "running and Ada will not remove the lock"
+            )
         paths = self._memory_markdown_paths()
         if not paths:
             return False
@@ -257,12 +264,15 @@ class GitMemoryHistory:
         extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         env = {
+            # No HOME/XDG_CONFIG_HOME: user-level Git ignore/attributes files
+            # must not change Memory history capture.
             "PATH": os.environ.get("PATH", ""),
-            "HOME": os.environ.get("HOME", ""),
             "LC_ALL": "C",
             "LANG": "C",
             "GIT_CONFIG_GLOBAL": os.devnull,
             "GIT_CONFIG_NOSYSTEM": "1",
+            # Never discover an enclosing repository if the Memory .git vanishes.
+            "GIT_DIR": str(self.root / ".git"),
             "GIT_LITERAL_PATHSPECS": "1",
             "GIT_AUTHOR_NAME": "Ada Memory History",
             "GIT_AUTHOR_EMAIL": "ada-memory@localhost.invalid",

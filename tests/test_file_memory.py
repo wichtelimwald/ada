@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 import errno
+import os
 from pathlib import Path
 import re
+import shutil
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
@@ -726,6 +728,28 @@ class FileMemoryTests(unittest.TestCase):
             staged = _git(temp, "diff", "--cached", "--name-only")
             self.assertEqual(staged, "unrelated.txt")
 
+    def test_user_level_git_ignore_does_not_affect_history(self) -> None:
+        with TemporaryDirectory() as home, TemporaryDirectory() as temp:
+            ignore = Path(home) / ".config" / "git" / "ignore"
+            ignore.parent.mkdir(parents=True)
+            ignore.write_text("*.md\n", encoding="utf-8")
+            with patch.dict(os.environ, {"HOME": home}):
+                os.environ.pop("XDG_CONFIG_HOME", None)
+                store = FileMemoryStore(temp)
+                entry = store.remember_explicit(
+                    kind=MemoryKind.FACT,
+                    content="Recorded despite user-level ignore rules.",
+                )
+
+            log = _git(
+                temp,
+                "log",
+                "--format=%s",
+                "--",
+                f"memory/{entry.entry_id}.md",
+            )
+            self.assertEqual(log, "Ada Memory: create explicit Memory")
+
     def test_existing_foreign_git_repository_is_refused(self) -> None:
         with TemporaryDirectory() as temp:
             subprocess.run(
@@ -763,24 +787,70 @@ class FileMemoryTests(unittest.TestCase):
             self.assertTrue(marker.is_file())
 
     def test_git_lock_failure_stops_before_current_memory_write(self) -> None:
-        with TemporaryDirectory() as temp:
-            store = FileMemoryStore(temp)
-            lock = Path(temp) / ".git" / "index.lock"
-            lock.write_text("synthetic lock", encoding="utf-8")
-            try:
-                with self.assertRaisesRegex(
-                    FileMemoryError,
-                    "Git command failed",
-                ):
-                    store.remember_explicit(
-                        kind=MemoryKind.FACT,
-                        content="Must not be written.",
-                    )
-            finally:
-                lock.unlink()
+        for existing_markdown in (False, True):
+            with self.subTest(existing_markdown=existing_markdown):
+                with TemporaryDirectory() as temp:
+                    store = FileMemoryStore(temp)
+                    if existing_markdown:
+                        bootstrap_personality_memory(store)
+                    lock = Path(temp) / ".git" / "index.lock"
+                    lock.write_text("synthetic lock", encoding="utf-8")
+                    try:
+                        with self.assertRaisesRegex(
+                            FileMemoryError,
+                            r"index\.lock",
+                        ):
+                            store.remember_explicit(
+                                kind=MemoryKind.FACT,
+                                content="Must not be written.",
+                            )
+                        self.assertTrue(lock.exists())
+                    finally:
+                        lock.unlink()
 
-            generic_files = list((Path(temp) / "memory").glob("m-*.md"))
-            self.assertEqual(generic_files, [])
+                    generic_files = list(
+                        (Path(temp) / "memory").glob("m-*.md")
+                    )
+                    self.assertEqual(generic_files, [])
+
+    def test_missing_memory_git_never_falls_back_to_enclosing_repository(
+        self,
+    ) -> None:
+        with TemporaryDirectory() as temp:
+            project = Path(temp)
+            _git(project, "init", "--quiet")
+            _git(
+                project,
+                "-c",
+                "user.name=Synthetic",
+                "-c",
+                "user.email=synthetic@example.invalid",
+                "commit",
+                "--quiet",
+                "--allow-empty",
+                "-m",
+                "unrelated project",
+            )
+            root = project / "memory-root"
+            store = FileMemoryStore(root)
+            store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Existing synthetic fact.",
+            )
+            shutil.rmtree(root / ".git")
+
+            with self.assertRaisesRegex(FileMemoryError, "not a git repository"):
+                store.remember_explicit(
+                    kind=MemoryKind.FACT,
+                    content="Must not reach the enclosing repository.",
+                )
+
+            self.assertEqual(_git(project, "ls-files"), "")
+            self.assertEqual(
+                _git(project, "log", "--format=%s"),
+                "unrelated project",
+            )
+            self.assertEqual(len(list((root / "memory").glob("m-*.md"))), 1)
 
     def test_history_failure_after_write_has_explicit_ambiguous_outcome(self) -> None:
         with TemporaryDirectory() as temp:
