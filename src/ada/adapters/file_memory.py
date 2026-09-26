@@ -164,7 +164,7 @@ class FileMemoryStore:
             self._verify_revision(path, revision)
             self._capture_ada_write(
                 (self._history_path(path),),
-                reason=reason,
+                reason="initialize personality",
             )
         return True
 
@@ -197,7 +197,7 @@ class FileMemoryStore:
             self._verify_revision(path, revision)
             self._capture_ada_write(
                 (self._history_path(path),),
-                reason=reason,
+                reason="update personality",
             )
 
         return PersonalitySnapshot(profile=profile, revision=revision)
