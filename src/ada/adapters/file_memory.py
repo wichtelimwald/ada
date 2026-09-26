@@ -32,7 +32,7 @@ from ada.core.personality import PersonalityProfile
 
 _ENTRY_ID = re.compile(r"m-[0-9a-f]{32}")
 _FORGOTTEN_BODY = "[forgotten]"
-_HISTORY_PATHS = ("memory", "learning")
+_STALE_TEMP = re.compile(r"\.ada-memory-tmp-[0-9a-f]{32}")
 
 
 class FileMemoryError(RuntimeError):
@@ -101,7 +101,10 @@ class FileMemoryStore:
 
         with self._write_lock():
             self._history_call(self._history.ensure_initialized)
-            self._capture_external_changes()
+            self._cleanup_stale_temp_files()
+            self._capture_external_changes(
+                message="Capture pre-existing Memory state",
+            )
 
     def load_personality(self) -> PersonalityProfile | None:
         snapshot = self.load_personality_snapshot()
@@ -834,7 +837,7 @@ class FileMemoryStore:
     ) -> str:
         self._ensure_directory(path.parent)
         directory_fd = self._open_directory_fd(path.parent)
-        temp_name = f".{path.name}.{uuid4().hex}.tmp"
+        temp_name = f".ada-memory-tmp-{uuid4().hex}"
         temp_exists = False
         try:
             temp_fd = os.open(
@@ -1147,8 +1150,27 @@ class FileMemoryStore:
         finally:
             os.close(root_fd)
 
-    def _capture_external_changes(self) -> None:
-        self._history_call(self._history.capture_external_changes)
+    def _cleanup_stale_temp_files(self) -> None:
+        for directory in (self.memory_dir, self.learning_dir):
+            try:
+                children = tuple(directory.iterdir())
+            except OSError as exc:
+                raise FileMemoryError(
+                    f"cannot scan Memory directory for stale temp files: {directory}"
+                ) from exc
+            for child in children:
+                if _STALE_TEMP.fullmatch(child.name):
+                    self._unlink_durable(child)
+
+    def _capture_external_changes(
+        self,
+        *,
+        message: str = "Capture external Memory edit",
+    ) -> None:
+        try:
+            self._history.capture_external_changes(message=message)
+        except GitMemoryHistoryError as exc:
+            raise FileMemoryError(str(exc)) from exc
 
     def _capture_ada_write(
         self,
