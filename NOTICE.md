@@ -84,6 +84,12 @@ availability, bundled native libraries, and applicable LGPL conditions
 that distribution mode. Model artifacts remain separately installed as
 described above.
 
+The current Dockerfile and dependency manifest are **not reproducible
+release inputs**. The deliberately failing
+[release input gate](docs/research/reproducible-release-gate.md) tracks missing
+hashed, platform-specific Python 3.14 wheels and a reviewed base-image
+digest; it does not clear third-party license obligations.
+
 ## External local-model baseline
 
 The first local-chat profile is designed to interoperate with separately installed software/model artifacts that are **not vendored or redistributed by Ada**:
