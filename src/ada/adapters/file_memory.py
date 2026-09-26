@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import re
+import stat
 from tempfile import NamedTemporaryFile
 import tomllib
 from typing import Any
@@ -18,6 +20,8 @@ from ada.core.personality import PersonalityProfile
 
 
 _ENTRY_ID = re.compile(r"[a-z0-9][a-z0-9._-]{0,63}")
+_RESERVED_ENTRY_IDS = frozenset({"personality"})
+_FORGOTTEN_BODY = "[forgotten]"
 
 
 class FileMemoryError(RuntimeError):
@@ -34,7 +38,16 @@ class FileMemoryStore:
     """
 
     def __init__(self, root: str | Path) -> None:
-        self.root = Path(root).expanduser().resolve()
+        if isinstance(root, str) and not root.strip():
+            raise FileMemoryError("Memory root must not be blank")
+
+        expanded = Path(root).expanduser()
+        if expanded.is_symlink():
+            raise FileMemoryError(
+                f"Memory root must not be a symlink: {expanded}"
+            )
+
+        self.root = expanded.resolve()
         self.memory_dir = self.root / "memory"
         self.learning_dir = self.root / "learning"
         self._ensure_directory(self.root)
@@ -47,15 +60,18 @@ class FileMemoryStore:
             return None
         metadata, _body = self._read_markdown(path)
         try:
-            schema_version = int(metadata["schema_version"])
+            schema_version = self._require_int(metadata, "schema_version")
             if schema_version != 1:
                 raise ValueError("unsupported personality Memory schema")
             return PersonalityProfile(
                 schema_version=schema_version,
-                profile_id=str(metadata["profile_id"]),
-                display_name=str(metadata["display_name"]),
-                inspiration=str(metadata["inspiration"]).strip(),
-                background_story=str(metadata["background_story"]).strip(),
+                profile_id=self._require_str(metadata, "profile_id"),
+                display_name=self._require_str(metadata, "display_name"),
+                inspiration=self._require_str(metadata, "inspiration"),
+                background_story=self._require_str(
+                    metadata,
+                    "background_story",
+                ),
                 traits=self._string_tuple(metadata, "traits"),
                 interaction_style=self._string_tuple(
                     metadata,
@@ -84,7 +100,7 @@ class FileMemoryStore:
             "traits": profile.traits,
             "interaction_style": profile.interaction_style,
             "boundaries": profile.boundaries,
-            "change_reason": reason,
+            "last_ada_write_reason": reason,
         }
         body = (
             "# Personality\n\n"
