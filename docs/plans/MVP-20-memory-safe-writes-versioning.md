@@ -170,7 +170,10 @@ commit.
   Git worktrees/clones with commit-based synchronization as the stronger concurrency
   model for protected Memory. If selected, synchronization must preserve divergent
   commits as explicit merge/conflict state, never silently reconcile with
-  last-writer-wins, force reset/push, or an implicit public/cloud remote.
+  last-writer-wins, force reset/push, or an implicit public/cloud remote. MVP-30
+  must then simplify the implementation by removing MVP-20 shared-working-tree
+  race handling that the selected model makes obsolete instead of stacking both
+  concurrency models indefinitely.
 - MVP-40 owns automatic lifecycle transitions, contradiction/currentness resolution
   and derived retrieval. Its explicit-user confirmation binding must also bind
   promotion to the evidence revision the user saw; MVP-20 `promote_learning`
