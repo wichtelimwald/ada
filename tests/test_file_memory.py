@@ -779,6 +779,37 @@ class FileMemoryTests(unittest.TestCase):
             self.assertFalse((Path(temp) / "learning").exists())
             self.assertFalse((Path(temp) / ".ada-memory.lock").exists())
 
+    def test_interrupted_git_initialization_can_resume(self) -> None:
+        with TemporaryDirectory() as temp:
+            with patch(
+                "ada.adapters.git_memory_history.GitMemoryHistory._create_ownership_marker",
+                side_effect=GitMemoryHistoryError("synthetic initialization crash"),
+            ):
+                with self.assertRaisesRegex(
+                    FileMemoryError,
+                    "synthetic initialization crash",
+                ):
+                    FileMemoryStore(temp)
+
+            root = Path(temp)
+            self.assertTrue((root / ".git").is_dir())
+            self.assertTrue((root / ".ada-memory-git-init-v1").is_file())
+            self.assertFalse(
+                (root / ".git" / "ada-memory-history-v1").exists()
+            )
+
+            store = FileMemoryStore(temp)
+
+            self.assertTrue(
+                (root / ".git" / "ada-memory-history-v1").is_file()
+            )
+            self.assertFalse((root / ".ada-memory-git-init-v1").exists())
+            entry = store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Recovered after interrupted Git initialization.",
+            )
+            self.assertIsNotNone(store.load_memory_entry(entry.entry_id))
+
     def test_ada_owned_history_can_be_reopened(self) -> None:
         with TemporaryDirectory() as temp:
             first_store = FileMemoryStore(temp)
