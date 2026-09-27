@@ -230,10 +230,6 @@ class GitMemoryHistory:
         )
         return bool(result.stdout.strip())
 
-    def head(self) -> str:
-        result = self._run("rev-parse", "HEAD")
-        return result.stdout.strip()
-
     def _has_staged_changes(self, paths: tuple[str, ...]) -> bool:
         result = self._run(
             "diff",
