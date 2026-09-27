@@ -82,12 +82,6 @@ class MemorySnapshot:
     revision: str
 
 
-@dataclass(frozen=True, slots=True)
-class PersonalitySnapshot:
-    profile: PersonalityProfile
-    revision: str
-
-
 class FileMemoryStore:
     """Current-file Memory adapter with safe local writes and Git history.
 
@@ -127,19 +121,15 @@ class FileMemoryStore:
             )
 
     def load_personality(self) -> PersonalityProfile | None:
-        snapshot = self.load_personality_snapshot()
-        return snapshot.profile if snapshot is not None else None
-
-    def load_personality_snapshot(self) -> PersonalitySnapshot | None:
         path = self.memory_dir / "personality.md"
         if not self._path_exists(path):
             return None
-        metadata, _body, revision = self._read_markdown(path)
+        metadata, _body, _revision = self._read_markdown(path)
         try:
             schema_version = self._require_int(metadata, "schema_version")
             if schema_version != 1:
                 raise ValueError("unsupported personality Memory schema")
-            profile = PersonalityProfile(
+            return PersonalityProfile(
                 schema_version=schema_version,
                 profile_id=self._require_str(metadata, "profile_id"),
                 display_name=self._require_str(metadata, "display_name"),
@@ -159,7 +149,6 @@ class FileMemoryStore:
             raise FileMemoryError(
                 f"invalid personality Memory metadata in {path}"
             ) from exc
-        return PersonalitySnapshot(profile=profile, revision=revision)
 
     def create_personality_if_absent(
         self,
@@ -189,41 +178,6 @@ class FileMemoryStore:
                 expected_revisions=((path, revision),),
             )
         return True
-
-    def update_personality(
-        self,
-        profile: PersonalityProfile,
-        *,
-        reason: str,
-        expected_revision: str,
-    ) -> PersonalitySnapshot:
-        path = self.memory_dir / "personality.md"
-        metadata, body = self._personality_document(profile, reason=reason)
-
-        with self._write_lock():
-            self._capture_external_changes()
-            current = self.load_personality_snapshot()
-            if current is None:
-                raise FileMemoryError("personality Memory does not exist")
-            self._require_expected_revision(
-                current.revision,
-                expected_revision,
-                path,
-            )
-            revision = self._write_markdown(
-                path,
-                metadata,
-                body,
-                expected_revision=expected_revision,
-            )
-            self._verify_revision(path, revision)
-            self._capture_ada_write(
-                (self._history_path(path),),
-                reason="update personality",
-                expected_revisions=((path, revision),),
-            )
-
-        return PersonalitySnapshot(profile=profile, revision=revision)
 
     def remember_explicit(
         self,
@@ -587,12 +541,6 @@ class FileMemoryStore:
             include_inactive=include_inactive,
         )
         return snapshot.entry if snapshot is not None else None
-
-    def history_head(self) -> str:
-        try:
-            return self._history.head()
-        except GitMemoryHistoryError as exc:
-            raise FileMemoryError(str(exc)) from exc
 
     def _load_learning_snapshot(
         self,
