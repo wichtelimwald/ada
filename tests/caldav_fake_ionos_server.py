@@ -13,6 +13,31 @@ def _xml_escape(value: str) -> str:
     return saxutils.escape(value)
 
 
+class _UnboundedByteStream(httpx2.SyncByteStream):
+    """Yields many chunks, without any ``Content-Length`` header.
+
+    Used to prove the response-size cap is enforced while *reading* a
+    genuinely incremental response, not only after an already-materialized
+    mock body has been checked post hoc. Bounded at a large but finite chunk
+    count (rather than truly infinite) so a regression in the cap logic
+    fails the test instead of hanging it forever.
+    """
+
+    def __init__(self, chunk: bytes, *, max_chunks: int = 1_000_000) -> None:
+        self._chunk = chunk
+        self._max_chunks = max_chunks
+        self.chunks_yielded = 0
+        self.closed = False
+
+    def __iter__(self):
+        for _ in range(self._max_chunks):
+            self.chunks_yielded += 1
+            yield self._chunk
+
+    def close(self) -> None:
+        self.closed = True
+
+
 @dataclass
 class _StoredResource:
     body: bytes
@@ -55,8 +80,10 @@ class FakeIonosCalDAVServer:
         # Test-controlled fault injection, checked once per call.
         self.inject_doctype = False
         self.oversized_body: bytes | None = None
+        self.stream_oversized_without_content_length = False
+        self.last_unbounded_stream: _UnboundedByteStream | None = None
         self.wrong_origin_href: str | None = None
-        self.force_redirect = False
+        self.force_redirect_methods: frozenset[str] = frozenset()
 
         # Observability for assertions.
         self.received_time_ranges: list[tuple[datetime, datetime]] = []
@@ -111,13 +138,21 @@ class FakeIonosCalDAVServer:
                 },
             )
 
-        if self.force_redirect:
+        if self.stream_oversized_without_content_length:
+            self.last_unbounded_stream = _UnboundedByteStream(b"x" * 4096)
             return httpx2.Response(
-                302, headers={"Location": "https://dav.mailbusiness.ionos.test/elsewhere"}
+                207,
+                headers={"Content-Type": "application/xml"},
+                stream=self.last_unbounded_stream,
             )
 
         path = request.url.path
         method = request.method
+
+        if method in self.force_redirect_methods:
+            return httpx2.Response(
+                302, headers={"Location": "https://dav.mailbusiness.ionos.test/elsewhere"}
+            )
 
         if method == "PROPFIND":
             return self._propfind(path)

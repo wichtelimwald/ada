@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import urljoin, urlsplit
 from xml.etree import ElementTree
 
@@ -99,6 +99,9 @@ def build_client(
     )
 
 
+_SAFE_METHODS = frozenset({"GET", "PROPFIND", "REPORT"})
+
+
 def send_request(
     client: httpx2.Client,
     method: str,
@@ -106,18 +109,27 @@ def send_request(
     *,
     headers: dict[str, str] | None = None,
     content: bytes | None = None,
+    max_response_bytes: int,
 ) -> httpx2.Response:
     """Send one request, classifying transport failures per ADR-0009 section 6.
 
     Connection failures before a request is sent are "not attempted";
-    timeouts or transport errors after sending are ambiguous. A redirect is
-    never followed and is treated as not attempted (it indicates the
-    configured collection URL no longer matches the server, not a
-    transient condition safe to retry blindly).
+    timeouts or transport errors after sending are ambiguous. The response
+    body is read incrementally and capped while reading (never materialized
+    fully first), so an untrusted or misbehaving response cannot exhaust
+    memory regardless of whether the caller inspects the body.
+
+    A redirect is never followed. For a safe (read) method that is simply a
+    protocol/configuration condition ("not attempted": nothing unsafe
+    happened). For an unsafe (write) method the request has already reached
+    the server and produced a response, so the outcome cannot be treated as
+    not-attempted; it is ambiguous and must be reconciled, never silently
+    retried.
     """
 
     try:
-        response = client.request(method, url, headers=headers, content=content)
+        request = client.build_request(method, url, headers=headers, content=content)
+        response = client.send(request, stream=True)
     except httpx2.ConnectError as exc:
         raise CalDAVNotAttemptedError(str(exc)) from exc
     except httpx2.ConnectTimeout as exc:
@@ -127,15 +139,35 @@ def send_request(
     except httpx2.TransportError as exc:
         raise CalDAVAmbiguousTransportError(str(exc)) from exc
 
+    is_safe = method in _SAFE_METHODS
+
     if response.status_code in (301, 302, 303, 307, 308):
-        raise CalDAVNotAttemptedError(
-            f"unexpected redirect response {response.status_code}"
+        response.close()
+        if is_safe:
+            raise CalDAVNotAttemptedError(
+                f"unexpected redirect response {response.status_code}"
+            )
+        raise CalDAVAmbiguousTransportError(
+            f"unexpected redirect response {response.status_code} "
+            "after a write request was already sent"
         )
+
+    try:
+        _consume_capped(response, max_bytes=max_response_bytes)
+    except BaseException:
+        response.close()
+        raise
     return response
 
 
-def read_capped_body(response: httpx2.Response, *, max_bytes: int) -> bytes:
-    """Read a response body, failing closed on an untrusted oversized body."""
+def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> None:
+    """Read a streamed response body, aborting as soon as it exceeds the cap.
+
+    Reads incrementally via ``iter_bytes()`` rather than the buffering
+    ``.content``/``.read()`` shortcut, so an oversized or falsely-labeled
+    response is capped while reading, not after it is already fully in
+    memory.
+    """
 
     declared = response.headers.get("content-length")
     if declared is not None:
@@ -148,12 +180,13 @@ def read_capped_body(response: httpx2.Response, *, max_bytes: int) -> bytes:
                 f"response declared {declared_bytes} bytes, exceeds cap {max_bytes}"
             )
 
-    content = response.content
-    if len(content) > max_bytes:
-        raise CalDAVResponseTooLargeError(
-            f"response body is {len(content)} bytes, exceeds cap {max_bytes}"
-        )
-    return content
+    total = 0
+    for chunk in response.iter_bytes():
+        total += len(chunk)
+        if total > max_bytes:
+            raise CalDAVResponseTooLargeError(
+                f"response body exceeds the {max_bytes}-byte cap"
+            )
 
 
 def parse_safe_xml(content: bytes) -> ElementTree.Element:
@@ -191,9 +224,17 @@ def normalize_etag(raw: str) -> str:
 
 
 def format_time_range_bound(value: datetime) -> str:
-    """Render a UTC datetime as the basic ISO form CalDAV time-range expects."""
+    """Render a datetime as the UTC basic-ISO form CalDAV time-range expects.
 
-    return value.strftime("%Y%m%dT%H%M%SZ")
+    ``strftime`` preserves the input wall clock; a non-UTC offset must be
+    converted first or the sent bound silently shifts by that offset.
+    """
+
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise CalDAVConfigurationError(
+            "time-range bound must be timezone-aware"
+        )
+    return value.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,7 +260,15 @@ def propfind_collection(
     as the operative address for later requests (evaluation section 3:
     "the collection also has an opaque canonical URL besides the requested
     alias").
+
+    ``collection_path`` is untrusted household configuration, not a
+    server-reported value: it is validated against ``base_url`` *before*
+    anything is sent, so a misconfigured or malicious absolute collection
+    URL on another origin is rejected before the request (and its Basic
+    Auth header) ever leaves the process.
     """
+
+    resolved_path = resolve_same_origin_href(base_url, collection_path)
 
     body = (
         '<?xml version="1.0" encoding="utf-8"?>'
@@ -235,20 +284,20 @@ def propfind_collection(
     response = send_request(
         client,
         "PROPFIND",
-        collection_path,
+        resolved_path,
         headers={
             "Content-Type": 'application/xml; charset="utf-8"',
             "Depth": "0",
         },
         content=body,
+        max_response_bytes=max_response_bytes,
     )
     if response.status_code != 207:
         raise CalDAVProtocolError(
-            f"PROPFIND on {collection_path!r} returned {response.status_code}"
+            f"PROPFIND on {resolved_path!r} returned {response.status_code}"
         )
 
-    content = read_capped_body(response, max_bytes=max_response_bytes)
-    root = parse_safe_xml(content)
+    root = parse_safe_xml(response.content)
 
     resp_elem = root.find(_tag(NS_DAV, "response"))
     if resp_elem is None:
@@ -317,6 +366,7 @@ def calendar_query(
             "Depth": "1",
         },
         content=body,
+        max_response_bytes=max_response_bytes,
     )
     if response.status_code != 207:
         raise CalDAVProtocolError(
@@ -324,8 +374,7 @@ def calendar_query(
             f"returned {response.status_code}"
         )
 
-    content = read_capped_body(response, max_bytes=max_response_bytes)
-    root = parse_safe_xml(content)
+    root = parse_safe_xml(response.content)
 
     entries: list[CalendarQueryEntry] = []
     for resp_elem in root.findall(_tag(NS_DAV, "response")):
@@ -370,7 +419,9 @@ def get_resource(
 ) -> GetResourceResult | None:
     """``GET`` one event resource; ``None`` when the provider reports 404."""
 
-    response = send_request(client, "GET", resource_href)
+    response = send_request(
+        client, "GET", resource_href, max_response_bytes=max_response_bytes
+    )
     if response.status_code == 404:
         return None
     if response.status_code != 200:
@@ -378,10 +429,9 @@ def get_resource(
             f"GET {resource_href!r} returned {response.status_code}"
         )
 
-    content = read_capped_body(response, max_bytes=max_response_bytes)
     raw_etag = response.headers.get("etag")
     etag = normalize_etag(raw_etag) if raw_etag else None
-    return GetResourceResult(calendar_data=content, etag=etag)
+    return GetResourceResult(calendar_data=response.content, etag=etag)
 
 
 def put_create_only(
@@ -389,6 +439,7 @@ def put_create_only(
     resource_href: str,
     *,
     body: bytes,
+    max_response_bytes: int,
 ) -> httpx2.Response:
     """Create-only ``PUT`` (``If-None-Match: *``); never overwrites a resource."""
 
@@ -400,5 +451,6 @@ def put_create_only(
             "If-None-Match": "*",
             "Content-Type": "text/calendar; charset=utf-8",
         },
+        max_response_bytes=max_response_bytes,
         content=body,
     )

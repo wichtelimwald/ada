@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 import hashlib
 
 import icalendar
@@ -29,6 +29,16 @@ _FREQ_SECONDS = {
 
 class CalDAVMappingError(RuntimeError):
     """A CalDAV resource did not have the shape Ada's mapping expects."""
+
+
+class FloatingTimeNotSupportedError(CalDAVMappingError):
+    """A floating (timezone-unspecified) DATE-TIME was rejected.
+
+    RFC 5545 S3.3.5: a DATE-TIME without ``Z`` and without ``TZID`` is
+    floating, explicitly *not* bound to UTC. Ada has no configured
+    calendar/user timezone yet (a later decision); guessing UTC would
+    silently shift busy/conflict intervals, so this fails closed instead.
+    """
 
 
 class CalendarComplexityExceededError(RuntimeError):
@@ -64,6 +74,44 @@ def _property_count(component: "icalendar.cal.Component") -> int:
     return total
 
 
+# RFC 5545 S3.3.10: BYSECOND/BYMINUTE/BYHOUR can only ever narrow the time
+# between generated occurrences down to their named granularity; the
+# date-level parts (BYDAY, BYMONTHDAY, BYYEARDAY, BYWEEKNO, BYMONTH) can
+# narrow it down to one day (they can never produce two occurrences on the
+# same calendar day). BYSETPOS only *selects from* an already-generated set,
+# so it can only reduce a count, never increase one, and is intentionally
+# excluded below.
+_SUB_DAY_GRANULARITY_SECONDS = {
+    "BYSECOND": 1,
+    "BYMINUTE": 60,
+    "BYHOUR": 3600,
+}
+_DATE_LEVEL_PARTS = ("BYDAY", "BYMONTHDAY", "BYYEARDAY", "BYWEEKNO", "BYMONTH")
+
+
+def _rrule_granularity_seconds(
+    rrule: "icalendar.prop.recur.recur.vRecur", base_period_seconds: int
+) -> int:
+    """A safe (never too large) floor on the spacing between occurrences.
+
+    This does not attempt to model RFC 5545's exact BYxxx combinatorics
+    (BYMONTH + BYDAY interactions, BYSETPOS selection, leap units, ...);
+    doing that precisely is its own source of bugs. Instead it asks only
+    "what is the finest granularity any present BYxxx part could possibly
+    introduce", which is always a valid (if sometimes pessimistic) upper
+    bound on how many occurrences can appear in a given time span, however
+    the present BYxxx parts combine.
+    """
+
+    granularity = base_period_seconds
+    for name, seconds in _SUB_DAY_GRANULARITY_SECONDS.items():
+        if rrule.get(name) is not None:
+            granularity = min(granularity, seconds)
+    if any(rrule.get(name) is not None for name in _DATE_LEVEL_PARTS):
+        granularity = min(granularity, 86400)
+    return max(granularity, 1)
+
+
 def estimate_series_occurrence_bound(
     component: "icalendar.cal.Component",
     *,
@@ -73,7 +121,8 @@ def estimate_series_occurrence_bound(
     """Cheap analytical upper bound on occurrences within the window.
 
     Computed from RRULE/RDATE alone, without expanding anything, so a
-    pathological pattern (for example ``FREQ=SECONDLY`` over a wide window)
+    pathological pattern (for example ``FREQ=SECONDLY``, or ``FREQ=DAILY``
+    combined with many ``BYHOUR``/``BYMINUTE`` values, over a wide window)
     is rejected before any real expansion runs ("expanded lazily against
     that budget", ADR-0009 section 5). An unrecognized/malformed ``FREQ``
     is treated as the worst case rather than ignored.
@@ -92,9 +141,10 @@ def estimate_series_occurrence_bound(
         if interval <= 0:
             interval = 1
 
-        period_seconds = _FREQ_SECONDS.get(freq, 1)
+        base_period_seconds = _FREQ_SECONDS.get(freq, 1) * interval
+        granularity_seconds = _rrule_granularity_seconds(rrule, base_period_seconds)
         window_seconds = max((window_end - window_start).total_seconds(), 0.0)
-        by_window = int(window_seconds // (period_seconds * interval)) + 1
+        by_window = int(window_seconds // granularity_seconds) + 1
 
         count_raw = _first(rrule.get("COUNT"))
         try:
@@ -114,10 +164,34 @@ def _is_all_day(value: object) -> bool:
 
 def _as_utc_datetime(value: "date | datetime") -> datetime:
     if isinstance(value, datetime):
-        if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise FloatingTimeNotSupportedError(
+                "floating (timezone-unspecified) DATE-TIME is not supported"
+            )
         return value.astimezone(timezone.utc)
     return datetime.combine(value, time.min, tzinfo=timezone.utc)
+
+
+def _resolve_end(
+    dtstart: "date | datetime", dtend_prop: object, duration_prop: object = None
+) -> "date | datetime":
+    """The event's end value, applying RFC 5545's implicit-duration defaults.
+
+    A ``DTEND``/``DURATION`` takes priority when present. Otherwise: a
+    ``DATE``-only ``DTSTART`` (an all-day event) has an implicit one-day
+    duration (RFC 5545 S3.6.1) — using ``dtstart`` itself would silently
+    make the event zero-length and drop it from boundary overlap checks. A
+    ``DATE-TIME`` ``DTSTART`` without either has no RFC-defined default;
+    Ada keeps the existing zero-length fallback for that case.
+    """
+
+    if dtend_prop is not None:
+        return dtend_prop.dt  # type: ignore[attr-defined]
+    if duration_prop is not None:
+        return dtstart + duration_prop.dt  # type: ignore[attr-defined]
+    if isinstance(dtstart, datetime):
+        return dtstart
+    return dtstart + timedelta(days=1)
 
 
 def _is_busy(component: "icalendar.cal.Component") -> bool:
@@ -155,15 +229,33 @@ def map_resource_occurrences(
     window_end: datetime,
     max_properties_per_component: int,
     max_occurrences_per_series: int,
+    remaining_component_budget: int,
+    remaining_occurrence_budget: int,
 ) -> MappedResource:
     """Parse one CalDAV resource's iCalendar data into Ada's read model.
 
     Expands recurrences client-side (decision D1, ``recurring-ical-events``)
     because OX/IONOS does not do so server-side (evaluation section 3).
+
+    ``remaining_component_budget``/``remaining_occurrence_budget`` are the
+    caller's per-response/per-query budgets *still available* before this
+    resource. Both are checked, using only cheap pre-expansion facts (raw
+    component count; the analytical per-series bound), before
+    ``recurring_ical_events`` is ever invoked: a resource containing several
+    individually-small recurring masters must not be allowed to expand past
+    the query's total budget just because each master passes its own
+    per-series check (ADR-0009 section 5: "expanded lazily against that
+    budget").
     """
 
     calendar = icalendar.Calendar.from_ical(calendar_data)
     all_vevents = list(calendar.walk("VEVENT"))
+
+    if len(all_vevents) > remaining_component_budget:
+        raise CalendarComplexityExceededError(
+            f"event resource {resource_name!r} exceeds the remaining "
+            "per-response component budget"
+        )
 
     for component in all_vevents:
         if _property_count(component) > max_properties_per_component:
@@ -183,6 +275,7 @@ def map_resource_occurrences(
         for master in masters
     }
 
+    per_master_bounds: list[int] = []
     for master in masters:
         bound = estimate_series_occurrence_bound(
             master, window_start=window_start, window_end=window_end
@@ -193,10 +286,26 @@ def map_resource_occurrences(
                 f"{master.get('uid')!r} exceeds the per-series occurrence "
                 f"budget ({bound} > {max_occurrences_per_series})"
             )
+        per_master_bounds.append(bound)
+
+    if sum(per_master_bounds) > remaining_occurrence_budget:
+        raise CalendarComplexityExceededError(
+            f"event resource {resource_name!r} exceeds the remaining "
+            "per-query occurrence budget before any expansion ran"
+        )
 
     occurrences = recurring_ical_events.of(calendar).between(
         window_start, window_end
     )
+
+    if len(occurrences) > remaining_occurrence_budget:
+        # Defense in depth only: the pre-expansion bound above is meant to
+        # always be conservative enough that this never triggers. Trusting
+        # that blindly would defeat the point of a security budget.
+        raise CalendarComplexityExceededError(
+            f"event resource {resource_name!r} produced more occurrences "
+            "than its own pre-expansion bound predicted"
+        )
 
     events: list[CalendarEvent] = []
     for occurrence in occurrences:
@@ -207,12 +316,9 @@ def map_resource_occurrences(
             )
         dtstart = dtstart_prop.dt
 
-        dtend_prop = occurrence.get("dtend")
-        if dtend_prop is not None:
-            dtend = dtend_prop.dt
-        else:
-            duration_prop = occurrence.get("duration")
-            dtend = dtstart + duration_prop.dt if duration_prop is not None else dtstart
+        dtend = _resolve_end(
+            dtstart, occurrence.get("dtend"), occurrence.get("duration")
+        )
 
         uid = str(occurrence.get("uid"))
         is_recurring = recurring_by_uid.get(uid, False)
@@ -293,8 +399,7 @@ def build_calendar_event_from_component(
         )
     dtstart = dtstart_prop.dt
 
-    dtend_prop = component.get("dtend")
-    dtend = dtend_prop.dt if dtend_prop is not None else dtstart
+    dtend = _resolve_end(dtstart, component.get("dtend"), component.get("duration"))
 
     return CalendarEvent(
         event_id=resource_name,

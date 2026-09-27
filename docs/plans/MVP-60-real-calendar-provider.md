@@ -230,11 +230,18 @@ S6-S7 (roadmap `done` only in the last PR).
 - **S3 CalDAV create: done.** Deterministic non-semantic UID/resource name
   and operation marker derived from `OperationId`
   (`mapping.derive_event_uid`/`derive_resource_name`/`derive_operation_marker`),
-  create-only `PUT`, 412/403 reconciliation by `GET` + marker match, read-back
-  after create (no `ETag` in the IONOS create response). Tests:
-  `tests/test_caldav_create.py` (read-only/unconfigured calendar fail closed
-  before any request, duplicate-UID-under-different-resource, not-attempted
-  vs. ambiguous transport-failure classification) and
+  create-only `PUT`, 412 reconciliation by `GET` + marker match, read-back
+  after create (no `ETag` in the IONOS create response). A 403 (duplicate
+  UID under a different resource name) intentionally stays `ambiguous`
+  without a GET: it cannot happen from Ada's own deterministic naming, and
+  resolving it would need a UID-based search, out of MVP scope. Read-back/
+  reconciliation failures after an already-sent write (2xx or 412) are
+  caught and mapped to a typed ambiguous outcome rather than escaping as an
+  exception. Tests: `tests/test_caldav_create.py` (read-only/unconfigured
+  calendar fail closed before any request, duplicate-UID-under-different-
+  resource stays ambiguous, not-attempted vs. ambiguous transport-failure
+  classification including a redirect after PUT, post-write
+  read-back/reconciliation fault injection) and
   `tests/test_caldav_create_crash_recovery.py` (hard process kill after the
   provider commit recovers to exactly one event via
   `tests/dbos_caldav_crash_worker.py`, extending the pattern in
@@ -299,10 +306,18 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
 ## Validation
 
 S1-S3 evidence: `scripts/validate.sh` passes (compile, unit tests, `ada
-doctor`) with 31 new tests (132 total); exact validation-to-commit binding is
-recorded in [PR #44](https://github.com/wichtelimwald/ada/pull/44), not
-duplicated here as it will go stale. Items below tagged S4+ remain open for
-later PRs.
+doctor`); test count grows across review-fix rounds. Exact validation-to-
+commit binding and current test counts are recorded in
+[PR #44](https://github.com/wichtelimwald/ada/pull/44) rather than duplicated
+here, where they would go stale. Independent review found and this PR fixed:
+a cross-origin configured-collection auth-leak, a response-size cap applied
+only after the body was already buffered, a recurrence-complexity bound that
+ignored `BYHOUR`/`BYMINUTE`/`BYSECOND`, budgets enforced only after
+expansion, a write-redirect misclassified as not-attempted, a non-UTC
+time-range bound, floating-time silently treated as UTC, an all-day event
+without `DTEND` collapsing to zero duration, and post-write read-back/
+reconciliation exceptions escaping the typed outcome contract. Items below
+tagged S4+ remain open for later PRs.
 
 - `scripts/validate.sh` (compile, unit tests, `ada doctor`).
 - Contract suite against every `CalendarPort` adapter.

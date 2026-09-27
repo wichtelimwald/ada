@@ -10,9 +10,15 @@ from ada.adapters.caldav.dav_client import (
     CalDAVAmbiguousTransportError,
     CalDAVConfigurationError,
     CalDAVNotAttemptedError,
+    CalDAVProtocolError,
+    CalDAVResponseTooLargeError,
+    CalDAVUnsafeXmlError,
     CollectionInfo,
 )
-from ada.adapters.caldav.mapping import CalendarComplexityExceededError
+from ada.adapters.caldav.mapping import (
+    CalDAVMappingError,
+    CalendarComplexityExceededError,
+)
 from ada.adapters.caldav.profile import CalDAVProviderProfile
 from ada.core.action_outcomes import ProviderCapability
 from ada.core.actions import CreateCalendarEventProposal
@@ -28,6 +34,24 @@ from ada.ports.calendar import (
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+# Errors that mean "Ada could not read back/verify a resource", never
+# "nothing happened" or "prove a stronger outcome". They are caught around
+# post-write verification (a GET/parse after an already-sent PUT) so a
+# transport hiccup or a malformed read-back never escapes the typed
+# CalendarCreateResult/CalendarEvent contract as a raw exception; the caller
+# already has provider evidence (a status code) and must keep reporting only
+# what that evidence supports (ADR-0005), not crash the durable workflow.
+_RECOVERABLE_VERIFICATION_ERRORS = (
+    CalDAVNotAttemptedError,
+    CalDAVAmbiguousTransportError,
+    CalDAVProtocolError,
+    CalDAVResponseTooLargeError,
+    CalDAVUnsafeXmlError,
+    CalDAVMappingError,
+    CalendarComplexityExceededError,
+)
 
 
 class CalDAVCalendarAdapter:
@@ -110,7 +134,11 @@ class CalDAVCalendarAdapter:
         clamped_start, clamped_end = self._clamp_window(start, end)
 
         events: list[CalendarEvent] = []
-        total_occurrences = 0
+        # Per-query budget: shared across every collection queried by this
+        # call, decremented as each resource is mapped, and passed *into*
+        # the mapper so it is enforced before that resource's own
+        # recurrence expansion runs (ADR-0009 section 5).
+        occurrences_remaining = self._profile.max_occurrences_per_query
 
         for ref in self._calendars.values():
             collection = self._resolve_collection(ref)
@@ -126,7 +154,7 @@ class CalDAVCalendarAdapter:
             # Component/property limits are per response (one REPORT call,
             # i.e. one collection); the occurrence limit is per query (the
             # whole list_events call, matching ADR-0009 section 5).
-            components_in_this_response = 0
+            components_remaining = self._profile.max_components_per_response
 
             for entry in entries:
                 resource_name = entry.href.rsplit("/", 1)[-1]
@@ -143,25 +171,12 @@ class CalDAVCalendarAdapter:
                     max_occurrences_per_series=(
                         self._profile.max_occurrences_per_series
                     ),
+                    remaining_component_budget=components_remaining,
+                    remaining_occurrence_budget=occurrences_remaining,
                 )
 
-                components_in_this_response += mapped.component_count
-                if (
-                    components_in_this_response
-                    > self._profile.max_components_per_response
-                ):
-                    raise CalendarComplexityExceededError(
-                        f"calendar {ref.calendar_id!r} response exceeds the "
-                        "per-response component limit"
-                    )
-
-                total_occurrences += len(mapped.events)
-                if total_occurrences > self._profile.max_occurrences_per_query:
-                    raise CalendarComplexityExceededError(
-                        f"calendar {ref.calendar_id!r} query exceeds the "
-                        "per-query occurrence limit"
-                    )
-
+                components_remaining -= mapped.component_count
+                occurrences_remaining -= len(mapped.events)
                 events.extend(mapped.events)
 
         return tuple(
@@ -196,7 +211,10 @@ class CalDAVCalendarAdapter:
 
         try:
             response = dav_client.put_create_only(
-                self._client, resource_href, body=body
+                self._client,
+                resource_href,
+                body=body,
+                max_response_bytes=self._profile.max_response_bytes,
             )
         except CalDAVNotAttemptedError:
             return CalendarCreateResult(
@@ -210,7 +228,16 @@ class CalDAVCalendarAdapter:
             )
 
         if response.status_code in (200, 201, 204):
-            event = self._read_back(ref.calendar_id, resource_href, resource_name)
+            # The provider has already committed the write (2xx); a failure
+            # to then read it back is a verification problem, never grounds
+            # to report anything weaker than "committed, reference unknown".
+            try:
+                event = self._read_back(ref.calendar_id, resource_href, resource_name)
+            except _RECOVERABLE_VERIFICATION_ERRORS:
+                return CalendarCreateResult(
+                    status=CalendarCreateStatus.AMBIGUOUS,
+                    error_code="post_write_verification_failed",
+                )
             if event is None:
                 return CalendarCreateResult(
                     status=CalendarCreateStatus.AMBIGUOUS,
@@ -221,7 +248,7 @@ class CalDAVCalendarAdapter:
             )
 
         if response.status_code == 412:
-            existing = self._reconcile_via_marker(
+            existing = self._safe_reconcile_via_marker(
                 ref.calendar_id, resource_href, resource_name, marker
             )
             if existing is not None:
@@ -237,7 +264,8 @@ class CalDAVCalendarAdapter:
             # Duplicate UID under a different resource name. Under normal
             # operation this cannot happen (both are derived deterministically
             # from the same operation_id); Ada cannot safely resolve it
-            # without a UID-based search, which is out of MVP scope.
+            # without a UID-based search, which is out of MVP scope. This
+            # intentionally does not attempt a GET-based reconciliation.
             return CalendarCreateResult(
                 status=CalendarCreateStatus.AMBIGUOUS,
                 error_code="duplicate_uid_conflict",
@@ -257,7 +285,7 @@ class CalDAVCalendarAdapter:
                 continue
             collection = self._resolve_collection(ref)
             resource_href = f"{collection.href.rstrip('/')}/{resource_name}"
-            existing = self._reconcile_via_marker(
+            existing = self._safe_reconcile_via_marker(
                 ref.calendar_id, resource_href, resource_name, marker
             )
             if existing is not None:
@@ -280,6 +308,27 @@ class CalDAVCalendarAdapter:
             calendar_data=result.calendar_data,
             version=EventVersion(result.etag) if result.etag else None,
         )
+
+    def _safe_reconcile_via_marker(
+        self,
+        calendar_id: str,
+        resource_href: str,
+        resource_name: str,
+        marker: str,
+    ) -> CalendarEvent | None:
+        """As :meth:`_reconcile_via_marker`, but never lets an exception escape.
+
+        The port contract for this call is "prove a commit or say you
+        can't"; a transport/parsing failure while trying to prove it is
+        exactly the "can't" case, not a reason to crash the caller.
+        """
+
+        try:
+            return self._reconcile_via_marker(
+                calendar_id, resource_href, resource_name, marker
+            )
+        except _RECOVERABLE_VERIFICATION_ERRORS:
+            return None
 
     def _reconcile_via_marker(
         self,
