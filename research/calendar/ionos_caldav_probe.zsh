@@ -69,6 +69,13 @@ if [[ $TEST_MODE == 1 ]] && ! is_loopback $url_host; then
   exit 1
 fi
 
+# Hermetic curl: ambient settings must not add transfers, proxies or key logs.
+# "-q" must be curl's FIRST argument so that no .curlrc is read; proxies are
+# disabled explicitly. Normal mode also uses only the system trust store.
+CURL_HERMETIC=(-q --noproxy '*')
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY SSLKEYLOGFILE
+[[ $TEST_MODE == 0 ]] && unset CURL_CA_BUNDLE SSL_CERT_FILE SSL_CERT_DIR
+
 # Credentials are read only after the destinations are fixed.
 if [[ $TEST_MODE == 1 ]]; then
   [[ $ADA_USER == *.invalid ]] || { print -u2 "test mode: use a synthetic user such as probe@example.invalid"; exit 1 }
@@ -97,7 +104,7 @@ trap '(( $+functions[cleanup_probe] )) && cleanup_probe; rm -rf -- "$WORK"' EXIT
 # Credentials reach curl through stdin (--config -), never through argv.
 dav() {
   print -r -- "user = \"$ADA_USER:$ADA_PASS\"" |
-    curl --silent --show-error --proto '=https' --max-redirs 0 --max-time 30 --config - "$@"
+    curl $CURL_HERMETIC --silent --show-error --proto '=https' --max-redirs 0 --max-time 30 --config - "$@"
 }
 http_code() { dav --output /dev/null --write-out '%{http_code}' "$@" }
 report() { print -r -- "$1: $2 (expected: $3)" }
@@ -327,6 +334,6 @@ done
 
 print "== P9 credential scope"
 print -r -- "user = \"$ADA_USER:$ADA_PASS\"" |
-  curl --silent --proto '=imaps' --max-time 30 --config - --output /dev/null "imaps://$IMAP_HOST/"
+  curl $CURL_HERMETIC --silent --proto '=imaps' --max-time 30 --config - --output /dev/null "imaps://$IMAP_HOST/"
 rc=$?
 report P9-imap-login-with-app-password "curl exit $rc" "curl exit 0 (IONOS: app password also grants IMAP); 67 = denied; other = inconclusive"

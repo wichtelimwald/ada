@@ -66,12 +66,32 @@ only `localhost`/`127.0.0.1` (IMAP via `ADA_PROBE_IMAP_HOST`, default
 `localhost`), never reads the Keychain and requires a synthetic user ending in
 `.invalid`.
 
+**Hermetic curl.** Every curl call starts with `-q` (no `.curlrc`) and
+`--noproxy '*'`; proxy variables and `SSLKEYLOGFILE` are unset, and normal mode
+also ignores CA-bundle overrides and uses the system trust store.
+
 The "expected" values in the output describe IONOS as recorded in runs 1–4; a
 different value is a regression signal. The probe stops before any write if the
 calendar listing fails. It records every probe resource address
 **before** the create attempt and, on exit (also after an error or Ctrl-C),
 deletes whatever exists at those addresses — including events whose create
 outcome was ambiguous — and prints the cleanup status.
+
+## Local self-test
+
+```bash
+zsh research/calendar/selftest/run_selftest.zsh
+```
+
+Runs entirely on localhost with synthetic data and never contacts IONOS. It
+starts an HTTPS fake CalDAV server (generic behavior, not the IONOS profile) and
+a fake proxy, then checks:
+- the four destination refusals (before any request);
+- that a hostile `.curlrc` (extra URL, proxy) and proxy environment variables
+  do not divert the credential;
+- that a committed create with a lost response is still cleaned up.
+
+Requirements: zsh, curl, openssl, nc, Python 3.
 
 ## What each result checks
 
