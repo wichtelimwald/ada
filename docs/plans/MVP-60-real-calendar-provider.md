@@ -34,8 +34,10 @@ trade-offs.
 - README states that the calendar path is synthetic and that durable workflow
   payloads must be reviewed before real event data is used.
 - Evidence for this step: [provider evaluation](../research/calendar-provider-evaluation.md),
-  [proposed ADR-0009](../decisions/ADR-0009-calendar-provider-integration.md),
-  [IONOS probe](../../research/calendar/README.md) (prepared, not yet run).
+  [ADR-0009](../decisions/ADR-0009-calendar-provider-integration.md) (accepted
+  2026-09-26), [IONOS probe](../../research/calendar/README.md) (maintainer runs
+  1–4 and manual checks M1–M6 on 2026-09-26; results in the evaluation,
+  section 10).
 
 ## Scope
 
@@ -86,19 +88,29 @@ needs a replacement record and a crash-safe order:
   `operation_id`, action kind, **keyed action fingerprint** (HMAC-SHA-256 over
   the canonical action binding with a per-installation key kept in the
   Keychain; a plain hash of low-entropy fields such as title and time could be
-  brute-forced), provider event reference, terminal provider/business outcome
-  and resulting version. It also records which events Ada created (D3).
+  brute-forced), provider event reference, terminal provider/business outcome,
+  resulting version and a **purge state** (`pending` → `workflow_deleted` →
+  `scrubbed`). It also records which events Ada created (D3).
 - **Binding check:** consult the operation record first, the DBOS workflow
   second. Reusing an operation ID with a different payload stays rejected after
   the purge.
-- **Order:** terminal checkpoint → upsert operation record (idempotent) →
-  delete the DBOS workflow. A startup sweep completes both later steps for any
-  terminal workflow left behind by a crash.
-- **Residue:** a row delete is not the whole retention story. The sweep makes
-  deleted content unrecoverable from the SQLite main file and its WAL/journal
-  (`secure_delete` on the deleting connection where configurable, otherwise
-  `VACUUM` and `wal_checkpoint(TRUNCATE)`); validation searches all these
-  files for synthetic sentinel strings.
+- **Order:** terminal checkpoint → upsert operation record with purge state
+  `pending` (idempotent) → delete the DBOS workflow → set `workflow_deleted` →
+  scrub → set `scrubbed` only after the scrub **completed successfully**.
+- **Recovery is driven by the operation record, not by the DBOS row.** The
+  startup sweep (1) creates the missing record for any terminal workflow
+  without one, (2) deletes the workflow for records still `pending`, and (3)
+  scrubs for every record that is not `scrubbed`. A crash after
+  `delete_workflow` but before the scrub completed therefore still leaves a
+  `workflow_deleted` record that the next start finishes. Every step is
+  idempotent; deleting a workflow that is already gone counts as done.
+- **Scrub:** a row delete is not the whole retention story. `secure_delete`
+  only helps if it is enabled on the connection **before** the delete;
+  otherwise the scrub runs `VACUUM`. Then `wal_checkpoint(TRUNCATE)`, which
+  truncates the WAL only on success: a BUSY or failed result leaves the record
+  in `workflow_deleted`, is retried at the next sweep, and is reported by
+  `ada doctor` while pending. Validation searches the SQLite main file and its
+  WAL/journal for synthetic sentinel strings.
 - MVP-30 encryption may replace parts of this later.
 
 ## Reuse / dependency evidence
@@ -246,8 +258,9 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
    latency documented, not asserted).
 9. No credential, event title or location appears in logs; ambient proxy
    variables are ignored; no request leaves for another origin.
-10. After a terminal outcome and the purge sweep — also after a crash between
-    the terminal checkpoint and the purge — neither the SQLite main file nor
+10. After a terminal outcome and the purge sweep — also after a crash at any
+    purge boundary, including after `delete_workflow` but before the scrub
+    completed, and after a BUSY checkpoint — neither the SQLite main file nor
     its WAL/journal contains event titles or locations (sentinel search, D5).
 11. Recurring series, occurrences and events with attendees are refused for
     writes with a clear explanation.
@@ -266,9 +279,12 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
   responses, query window, canonical URL alias, lossy round trip. A separate
   generic fixture (for example 409 when a server requires a missing
   precondition, as noted for self-hosted OX) only where a test needs it.
-- Operation-record tests: binding enforced after purge; sweep after a crash
-  between terminal checkpoint and purge; residue search in SQLite main file
-  and WAL/journal.
+- Operation-record tests: binding enforced after purge; crash tests at every
+  purge boundary — before the record upsert, after it but before
+  `delete_workflow`, and **after `delete_workflow` but before the scrub
+  completed**; a checkpoint that returns BUSY (for example while a reader
+  holds the WAL) keeps the record pending and succeeds on a later sweep;
+  residue search in the SQLite main file and WAL/journal.
 - Negative recurrence tests against the complexity budget.
 - DBOS crash tests extending `tests/dbos_crash_worker.py` for create, update
   and cancel.

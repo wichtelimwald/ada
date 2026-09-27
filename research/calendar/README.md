@@ -55,10 +55,20 @@ zsh research/calendar/ionos_caldav_probe.zsh
 ```
 
 Requirements: macOS zsh, `curl`, `uuidgen`, BSD `date`, `security`, Python 3
-standard library (`ADA_PYTHON` may point to a specific interpreter). Optional
-environment variables: `ADA_PROBE_CONFIG` (other config file),
-`ADA_PROBE_IMAP_HOST` (default `imap.ionos.de`). The probe stops before any
-write if the calendar listing fails. It records every probe resource address
+standard library (`ADA_PYTHON` may point to a specific interpreter). Optional:
+`ADA_PROBE_CONFIG` (other config file).
+
+**Pinned destinations.** Ada's app password also grants mail access (P9), so
+the probe sends it only to `dav.mailbusiness.ionos.de` and `imap.ionos.de`. It
+refuses any other CalDAV host before reading the Keychain. For local fake
+servers there is an explicit test mode, `ADA_PROBE_TEST_MODE=1`: it accepts
+only `localhost`/`127.0.0.1` (IMAP via `ADA_PROBE_IMAP_HOST`, default
+`localhost`), never reads the Keychain and requires a synthetic user ending in
+`.invalid`.
+
+The "expected" values in the output describe IONOS as recorded in runs 1–4; a
+different value is a regression signal. The probe stops before any write if the
+calendar listing fails. It records every probe resource address
 **before** the create attempt and, on exit (also after an error or Ctrl-C),
 deletes whatever exists at those addresses — including events whose create
 outcome was ambiguous — and prints the cleanup status.

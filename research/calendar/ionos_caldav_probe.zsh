@@ -8,6 +8,10 @@
 # properties and synthetic probe fields. It does not print calendar display
 # names, principals, credentials or non-probe event values.
 #
+# "expected" values describe the IONOS behavior recorded in runs 1-4
+# (2026-09-26, docs/research/calendar-provider-evaluation.md section 10). A
+# different value is a regression signal, not necessarily an error.
+#
 # Requirements: macOS zsh, curl, uuidgen, BSD date, security, Python 3 (stdlib only).
 
 emulate -L zsh
@@ -21,8 +25,25 @@ for tool in curl uuidgen date security $PY; do
   command -v $tool >/dev/null || { print -u2 "missing required tool: $tool"; exit 1 }
 done
 
-# Non-secret settings come from a local file outside the repository; the app
-# password comes from the macOS Keychain. Prompts are only a fallback.
+# The probe credential is Ada's app password, which also grants mail access
+# (P9). Normal mode therefore sends it only to the pinned IONOS endpoints.
+# Test mode (ADA_PROBE_TEST_MODE=1) is for local fake servers: loopback hosts
+# only, no Keychain, and only synthetic "*.invalid" credentials.
+CALDAV_HOST=dav.mailbusiness.ionos.de
+IMAP_HOST=imap.ionos.de
+TEST_MODE=${ADA_PROBE_TEST_MODE:-0}
+[[ $TEST_MODE == [01] ]] || { print -u2 "ADA_PROBE_TEST_MODE must be 0 or 1"; exit 1 }
+is_loopback() { [[ ${1%%:*} == (localhost|127.0.0.1) ]] }
+if [[ $TEST_MODE == 0 && -n ${ADA_PROBE_IMAP_HOST:-} ]]; then
+  print -u2 "ADA_PROBE_IMAP_HOST is only allowed in test mode"
+  exit 1
+fi
+if [[ $TEST_MODE == 1 ]]; then
+  IMAP_HOST=${ADA_PROBE_IMAP_HOST:-localhost}
+  is_loopback $IMAP_HOST || { print -u2 "test mode: IMAP host must be localhost or 127.0.0.1"; exit 1 }
+fi
+
+# Non-secret settings come from a local file outside the repository.
 CONF=${ADA_PROBE_CONFIG:-${XDG_CONFIG_HOME:-$HOME/.config}/ada/caldav-probe.conf}
 ADA_USER="" PROBE_URL=""
 if [[ -r $CONF ]]; then
@@ -30,21 +51,35 @@ if [[ -r $CONF ]]; then
   PROBE_URL=$(sed -n 's/^ADA_CALDAV_PROBE_URL=//p' "$CONF" | head -n 1)
 fi
 [[ -z $ADA_USER ]] && read -r "ADA_USER?Ada mailbox address: "
-[[ -z $PROBE_URL ]] && read -r "PROBE_URL?CalDAV URL of the probe calendar (https://<host>/caldav/<id>): "
-ADA_PASS=$(security find-generic-password -s ada-caldav -a "$ADA_USER" -w 2>/dev/null) || ADA_PASS=""
-if [[ -z $ADA_PASS ]]; then
-  print -u2 "No Keychain item (service ada-caldav) for this mailbox; see research/calendar/README.md."
-  read -rs "ADA_PASS?Ada app password (input hidden): "; print
-fi
-IMAP_HOST=${ADA_PROBE_IMAP_HOST:-imap.ionos.de}
+[[ -z $PROBE_URL ]] && read -r "PROBE_URL?CalDAV URL of the probe calendar (https://$CALDAV_HOST/caldav/<id>): "
 
 # Webmail shows collection URLs without a trailing slash; normalize.
 [[ $PROBE_URL != */ ]] && PROBE_URL=$PROBE_URL/
-if [[ $PROBE_URL != https://*/caldav/*/ || $PROBE_URL == *[\#\?]* ]]; then
-  print -u2 "Not a CalDAV URL: expected https://<host>/caldav/<calendar-id> (calendar ⋯ → Properties), not the webmail address"
+if [[ $PROBE_URL != https://*/caldav/*/ || $PROBE_URL == *[\#\?@]* ]]; then
+  print -u2 "Not a CalDAV URL: expected https://$CALDAV_HOST/caldav/<calendar-id> (calendar ⋯ → Properties), not the webmail address"
   exit 1
 fi
-[[ $IMAP_HOST == *[^A-Za-z0-9.-]* ]] && { print -u2 "IMAP host must be a hostname such as imap.ionos.de"; exit 1 }
+url_host=${${PROBE_URL#https://}%%/*}
+if [[ $TEST_MODE == 0 && $url_host != $CALDAV_HOST ]]; then
+  print -u2 "Refusing to send the credential to $url_host: normal mode only talks to $CALDAV_HOST"
+  exit 1
+fi
+if [[ $TEST_MODE == 1 ]] && ! is_loopback $url_host; then
+  print -u2 "test mode: the CalDAV URL must point to localhost or 127.0.0.1"
+  exit 1
+fi
+
+# Credentials are read only after the destinations are fixed.
+if [[ $TEST_MODE == 1 ]]; then
+  [[ $ADA_USER == *.invalid ]] || { print -u2 "test mode: use a synthetic user such as probe@example.invalid"; exit 1 }
+  read -rs "ADA_PASS?Synthetic test password (input hidden): "; print
+else
+  ADA_PASS=$(security find-generic-password -s ada-caldav -a "$ADA_USER" -w 2>/dev/null) || ADA_PASS=""
+  if [[ -z $ADA_PASS ]]; then
+    print -u2 "No Keychain item (service ada-caldav) for this mailbox; see research/calendar/README.md."
+    read -rs "ADA_PASS?Ada app password (input hidden): "; print
+  fi
+fi
 # curl --config strings treat quote and backslash specially.
 if [[ $ADA_PASS == *[\"\\]* || $ADA_USER == *[\"\\]* ]]; then
   print -u2 "credentials containing quote or backslash are not supported by this probe"
@@ -89,7 +124,7 @@ stored_state() { # url -> sets S_ETAG S_SEQ S_DTSTAMP S_LASTMOD S_SUMMARY S_DATE
   S_SUMMARY=$(grep -m 1 '^SUMMARY:' "$WORK/st.ics" | cut -d: -f2- | tr -d '\r')
 }
 
-p11() { # label dtstamp(old|fresh) sequence(none|equal|plus1) etag(current|wrong|none)
+p11() { # label dtstamp(old|fresh) sequence(none|equal|plus1) etag(current|wrong|none) expected
   local label=$1 dts seq code before applied=no
   stored_state $URL_G
   before=${S_SEQ:-absent}
@@ -107,7 +142,7 @@ p11() { # label dtstamp(old|fresh) sequence(none|equal|plus1) etag(current|wrong
   esac
   stored_state $URL_G
   [[ $S_SUMMARY == "Ada probe G $label" ]] && applied=yes
-  report "P11-$label" "$code applied=$applied sequence ${before}->${S_SEQ:-absent}" "see README"
+  report "P11-$label" "$code applied=$applied sequence ${before}->${S_SEQ:-absent}" "$5"
 }
 
 put_new() { # url file -> status; records the resource for cleanup BEFORE the attempt
@@ -137,6 +172,8 @@ current_etag() { # url -> quoted ETag or empty
   dav --dump-header "$WORK/etag.hdr" --output /dev/null "$1" >/dev/null
   grep -i '^etag:' "$WORK/etag.hdr" | head -n 1 | cut -d' ' -f2- | tr -d '\r'
 }
+
+unquote_etag() { local v=${1#W/}; v=${v#\"}; print -r -- "${v%\"}" }
 
 etag_shape() { # etag -> shape description; never prints the value
   local v=${1:-} weak=no quoted=no
@@ -187,9 +224,9 @@ print "== P2 create-only semantics"
 EVT_A=$(new_event_id)
 ics $EVT_A "Ada probe A" ${NEAR_DAY}T100000Z ${NEAR_DAY}T110000Z "X-ADA-PROBE:preserved" > "$WORK/a.ics"
 report P2a-create "$(put_new ${PROBE_URL}${EVT_A}.ics "$WORK/a.ics")" "201"
-report P2a-etag-on-create "$(grep -qi '^etag:' "$WORK/last-put.hdr" && print present || print absent)" "present or absent (informational)"
+report P2a-etag-on-create "$(grep -qi '^etag:' "$WORK/last-put.hdr" && print present || print absent)" "absent (IONOS)"
 report P2b-repeat-create "$(put_new ${PROBE_URL}${EVT_A}.ics "$WORK/a.ics")" "412"
-report P2c-same-uid-other-name "$(put_new ${PROBE_URL}${EVT_A}-dup.ics "$WORK/a.ics")" "403 or 409 (no-uid-conflict)"
+report P2c-same-uid-other-name "$(put_new ${PROBE_URL}${EVT_A}-dup.ics "$WORK/a.ics")" "403 (IONOS no-uid-conflict)"
 
 print "== P3 read-back"
 code=$(dav --dump-header "$WORK/a.hdr" --output "$WORK/a.get" --write-out '%{http_code}' "${PROBE_URL}${EVT_A}.ics")
@@ -200,10 +237,10 @@ report P3d-x-property "$(grep -c '^X-ADA-PROBE:preserved' "$WORK/a.get")" "1 = p
 
 print "== P4 conditional update"
 ics $EVT_A "Ada probe A updated" ${NEAR_DAY}T100000Z ${NEAR_DAY}T113000Z > "$WORK/a2.ics"
-report P4a-blind-overwrite "$(http_code -X PUT -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/a2.ics" ${PROBE_URL}${EVT_A}.ics)" "409 (If-Match required)"
+report P4a-blind-overwrite "$(http_code -X PUT -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/a2.ics" ${PROBE_URL}${EVT_A}.ics)" "201 (IONOS accepts blind overwrites)"
 report P4b-stale-if-match "$(http_code -X PUT -H 'If-Match: "ada-stale-etag"' -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/a2.ics" ${PROBE_URL}${EVT_A}.ics)" "412"
 etag=$(current_etag ${PROBE_URL}${EVT_A}.ics)
-report P4c-matching-if-match "$(http_code -X PUT -H "If-Match: $etag" -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/a2.ics" ${PROBE_URL}${EVT_A}.ics)" "204 or 201"
+report P4c-matching-if-match "$(http_code -X PUT -H "If-Match: $etag" -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/a2.ics" ${PROBE_URL}${EVT_A}.ics)" "412 (IONOS: stale SEQUENCE, see P11)"
 
 print "== P4 diagnostics (fresh event; conditional updates before any blind overwrite)"
 EVT_F=$(new_event_id); URL_F=${PROBE_URL}${EVT_F}.ics
@@ -213,22 +250,22 @@ done
 report P4d-create "$(put_new $URL_F "$WORK/f1.ics")" "201"
 e1=$(current_etag $URL_F)
 report P4e-get-etag-shape "$(etag_shape "$e1")" "quoted, not weak"
-report P4f-update-with-get-etag "$(put_if_match $URL_F "$WORK/f2.ics" "$e1")" "204 or 201"
-report P4g-etag-on-update-response "$(grep -qi '^etag:' "$WORK/last-update.hdr" && print present || print absent)" "informational"
+report P4f-update-with-get-etag "$(put_if_match $URL_F "$WORK/f2.ics" "$e1")" "201 (IONOS: first update, SEQUENCE equal to stored)"
+report P4g-etag-on-update-response "$(grep -qi '^etag:' "$WORK/last-update.hdr" && print present || print absent)" "absent (IONOS)"
 e2=$(current_etag $URL_F)
 report P4h-etag-changed-after-update "$([[ -n $e2 && $e2 != $e1 ]] && print yes || print no)" "yes"
-report P4i-second-update "$(put_if_match $URL_F "$WORK/f3.ics" "$e2")" "204 or 201"
+report P4i-second-update "$(put_if_match $URL_F "$WORK/f3.ics" "$e2")" "412 (IONOS: stale SEQUENCE)"
 e3=$(current_etag $URL_F)
 code=$(query_range $PROBE_URL ${NEAR_DAY}T000000Z ${NEAR_DAY}T235959Z "$WORK/f.xml")
 r3=$([[ $code == 207 ]] && $PY "$SUMMARIZE" etag-for-uid "$WORK/f.xml" $EVT_F)
-report P4j-report-etag-equals-get-etag "$([[ -n $r3 && $r3 == $e3 ]] && print yes || print "no (report etag $(etag_shape "$r3"))")" "yes"
-report P4k-update-with-report-etag "$(put_if_match $URL_F "$WORK/f4.ics" "${r3:-missing}")" "204 or 201"
-report P4l-blind-overwrite "$(http_code -X PUT -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/f5.ics" $URL_F)" "409 = If-Match required; 201/204 = not required"
+report P4j-report-vs-get-etag "equal-after-normalization=$([[ -n $r3 && $(unquote_etag "$r3") == $(unquote_etag "$e3") ]] && print yes || print no) report-quoted=$([[ $r3 == *\"* ]] && print yes || print no)" "equal-after-normalization=yes report-quoted=no (IONOS)"
+report P4k-update-with-report-etag "$(put_if_match $URL_F "$WORK/f4.ics" "${r3:-missing}")" "412 (IONOS: stale SEQUENCE)"
+report P4l-blind-overwrite "$(http_code -X PUT -H 'Content-Type: text/calendar; charset=utf-8' --data-binary "@$WORK/f5.ics" $URL_F)" "412 (IONOS: stale SEQUENCE; fresh blind writes pass, see P11)"
 e5=$(current_etag $URL_F)
-report P4m-update-after-blind-overwrite "$(put_if_match $URL_F "$WORK/f6.ics" "$e5")" "204 or 201"
+report P4m-update-after-blind-overwrite "$(put_if_match $URL_F "$WORK/f6.ics" "$e5")" "412 (IONOS: stale SEQUENCE)"
 code=$(query_range $PROBE_URL ${NEAR_DAY}T000000Z ${NEAR_DAY}T235959Z "$WORK/f-final.xml")
 report P4n-copies-of-event "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/f-final.xml" $EVT_F || print "status $code")" "1 (more = duplicates)"
-report P4o-stored-version "$(dav --output - $URL_F | grep -o 'SUMMARY:Ada probe F v[0-9]' | head -n 1)" "the last successful write"
+report P4o-stored-version "$(dav --output - $URL_F | grep -o 'SUMMARY:Ada probe F v[0-9]' | head -n 1)" "SUMMARY:Ada probe F v2 (IONOS: only the first update applied)"
 
 print "== P11 update freshness rules (SEQUENCE / DTSTAMP)"
 EVT_G=$(new_event_id); URL_G=${PROBE_URL}${EVT_G}.ics
@@ -240,20 +277,20 @@ server_epoch=$(LC_ALL=C date -j -u -f '%a, %d %b %Y %H:%M:%S GMT' "$S_DATE" +%s 
 report P11-clock-skew "$([[ -n $server_epoch ]] && print "$(( $(date -u +%s) - server_epoch ))s (local minus server)" || print unknown)" "within a few seconds"
 report P11-stored-after-create "sequence=${S_SEQ:-absent} dtstamp=${S_DTSTAMP:-absent} last-modified=${S_LASTMOD:-absent}" "informational"
 sleep 2
-p11 proper-1 fresh plus1 current
+p11 proper-1 fresh plus1 current "201 applied=yes"
 sleep 2
-p11 old-dtstamp-no-seq old none current
-p11 old-dtstamp-seq-plus1 old plus1 current
+p11 old-dtstamp-no-seq old none current "412 applied=no"
+p11 old-dtstamp-seq-plus1 old plus1 current "201 applied=yes"
 sleep 2
-p11 fresh-dtstamp-seq-equal fresh equal current
+p11 fresh-dtstamp-seq-equal fresh equal current "201 applied=yes (server increments)"
 sleep 2
-p11 fresh-dtstamp-no-seq fresh none current
+p11 fresh-dtstamp-no-seq fresh none current "412 applied=no"
 sleep 2
-p11 proper-2 fresh plus1 current
+p11 proper-2 fresh plus1 current "201 applied=yes"
 sleep 2
-p11 proper-wrong-etag fresh plus1 wrong
+p11 proper-wrong-etag fresh plus1 wrong "412 applied=no"
 sleep 2
-p11 proper-no-if-match fresh plus1 none
+p11 proper-no-if-match fresh plus1 none "201 applied=yes"
 stored_state $URL_G
 report P11-stored-final "sequence=${S_SEQ:-absent} dtstamp=${S_DTSTAMP:-absent} last-modified=${S_LASTMOD:-absent}" "informational"
 
@@ -268,12 +305,12 @@ EVT_C=$(new_event_id)
 ics $EVT_C "Ada probe far future" ${FAR_DAY}T100000Z ${FAR_DAY}T110000Z > "$WORK/c.ics"
 report P8a-create-far-future "$(put_new ${PROBE_URL}${EVT_C}.ics "$WORK/c.ics")" "201"
 code=$(query_range $PROBE_URL ${FAR_DAY}T000000Z ${FAR_DAY}T235959Z "$WORK/far.xml")
-report P8b-far-future-found "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/far.xml" $EVT_C || print "status $code")" "1 = within query window, 0 = hidden"
+report P8b-far-future-found "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/far.xml" $EVT_C || print "status $code")" "0 (IONOS: +18 months is outside the query window)"
 EVT_D=$(new_event_id)
 ics $EVT_D "Ada probe past" ${PAST_DAY}T100000Z ${PAST_DAY}T110000Z > "$WORK/d.ics"
 report P8c-create-past "$(put_new ${PROBE_URL}${EVT_D}.ics "$WORK/d.ics")" "201"
 code=$(query_range $PROBE_URL ${PAST_DAY}T000000Z ${PAST_DAY}T235959Z "$WORK/past.xml")
-report P8d-past-found "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/past.xml" $EVT_D || print "status $code")" "1 = within query window, 0 = hidden"
+report P8d-past-found "$([[ $code == 207 ]] && $PY "$SUMMARIZE" count-uid "$WORK/past.xml" $EVT_D || print "status $code")" "0 (IONOS: -3 months is outside the query window)"
 
 print "== P8 window boundaries"
 for off in +11m +13m -20d -40d; do
@@ -292,4 +329,4 @@ print "== P9 credential scope"
 print -r -- "user = \"$ADA_USER:$ADA_PASS\"" |
   curl --silent --proto '=imaps' --max-time 30 --config - --output /dev/null "imaps://$IMAP_HOST/"
 rc=$?
-report P9-imap-login-with-app-password "curl exit $rc" "67 = IMAP login denied (narrow credential), 0 = IMAP allowed (broad credential), other = inconclusive"
+report P9-imap-login-with-app-password "curl exit $rc" "curl exit 0 (IONOS: app password also grants IMAP); 67 = denied; other = inconclusive"

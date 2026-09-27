@@ -15,6 +15,10 @@ The maintainer selected **IONOS Mail Business** as the first provider. The
 family gets **one** provider account, for Ada. Further providers must remain
 addable later without changing Ada's domain semantics.
 
+This ADR refines ADR-0003's example "Calendar providers are different
+`CalendarPort` adapters": CalDAV providers share one adapter and differ only by
+data-only profiles; separate adapters are reserved for other protocols.
+
 This ADR records decisions. How a specific provider behaves is evidence, not
 decision content: IONOS's observed behavior is documented in the evaluation and
 becomes data of the IONOS provider profile during implementation.
