@@ -651,6 +651,85 @@ class FileMemoryTests(unittest.TestCase):
             assert current is not None
             self.assertEqual(current.content, "Fallback publication works.")
 
+    def test_create_only_fallback_rollback_failure_is_applied(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            real_unlink = os.unlink
+            real_file_sync = FileMemoryStore._sync_file_fd
+
+            def fail_target_sync():
+                # The first file sync is the temp file, the second the target.
+                calls = 0
+
+                def sync(fd: int) -> None:
+                    nonlocal calls
+                    calls += 1
+                    if calls == 2:
+                        raise OSError(errno.EIO, "synthetic target sync failure")
+                    real_file_sync(fd)
+
+                return sync
+
+            def fail_target_unlink(name, *args, **kwargs):
+                if str(name).startswith("m-"):
+                    raise OSError(errno.EIO, "synthetic rollback failure")
+                return real_unlink(name, *args, **kwargs)
+
+            no_hardlinks = patch(
+                "ada.adapters.file_memory.os.link",
+                side_effect=OSError(errno.EOPNOTSUPP, "synthetic no-hardlink"),
+            )
+
+            # Rollback succeeds: the target is gone and nothing was applied.
+            with no_hardlinks, patch.object(
+                store,
+                "_sync_file_fd",
+                side_effect=fail_target_sync(),
+            ):
+                with self.assertRaises(FileMemoryError) as rolled_back:
+                    store.remember_explicit(kind=MemoryKind.FACT, content="Gone.")
+            self.assertFalse(rolled_back.exception.current_state_applied)
+            self.assertEqual(list(store.memory_dir.glob("m-*.md")), [])
+
+            # Rollback unlink fails: the incomplete target is still current.
+            with no_hardlinks, patch.object(
+                store,
+                "_sync_file_fd",
+                side_effect=fail_target_sync(),
+            ), patch(
+                "ada.adapters.file_memory.os.unlink",
+                side_effect=fail_target_unlink,
+            ):
+                with self.assertRaises(MemoryDurabilityError) as remained:
+                    store.remember_explicit(kind=MemoryKind.FACT, content="Stuck.")
+            error = remained.exception
+            self.assertTrue(error.current_state_applied)
+            self.assertFalse(error.durability_confirmed)
+            self.assertIsInstance(error.__cause__, OSError)
+            leftovers = list(store.memory_dir.glob("m-*.md"))
+            self.assertEqual(len(leftovers), 1)
+            self.assertEqual(error.entry_id, leftovers[0].stem)
+            self.assertEqual(error.applied_paths, (f"memory/{leftovers[0].name}",))
+            self.assertEqual(list(store.memory_dir.glob(".ada-memory-tmp-*")), [])
+            leftovers[0].unlink()
+
+            # Rollback removes the target but cannot sync the removal.
+            with no_hardlinks, patch.object(
+                store,
+                "_sync_file_fd",
+                side_effect=fail_target_sync(),
+            ), patch.object(
+                store,
+                "_sync_directory_fd",
+                side_effect=_failing_directory_sync(store.memory_dir),
+            ):
+                with self.assertRaises(MemoryDurabilityError) as unsynced:
+                    store.remember_explicit(kind=MemoryKind.FACT, content="Unsynced.")
+            self.assertTrue(unsynced.exception.current_state_applied)
+            self.assertFalse(unsynced.exception.durability_confirmed)
+            self.assertIsNotNone(unsynced.exception.entry_id)
+            self.assertEqual(list(store.memory_dir.glob("m-*.md")), [])
+
     def test_non_markdown_editor_artifacts_are_not_recorded_in_history(self) -> None:
         with TemporaryDirectory() as temp:
             store = FileMemoryStore(temp)

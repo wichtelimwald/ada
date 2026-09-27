@@ -936,6 +936,7 @@ class FileMemoryStore:
                         directory_fd,
                         path,
                         data,
+                        entry_id=entry_id,
                     )
                 published = True
                 os.unlink(temp_name, dir_fd=directory_fd)
@@ -979,6 +980,8 @@ class FileMemoryStore:
         directory_fd: int,
         path: Path,
         data: bytes,
+        *,
+        entry_id: str | None = None,
     ) -> None:
         try:
             target_fd = os.open(
@@ -996,19 +999,34 @@ class FileMemoryStore:
                 f"Memory file already exists and will not be overwritten: {path}"
             ) from exc
 
-        remove_partial = True
         try:
-            self._write_all(target_fd, data)
-            self._sync_file_fd(target_fd)
-            remove_partial = False
-        finally:
-            os.close(target_fd)
-            if remove_partial:
-                try:
-                    os.unlink(path.name, dir_fd=directory_fd)
-                    self._sync_directory_fd(directory_fd)
-                except FileNotFoundError:
-                    pass
+            try:
+                self._write_all(target_fd, data)
+                self._sync_file_fd(target_fd)
+            finally:
+                os.close(target_fd)
+        except BaseException:
+            # The target is already current but incomplete: roll it back, and
+            # report an applied outcome if that cannot be confirmed.
+            removed = False
+            try:
+                os.unlink(path.name, dir_fd=directory_fd)
+                removed = True
+                self._sync_directory_fd(directory_fd)
+            except FileNotFoundError:
+                pass
+            except OSError as rollback_exc:
+                raise MemoryDurabilityError(
+                    f"incomplete Memory file {path} was removed, but the removal "
+                    "could not be synced; it may reappear after a crash"
+                    if removed
+                    else f"incomplete Memory file {path} could not be removed "
+                    "and may still be current",
+                    applied_paths=(self._history_path(path),),
+                    entry_id=entry_id,
+                    durability_confirmed=False,
+                ) from rollback_exc
+            raise
 
     def _read_text_file(self, path: Path) -> tuple[str, str]:
         directory_fd = self._open_directory_fd(path.parent)
