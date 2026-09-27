@@ -176,6 +176,9 @@ supported local storage profile.
   synchronization and expected base commits so divergent edits become conflicts
   rather than silent last-writer-wins; define commit ownership, conflict handling,
   offline behavior and private/local transport without assuming a cloud remote;
+- KISS simplification review: if a commit-based multi-workspace model is selected,
+  identify and remove MVP-20 shared-working-tree concurrency machinery that is no
+  longer required rather than layering the new model on top of obsolete safeguards;
 - separately configurable source/document providers per domain;
 - backup/restore responsibilities for encrypted vaults;
 - cross-domain negative tests and residual threat model.
