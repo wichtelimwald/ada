@@ -1,6 +1,6 @@
 # ADR-0010: File-native Memory write safety and Git history adapter
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-09-26
 
 ## Context
