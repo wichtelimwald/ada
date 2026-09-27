@@ -74,7 +74,9 @@ shape. Current maintained implementation options were re-checked before coding:
 
 - Git CLI: established external tool; GPLv2; no Python runtime dependency is added.
   `git commit --only <pathspec>` explicitly disregards staged contents for other
-  paths, which matches Ada's path-restricted history requirement.
+  paths, which matches path-restricted capture of out-of-band edits. Ada's own
+  writes are committed with Git plumbing from a temporary index so the commit holds
+  exactly Ada's bytes.
 - GitPython 3.1.x: BSD-3-Clause, but still requires Git and adds Python dependencies.
 - Dulwich 1.2.x: Apache-2.0 OR GPL-2.0-or-later and can avoid a Git executable, but
   adds a new runtime package and a larger Python implementation surface.
@@ -124,20 +126,26 @@ revisit how Git is provisioned before a consumer release.
 ## Acceptance / Definition of Done
 
 - Create and correction are distinct APIs; a stale correction cannot overwrite a
-  newer human edit.
-- Generic IDs are opaque random values and a forgotten ID cannot be recreated by
-  the public create APIs.
+  newer human edit that is already visible at Ada's final pre-publication revision
+  check. A non-cooperating save that lands after that check but before
+  same-working-tree publication is the documented R1 residual (ADR-0010); MVP-30
+  owns the stronger model.
+- Generic IDs are opaque UUIDv4 values; allocation never returns an ID present in
+  current files, including a forget tombstone, and never consults Git history.
 - Repeated forget returns an explicit already-forgotten result.
 - Malformed established Memory remains on disk and forgetting it fails visibly.
 - Invalid area/lifecycle combinations are rejected or excluded from current loads.
 - Personality bootstrap cannot clobber a concurrently created profile.
 - Symlinked files are rejected at open time.
-- Successful writes fsync file content and the containing directory; create-only
-  publication has an `O_EXCL` fallback when hard links are unavailable.
+- Successful writes fsync file content and the containing directory (with
+  `F_FULLFSYNC` on macOS); create-only publication has an `O_EXCL` fallback when
+  hard links are unavailable.
 - Human edits present before an Ada write are committed separately before the Ada
-  change; Ada writes are committed promptly and path-restricted.
+  change; Ada writes are committed promptly, path-restricted and with exactly
+  Ada's bytes, so a concurrent edit is never recorded under an Ada commit.
 - Git lock/history failures do not cause the Memory write to be reported as a clean
-  success.
+  success. Any failure after current files changed is a `MemoryWriteAppliedError`
+  (`current_state_applied`, applied/unapplied paths, new entry ID for creates).
 - Tests prove current reads never rehydrate from Git history.
 
 ## Validation
@@ -181,3 +189,9 @@ commit.
   promotion to the evidence revision the user saw; MVP-20 `promote_learning`
   promotes the evidence content current at promotion time.
 - Packaging must decide how Git is provisioned for non-developer installations.
+- Durability: Git history uses Git's default fsync behavior (the newest history
+  commit can be lost on power loss while current Markdown stays durable), and the
+  macOS directory `F_FULLFSYNC` path still needs target-Mac validation on APFS and
+  FAT.
+
+These follow-ups are tracked in `docs/todo.md`.

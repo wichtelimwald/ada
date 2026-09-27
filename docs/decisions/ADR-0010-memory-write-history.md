@@ -33,7 +33,9 @@ meaningful slug, person name or Memory content. The logical ID remains stable ac
 explicit correction/promotion. Public create APIs do not accept caller-selected
 generic IDs.
 
-A forgotten ID remains reserved by its tombstone/history and is never reused.
+UUIDv4 randomness is the collision-avoidance mechanism. Allocation additionally
+rejects an ID that is present in current `memory/` or `learning/` files, including
+a forget tombstone. Git history is never consulted for allocation.
 
 ### 3. Create and correction are different operations
 
@@ -52,6 +54,10 @@ Ada-originated writes are serialized with an OS file lock for the Memory root.
 Before an Ada write, the history adapter captures already-present out-of-band
 changes under `memory/` and `learning/`. The write then rechecks its expected
 revision and fails on staleness. A successful Ada write is captured immediately.
+Once current files have changed, any later failure (a concurrent change, a history
+failure, or a multi-file write that stopped halfway) is reported as an applied
+outcome (`current_state_applied`, applied/unapplied paths, and the ID of a newly
+created entry), never as "nothing happened".
 
 Ordinary human editors are not required to use Ada's lock. The optimistic revision
 is therefore the semantic conflict boundary: a human edit observed before the Ada
@@ -65,8 +71,10 @@ GitPython, Dulwich or pygit2.
 Reasons:
 
 - Git already implements the required durable history semantics.
-- Git's pathspec-aware commit supports committing the intended path(s) while
-  disregarding unrelated staged contents.
+- Git plumbing can commit exactly Ada's bytes for the intended path(s) from a
+  temporary index built on `HEAD`, so neither unrelated staged contents nor a
+  concurrent working-tree edit enter an Ada-labelled commit. Out-of-band edits are
+  captured separately with a pathspec-restricted `git commit --only`.
 - It adds no Python dependency or native Python extension.
 - The adapter can be replaced later without changing Memory semantics.
 
@@ -77,8 +85,9 @@ pathspecs, a fixed non-authenticating Ada history identity, and no remote/networ
 commands. It records only non-hidden Markdown files so OS/editor artifacts such
 as AppleDouble `._*.md` files stay out of history. An existing Git `index.lock`
 stops the operation before an Ada write is published; other Git/lock failures
-after publication are reported as an explicit ambiguous outcome. Ada never
-deletes an unexplained Git lock.
+after publication are reported as an explicit applied outcome. Ada never
+deletes an unexplained Git lock. Git output is decoded like file-system names, so
+a non-UTF-8 file name cannot break later history capture.
 
 Git is GPLv2 and is treated as a separately installed external executable, not
 vendored or redistributed by Ada in this decision. Future packaging/distribution
@@ -109,7 +118,10 @@ targets.
 
 - Reads use fd-based no-follow opens and verify regular files.
 - Writes use durable temporary files, file fsync, atomic replace where replacement
-  is intended, and directory fsync before success.
+  is intended, and directory fsync before success. On macOS, where `fsync(2)` does
+  not flush the drive cache, file and directory syncs after publication or deletion
+  also use `F_FULLFSYNC`; a volume that rejects it for a directory with `ENOTSUP`
+  keeps the plain directory `fsync`.
 - Create-only publication prefers hard-linking a fully synced temp file and falls
   back to `O_CREAT|O_EXCL` direct creation when hard links are unavailable.
   A crash during the fallback may leave a visibly malformed/incomplete file; this
