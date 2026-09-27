@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
@@ -15,9 +16,11 @@ from uuid import UUID
 from ada.adapters.file_memory import (
     FileMemoryError,
     FileMemoryStore,
+    MemoryChangedAfterWriteError,
     MemoryConflictError,
     MemoryHistoryCommitError,
     MemoryPartialWriteError,
+    MemoryWriteAppliedError,
 )
 from ada.adapters.git_memory_history import GitMemoryHistoryError
 from ada.bootstrap.personality import (
@@ -914,6 +917,11 @@ class FileMemoryTests(unittest.TestCase):
                 "Current state was published.",
                 generic_files[0].read_text(encoding="utf-8"),
             )
+            self.assertEqual(caught.exception.entry_id, generic_files[0].stem)
+            self.assertEqual(
+                caught.exception.applied_paths,
+                (f"memory/{generic_files[0].name}",),
+            )
 
     def test_partial_promotion_has_explicit_applied_outcome(self) -> None:
         with TemporaryDirectory() as temp:
@@ -974,6 +982,353 @@ class FileMemoryTests(unittest.TestCase):
             assert retained is not None
             self.assertEqual(retained.content, "Late human evidence edit wins.")
             self.assertIsNone(retained.supports_memory_id)
+
+    def test_promotion_edit_before_evidence_link_is_partial_outcome(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            observed = store.record_learning(
+                kind=MemoryKind.FACT,
+                evidence_origin=EvidenceOrigin.OBSERVED_FACT,
+                content="Promoted evidence.",
+            )
+            memory_path = store.memory_dir / f"{observed.entry_id}.md"
+            original_read_revision = store._read_revision
+
+            def read_after_human_edit(path, revision):
+                if path == memory_path:
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "Promoted evidence.",
+                            "Human edit on new Memory.",
+                        ),
+                        encoding="utf-8",
+                    )
+                return original_read_revision(path, revision)
+
+            with patch.object(
+                store,
+                "_read_revision",
+                side_effect=read_after_human_edit,
+            ):
+                with self.assertRaises(MemoryPartialWriteError) as caught:
+                    store.promote_learning(
+                        observed.entry_id,
+                        confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+                    )
+
+            error = caught.exception
+            self.assertTrue(error.current_state_applied)
+            self.assertEqual(
+                error.applied_paths,
+                (f"memory/{observed.entry_id}.md",),
+            )
+            self.assertEqual(
+                error.unapplied_paths,
+                (f"learning/{observed.entry_id}.md",),
+            )
+            self.assertIsInstance(error.__cause__, MemoryConflictError)
+            current = store.load_memory_entry(observed.entry_id)
+            assert current is not None
+            self.assertEqual(current.content, "Human edit on new Memory.")
+            evidence = store.load_learning_entry(
+                observed.entry_id,
+                include_inactive=True,
+            )
+            assert evidence is not None
+            self.assertIsNone(evidence.supports_memory_id)
+
+    def test_forget_edit_before_memory_removal_is_partial_outcome(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            entry = store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Fact to forget.",
+            )
+            memory_path = store.memory_dir / f"{entry.entry_id}.md"
+            learning_path = store.learning_dir / f"{entry.entry_id}.md"
+            original_unlink = store._unlink_durable
+
+            def unlink_after_human_edit(path, **kwargs):
+                if path == memory_path:
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "Fact to forget.",
+                            "Late human correction.",
+                        ),
+                        encoding="utf-8",
+                    )
+                return original_unlink(path, **kwargs)
+
+            with patch.object(
+                store,
+                "_unlink_durable",
+                side_effect=unlink_after_human_edit,
+            ):
+                with self.assertRaises(MemoryPartialWriteError) as caught:
+                    store.forget(entry.entry_id)
+
+            error = caught.exception
+            self.assertTrue(error.current_state_applied)
+            self.assertEqual(
+                error.applied_paths,
+                (f"learning/{entry.entry_id}.md",),
+            )
+            self.assertEqual(
+                error.unapplied_paths,
+                (f"memory/{entry.entry_id}.md",),
+            )
+            self.assertIsInstance(error.__cause__, MemoryConflictError)
+            self.assertIn('lifecycle = "forgotten"', learning_path.read_text())
+            self.assertIn("Late human correction.", memory_path.read_text())
+            self.assertIsNone(
+                store.load_memory_entry(entry.entry_id, include_inactive=True)
+            )
+
+    def test_change_after_create_reports_applied_entry_id(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            original_read_revision = store._read_revision
+            edited = False
+
+            def read_after_sync_tool_edit(path, revision):
+                nonlocal edited
+                if not edited:
+                    edited = True
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "Fresh fact.",
+                            "Fresh fact touched by a sync tool.",
+                        ),
+                        encoding="utf-8",
+                    )
+                return original_read_revision(path, revision)
+
+            with patch.object(
+                store,
+                "_read_revision",
+                side_effect=read_after_sync_tool_edit,
+            ):
+                with self.assertRaises(MemoryChangedAfterWriteError) as caught:
+                    store.remember_explicit(
+                        kind=MemoryKind.FACT,
+                        content="Fresh fact.",
+                    )
+
+            error = caught.exception
+            self.assertIsInstance(error, MemoryConflictError)
+            self.assertIsInstance(error, MemoryWriteAppliedError)
+            self.assertTrue(error.current_state_applied)
+            generic_files = list(store.memory_dir.glob("m-*.md"))
+            self.assertEqual(len(generic_files), 1)
+            self.assertEqual(error.entry_id, generic_files[0].stem)
+            self.assertEqual(
+                error.applied_paths,
+                (f"memory/{generic_files[0].name}",),
+            )
+            current = store.load_memory_entry(error.entry_id)
+            assert current is not None
+            self.assertEqual(current.content, "Fresh fact touched by a sync tool.")
+
+    def test_stale_revision_before_publication_is_not_applied(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            entry = store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Original.",
+            )
+            snapshot = store.load_memory_snapshot(entry.entry_id)
+            assert snapshot is not None
+            path = store.memory_dir / f"{entry.entry_id}.md"
+            path.write_text(
+                path.read_text(encoding="utf-8").replace("Original.", "Human."),
+                encoding="utf-8",
+            )
+
+            with self.assertRaises(MemoryConflictError) as caught:
+                store.correct_explicit(
+                    entry.entry_id,
+                    content="Stale.",
+                    expected_revision=snapshot.revision,
+                )
+
+            self.assertFalse(caught.exception.current_state_applied)
+            self.assertNotIsInstance(caught.exception, MemoryWriteAppliedError)
+
+    def test_edit_during_history_commit_is_not_recorded_as_ada_change(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            entry = store.remember_explicit(
+                kind=MemoryKind.FACT,
+                content="Base.",
+            )
+            snapshot = store.load_memory_snapshot(entry.entry_id)
+            assert snapshot is not None
+            path = store.memory_dir / f"{entry.entry_id}.md"
+            original_run = store._history._run
+
+            def run_with_edit_before_commit(*args, **kwargs):
+                if args[:1] == ("commit-tree",):
+                    path.write_text(
+                        path.read_text(encoding="utf-8").replace(
+                            "Ada correction.",
+                            "Human edit during history commit.",
+                        ),
+                        encoding="utf-8",
+                    )
+                return original_run(*args, **kwargs)
+
+            with patch.object(
+                store._history,
+                "_run",
+                side_effect=run_with_edit_before_commit,
+            ):
+                with self.assertRaises(MemoryChangedAfterWriteError):
+                    store.correct_explicit(
+                        entry.entry_id,
+                        content="Ada correction.",
+                        expected_revision=snapshot.revision,
+                    )
+
+            relative = f"memory/{entry.entry_id}.md"
+            log = _git(temp, "log", "--format=%H %s", "--", relative)
+            commits = [line.split(" ", 1) for line in log.splitlines()]
+            self.assertEqual(
+                [subject for _sha, subject in commits[:2]],
+                [
+                    "Capture external Memory edit",
+                    "Ada Memory: correct explicit Memory",
+                ],
+            )
+            human_sha, ada_sha = commits[0][0], commits[1][0]
+            ada_version = _git(temp, "show", f"{ada_sha}:{relative}")
+            self.assertIn("Ada correction.", ada_version)
+            self.assertNotIn("Human edit", ada_version)
+            self.assertIn(
+                "Human edit during history commit.",
+                _git(temp, "show", f"{human_sha}:{relative}"),
+            )
+
+    def test_non_utf8_markdown_file_name_does_not_break_the_store(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            raw_name = os.path.join(
+                os.fsencode(store.memory_dir),
+                b"notizen-\xe4.md",
+            )
+            try:
+                with open(raw_name, "wb") as handle:
+                    handle.write(b"human note\n")
+            except OSError:
+                self.skipTest("filesystem rejects non-UTF-8 file names")
+
+            store.remember_explicit(kind=MemoryKind.FACT, content="First.")
+            store.remember_explicit(kind=MemoryKind.FACT, content="Second.")
+            os.rename(
+                raw_name,
+                os.path.join(os.fsencode(store.memory_dir), b"notizen-ae.md"),
+            )
+            reopened = FileMemoryStore(temp)
+            reopened.remember_explicit(kind=MemoryKind.FACT, content="Third.")
+
+            tracked = subprocess.run(
+                ["git", "-C", temp, "ls-files", "-z", "--", "memory"],
+                check=True,
+                capture_output=True,
+                env={
+                    "PATH": os.environ.get("PATH", ""),
+                    "GIT_CONFIG_GLOBAL": os.devnull,
+                    "GIT_CONFIG_NOSYSTEM": "1",
+                },
+            ).stdout.split(b"\0")
+            self.assertIn(b"memory/notizen-ae.md", tracked)
+            self.assertNotIn(b"memory/notizen-\xe4.md", tracked)
+            self.assertEqual(len(list(store.memory_dir.glob("m-*.md"))), 3)
+
+    def test_macos_full_sync_covers_directory_publication(self) -> None:
+        full_fsync = 51  # synthetic command value; only its use is checked
+        directory_syncs: list[int] = []
+
+        def record_fcntl(fd, command, *args):
+            if command == full_fsync and stat.S_ISDIR(os.fstat(fd).st_mode):
+                directory_syncs.append(fd)
+            return 0
+
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            with patch("ada.adapters.file_memory._F_FULLFSYNC", full_fsync), patch(
+                "ada.adapters.file_memory.fcntl.fcntl",
+                side_effect=record_fcntl,
+            ):
+                entry = store.remember_explicit(
+                    kind=MemoryKind.FACT,
+                    content="Durable.",
+                )
+                after_create = len(directory_syncs)
+                snapshot = store.load_memory_snapshot(entry.entry_id)
+                assert snapshot is not None
+                store.correct_explicit(
+                    entry.entry_id,
+                    content="Durably corrected.",
+                    expected_revision=snapshot.revision,
+                )
+                after_replace = len(directory_syncs)
+                store.forget(entry.entry_id)
+
+            self.assertGreaterEqual(after_create, 1)
+            self.assertGreater(after_replace, after_create)
+            self.assertGreater(len(directory_syncs), after_replace)
+
+    def test_macos_directory_full_sync_fallback_is_narrow(self) -> None:
+        full_fsync = 51
+
+        def unsupported_on_directories(errno_value):
+            def fake_fcntl(fd, command, *args):
+                if stat.S_ISDIR(os.fstat(fd).st_mode):
+                    raise OSError(errno_value, os.strerror(errno_value))
+                return 0
+
+            return fake_fcntl
+
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            with patch("ada.adapters.file_memory._F_FULLFSYNC", full_fsync):
+                with patch(
+                    "ada.adapters.file_memory.fcntl.fcntl",
+                    side_effect=unsupported_on_directories(errno.ENOTSUP),
+                ):
+                    store.remember_explicit(
+                        kind=MemoryKind.FACT,
+                        content="fsync fallback keeps working.",
+                    )
+                with patch(
+                    "ada.adapters.file_memory.fcntl.fcntl",
+                    side_effect=unsupported_on_directories(errno.EIO),
+                ):
+                    with self.assertRaises(FileMemoryError):
+                        store.remember_explicit(
+                            kind=MemoryKind.FACT,
+                            content="An I/O error must not look durable.",
+                        )
+
+    def test_id_allocation_never_consults_git_history(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            original_run = store._history._run
+            git_commands: list[str] = []
+
+            def record_run(*args, **kwargs):
+                git_commands.append(args[0])
+                return original_run(*args, **kwargs)
+
+            with patch.object(
+                store._history,
+                "_run",
+                side_effect=record_run,
+            ):
+                store.remember_explicit(kind=MemoryKind.FACT, content="New.")
+
+            self.assertNotIn("log", git_commands)
+            self.assertNotIn("rev-list", git_commands)
 
     def test_scalar_front_matter_types_fail_closed(self) -> None:
         with TemporaryDirectory() as temp:

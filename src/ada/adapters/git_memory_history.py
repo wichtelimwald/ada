@@ -5,7 +5,7 @@ from pathlib import Path, PurePosixPath
 import shutil
 import subprocess
 from tempfile import TemporaryDirectory
-from typing import Iterable
+from typing import Mapping
 
 
 class GitMemoryHistoryError(RuntimeError):
@@ -283,40 +283,79 @@ class GitMemoryHistory:
 
     def capture_ada_write(
         self,
-        paths: Iterable[str],
+        changes: Mapping[str, bytes | None],
         *,
         reason: str,
     ) -> bool:
-        """Capture only paths intentionally changed by one Ada operation."""
+        """Commit exactly Ada's bytes for these paths; ``None`` records a deletion.
 
-        normalized = tuple(self._validate_owned_path(path) for path in paths)
-        if not normalized:
+        The commit is built from HEAD in a temporary index, so neither a
+        concurrent working-tree edit nor unrelated staged content can end up
+        in an Ada-labelled commit.
+        """
+
+        blobs: dict[str, str | None] = {}
+        for path, data in changes.items():
+            normalized = self._validate_owned_path(path)
+            blobs[normalized] = (
+                None
+                if data is None
+                else self._run(
+                    "hash-object",
+                    "-w",
+                    "--stdin",
+                    input=data,
+                ).stdout.strip()
+            )
+        if not blobs:
             raise ValueError("at least one Memory history path is required")
 
-        self._run("add", "-A", "--", *normalized)
-        if not self._has_staged_changes(normalized):
+        parent = self._run("rev-parse", "--verify", "HEAD").stdout.strip()
+        with TemporaryDirectory(prefix="ada-git-index-") as temp:
+            index_env = {"GIT_INDEX_FILE": os.path.join(temp, "index")}
+            self._run("read-tree", parent, extra_env=index_env)
+            self._update_index(blobs, extra_env=index_env)
+            tree = self._run("write-tree", extra_env=index_env).stdout.strip()
+        if tree == self._run("rev-parse", f"{parent}^{{tree}}").stdout.strip():
             return False
-        self._run(
-            "commit",
-            "--only",
-            "--no-gpg-sign",
+
+        message = f"Ada Memory: {reason}"
+        commit = self._run(
+            "commit-tree",
+            tree,
+            "-p",
+            parent,
             "-m",
-            f"Ada Memory: {reason}",
-            "--",
-            *normalized,
-        )
+            message,
+        ).stdout.strip()
+        self._run("update-ref", "-m", message, "HEAD", commit, parent)
+        # Keep the shared index in step with HEAD for these paths only.
+        self._update_index(blobs)
         return True
 
-    def has_path_history(self, path: str) -> bool:
-        normalized = self._validate_owned_path(path)
-        result = self._run(
-            "log",
-            "--format=%H",
-            "--all",
-            "--",
-            normalized,
-        )
-        return bool(result.stdout.strip())
+    def _update_index(
+        self,
+        blobs: Mapping[str, str | None],
+        *,
+        extra_env: dict[str, str] | None = None,
+    ) -> None:
+        added = [
+            argument
+            for path, blob in sorted(blobs.items())
+            if blob is not None
+            for argument in ("--cacheinfo", "100644", blob, path)
+        ]
+        removed = sorted(path for path, blob in blobs.items() if blob is None)
+        if added:
+            self._run("update-index", "--add", *added, extra_env=extra_env)
+        if removed:
+            self._run(
+                "update-index",
+                "--force-remove",
+                "--",
+                *removed,
+                extra_env=extra_env,
+            )
 
     def _has_staged_changes(self, paths: tuple[str, ...]) -> bool:
         result = self._run(
@@ -349,6 +388,7 @@ class GitMemoryHistory:
         *args: str,
         check: bool = True,
         extra_env: dict[str, str] | None = None,
+        input: bytes | None = None,
     ) -> subprocess.CompletedProcess[str]:
         env = {
             # No HOME/XDG_CONFIG_HOME: user-level Git ignore/attributes files
@@ -380,17 +420,25 @@ class GitMemoryHistory:
             *args,
         ]
         try:
-            result = subprocess.run(
+            raw = subprocess.run(
                 command,
                 check=False,
                 capture_output=True,
-                text=True,
+                input=input,
                 env=env,
             )
         except OSError as exc:
             raise GitMemoryHistoryError(
                 f"cannot execute Git for Memory history: {exc}"
             ) from exc
+        # Decode like os.scandir (surrogateescape), so a non-UTF-8 file name
+        # round-trips back to Git instead of breaking every later capture.
+        result = subprocess.CompletedProcess(
+            raw.args,
+            raw.returncode,
+            os.fsdecode(raw.stdout),
+            raw.stderr.decode("utf-8", "replace"),
+        )
 
         if check and result.returncode != 0:
             raise GitMemoryHistoryError(self._format_failure(args, result))

@@ -33,10 +33,17 @@ from ada.core.personality import PersonalityProfile
 _ENTRY_ID = re.compile(r"m-[0-9a-f]{32}")
 _FORGOTTEN_BODY = "[forgotten]"
 _STALE_TEMP = re.compile(r"\.ada-memory-tmp-[0-9a-f]{32}")
+# fsync(2) on macOS does not flush the drive cache; F_FULLFSYNC does.
+_F_FULLFSYNC: int | None = (
+    getattr(fcntl, "F_FULLFSYNC", None) if sys.platform == "darwin" else None
+)
 
 
 class FileMemoryError(RuntimeError):
     """The file-native Memory store could not be read or written safely."""
+
+    # True only when current Memory files already reflect (part of) the write.
+    current_state_applied = False
 
 
 class MemoryAlreadyExistsError(FileMemoryError):
@@ -47,33 +54,40 @@ class MemoryConflictError(FileMemoryError):
     """The caller's revision is stale and current Memory must win."""
 
 
-class MemoryHistoryCommitError(FileMemoryError):
-    """Current files changed, but the matching history commit did not complete."""
-
-    def __init__(self, message: str, *, paths: tuple[str, ...]) -> None:
-        super().__init__(message)
-        self.paths = paths
-        self.current_state_applied = True
-
-
-class MemoryPartialWriteError(FileMemoryError):
-    """A multi-file write published part of its current state, then stopped.
+class MemoryWriteAppliedError(FileMemoryError):
+    """Current files already reflect Ada's write, but the operation did not finish.
 
     ``applied_paths`` are already current; ``unapplied_paths`` still need
-    reconciliation. Do not treat this as "nothing happened" or retry blindly.
+    reconciliation; ``entry_id`` names an entry the operation created. Do not
+    treat this as "nothing happened" or retry blindly.
     """
+
+    current_state_applied = True
 
     def __init__(
         self,
         message: str,
         *,
         applied_paths: tuple[str, ...],
-        unapplied_paths: tuple[str, ...],
+        unapplied_paths: tuple[str, ...] = (),
+        entry_id: str | None = None,
     ) -> None:
         super().__init__(message)
         self.applied_paths = applied_paths
         self.unapplied_paths = unapplied_paths
-        self.current_state_applied = True
+        self.entry_id = entry_id
+
+
+class MemoryHistoryCommitError(MemoryWriteAppliedError):
+    """Current files changed, but the matching history commit did not complete."""
+
+
+class MemoryPartialWriteError(MemoryWriteAppliedError):
+    """A multi-file write published part of its current state, then stopped."""
+
+
+class MemoryChangedAfterWriteError(MemoryWriteAppliedError, MemoryConflictError):
+    """Ada's write was published, then the file changed or could not be re-read."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,9 +185,7 @@ class FileMemoryStore:
             except MemoryAlreadyExistsError:
                 self._capture_external_changes()
                 return False
-            self._verify_revision(path, revision)
             self._capture_ada_write(
-                (self._history_path(path),),
                 reason="initialize personality",
                 expected_revisions=((path, revision),),
             )
@@ -208,11 +220,10 @@ class FileMemoryStore:
             )
             path = self.memory_dir / f"{entry.entry_id}.md"
             revision = self._write_entry(path, entry, create_only=True)
-            self._verify_revision(path, revision)
             self._capture_ada_write(
-                (self._history_path(path),),
                 reason="create explicit Memory",
                 expected_revisions=((path, revision),),
+                entry_id=entry.entry_id,
             )
         return entry
 
@@ -246,11 +257,10 @@ class FileMemoryStore:
             )
             path = self.learning_dir / f"{entry.entry_id}.md"
             revision = self._write_entry(path, entry, create_only=True)
-            self._verify_revision(path, revision)
             self._capture_ada_write(
-                (self._history_path(path),),
                 reason="record learning evidence",
                 expected_revisions=((path, revision),),
+                entry_id=entry.entry_id,
             )
         return entry
 
@@ -329,14 +339,14 @@ class FileMemoryStore:
                 established,
                 create_only=True,
             )
-            self._verify_revision(memory_path, memory_revision)
             try:
+                # Link the evidence only while the new Memory is still Ada's.
+                self._read_revision(memory_path, memory_revision)
                 learning_revision = self._write_entry(
                     learning_path,
                     retained_evidence,
                     expected_revision=evidence_snapshot.revision,
                 )
-                self._verify_revision(learning_path, learning_revision)
             except FileMemoryError as exc:
                 raise MemoryPartialWriteError(
                     "promotion established current Memory but could not update "
@@ -347,10 +357,6 @@ class FileMemoryStore:
                 ) from exc
 
             self._capture_ada_write(
-                (
-                    self._history_path(memory_path),
-                    self._history_path(learning_path),
-                ),
                 reason="promote learning evidence",
                 expected_revisions=(
                     (memory_path, memory_revision),
@@ -404,9 +410,7 @@ class FileMemoryStore:
                 corrected,
                 expected_revision=expected_revision,
             )
-            self._verify_revision(path, revision)
             self._capture_ada_write(
-                (self._history_path(path),),
                 reason="correct explicit Memory",
                 expected_revisions=((path, revision),),
             )
@@ -458,10 +462,6 @@ class FileMemoryStore:
                 )
                 assert learning_revision is not None
                 self._capture_ada_write(
-                    (
-                        self._history_path(memory_path),
-                        self._history_path(learning_path),
-                    ),
                     reason="complete interrupted Memory forget",
                     expected_revisions=((learning_path, learning_revision),),
                     expected_absent=(memory_path,),
@@ -477,18 +477,24 @@ class FileMemoryStore:
                 create_only=not learning_exists,
                 expected_revision=learning_revision,
             )
-            self._verify_revision(learning_path, tombstone_revision)
-
-            changed_paths = (learning_path,)
             if memory_entry is not None:
-                self._unlink_durable(
-                    memory_path,
-                    expected_revision=memory_revision,
-                )
-                changed_paths = (memory_path, learning_path)
+                try:
+                    # Remove Memory only while the tombstone is still Ada's.
+                    self._read_revision(learning_path, tombstone_revision)
+                    self._unlink_durable(
+                        memory_path,
+                        expected_revision=memory_revision,
+                    )
+                except FileMemoryError as exc:
+                    raise MemoryPartialWriteError(
+                        "forget published the tombstone but could not remove "
+                        "current Memory; the entry is hidden, and the Memory "
+                        "file requires reconciliation",
+                        applied_paths=(self._history_path(learning_path),),
+                        unapplied_paths=(self._history_path(memory_path),),
+                    ) from exc
 
             self._capture_ada_write(
-                tuple(self._history_path(path) for path in changed_paths),
                 reason="forget current Memory",
                 expected_revisions=((learning_path, tombstone_revision),),
                 expected_absent=(memory_path,),
@@ -596,28 +602,16 @@ class FileMemoryStore:
         return metadata, body
 
     def _new_entry_id(self) -> str:
+        # UUIDv4 randomness is the collision-avoidance mechanism. Current files,
+        # including forget tombstones, are checked; Git history never is.
         for _attempt in range(32):
             entry_id = f"m-{uuid4().hex}"
-            if not self._entry_id_seen(entry_id):
+            if not any(
+                self._path_exists(directory / f"{entry_id}.md")
+                for directory in (self.memory_dir, self.learning_dir)
+            ):
                 return entry_id
         raise FileMemoryError("could not allocate a fresh opaque Memory entry id")
-
-    def _entry_id_seen(self, entry_id: str) -> bool:
-        for directory, prefix in (
-            (self.memory_dir, "memory"),
-            (self.learning_dir, "learning"),
-        ):
-            path = directory / f"{entry_id}.md"
-            if self._path_exists(path):
-                return True
-            try:
-                if self._history.has_path_history(
-                    f"{prefix}/{entry_id}.md"
-                ):
-                    return True
-            except GitMemoryHistoryError as exc:
-                raise FileMemoryError(str(exc)) from exc
-        return False
 
     def _write_forget_tombstone(
         self,
@@ -1059,6 +1053,10 @@ class FileMemoryStore:
         directory_fd: int,
         path: Path,
     ) -> str:
+        return sha256(self._read_in_directory(directory_fd, path)).hexdigest()
+
+    @staticmethod
+    def _read_in_directory(directory_fd: int, path: Path) -> bytes:
         try:
             fd = os.open(
                 path.name,
@@ -1067,7 +1065,7 @@ class FileMemoryStore:
             )
         except FileNotFoundError as exc:
             raise MemoryConflictError(
-                f"Memory file disappeared before publication: {path}"
+                f"Memory file disappeared during the operation: {path}"
             ) from exc
         except OSError as exc:
             if exc.errno == errno.ELOOP:
@@ -1083,13 +1081,14 @@ class FileMemoryStore:
                 raise FileMemoryError(
                     f"Memory file must be a regular file: {path}"
                 )
-            digest = sha256()
-            while True:
-                chunk = os.read(fd, 1024 * 1024)
-                if not chunk:
-                    break
-                digest.update(chunk)
-            return digest.hexdigest()
+            chunks = []
+            while chunk := os.read(fd, 1024 * 1024):
+                chunks.append(chunk)
+            return b"".join(chunks)
+        except OSError as exc:
+            raise FileMemoryError(
+                f"cannot read Memory file for revision check: {path}"
+            ) from exc
         finally:
             os.close(fd)
 
@@ -1194,33 +1193,63 @@ class FileMemoryStore:
 
     def _capture_ada_write(
         self,
-        paths: tuple[str, ...],
         *,
         reason: str,
         expected_revisions: tuple[tuple[Path, str], ...] = (),
         expected_absent: tuple[Path, ...] = (),
+        entry_id: str | None = None,
     ) -> None:
-        for path, revision in expected_revisions:
-            self._verify_revision(path, revision)
-        for path in expected_absent:
-            self._verify_absent(path)
+        """Commit an already published Ada write, then re-check it.
 
+        Everything here runs after current files changed, so every failure is
+        raised as a ``MemoryWriteAppliedError``, never as "nothing happened".
+        """
+
+        applied_paths = tuple(
+            self._history_path(path)
+            for path in (
+                *(path for path, _revision in expected_revisions),
+                *expected_absent,
+            )
+        )
         try:
-            self._history.capture_ada_write(paths, reason=reason)
-        except GitMemoryHistoryError as exc:
-            raise MemoryHistoryCommitError(
-                "current Memory state changed but Git history capture failed; "
-                "do not blindly retry the write, reconcile the current files first: "
-                f"{exc}",
-                paths=paths,
-            ) from exc
+            changes: dict[str, bytes | None] = {}
+            for path, revision in expected_revisions:
+                changes[self._history_path(path)] = self._read_revision(
+                    path,
+                    revision,
+                )
+            for path in expected_absent:
+                self._verify_absent(path)
+                changes[self._history_path(path)] = None
 
-        # Do not report a clean success if a non-cooperating editor changed the
-        # just-written state while history was being captured.
-        for path, revision in expected_revisions:
-            self._verify_revision(path, revision)
-        for path in expected_absent:
-            self._verify_absent(path)
+            try:
+                self._history.capture_ada_write(changes, reason=reason)
+            except GitMemoryHistoryError as exc:
+                raise MemoryHistoryCommitError(
+                    "current Memory state changed but Git history capture failed; "
+                    "do not blindly retry the write, reconcile the current files "
+                    f"first: {exc}",
+                    applied_paths=applied_paths,
+                    entry_id=entry_id,
+                ) from exc
+
+            # Do not report a clean success if a non-cooperating editor changed
+            # the just-written state while history was being captured.
+            for path, revision in expected_revisions:
+                self._read_revision(path, revision)
+            for path in expected_absent:
+                self._verify_absent(path)
+        except MemoryWriteAppliedError:
+            raise
+        except FileMemoryError as exc:
+            raise MemoryChangedAfterWriteError(
+                "Ada's write was published, but the file changed or could not "
+                "be re-read afterwards; current Memory wins, reload instead of "
+                f"retrying: {exc}",
+                applied_paths=applied_paths,
+                entry_id=entry_id,
+            ) from exc
 
     @staticmethod
     def _history_call(operation: Any) -> Any:
@@ -1229,13 +1258,20 @@ class FileMemoryStore:
         except GitMemoryHistoryError as exc:
             raise FileMemoryError(str(exc)) from exc
 
-    def _verify_revision(self, path: Path, expected_revision: str) -> None:
-        _text, current_revision = self._read_text_file(path)
-        if current_revision != expected_revision:
+    def _read_revision(self, path: Path, expected_revision: str) -> bytes:
+        """Return the file's bytes if they still match ``expected_revision``."""
+
+        directory_fd = self._open_directory_fd(path.parent)
+        try:
+            data = self._read_in_directory(directory_fd, path)
+        finally:
+            os.close(directory_fd)
+        if sha256(data).hexdigest() != expected_revision:
             self._capture_external_changes()
             raise MemoryConflictError(
                 f"Memory file changed concurrently and Ada will not overwrite it: {path}"
             )
+        return data
 
     def _verify_absent(self, path: Path) -> None:
         if self._path_exists(path):
@@ -1297,12 +1333,21 @@ class FileMemoryStore:
     @staticmethod
     def _sync_file_fd(fd: int) -> None:
         os.fsync(fd)
-        if sys.platform == "darwin" and hasattr(fcntl, "F_FULLFSYNC"):
-            fcntl.fcntl(fd, fcntl.F_FULLFSYNC)
+        if _F_FULLFSYNC is not None:
+            fcntl.fcntl(fd, _F_FULLFSYNC)
 
     @staticmethod
     def _sync_directory_fd(fd: int) -> None:
         os.fsync(fd)
+        if _F_FULLFSYNC is not None:
+            # macOS fsync(2) can leave the rename/unlink in the drive cache.
+            try:
+                fcntl.fcntl(fd, _F_FULLFSYNC)
+            except OSError as exc:
+                # Like Go's os.File.Sync on darwin: a volume that cannot full-sync
+                # keeps the plain fsync above instead of failing every write.
+                if exc.errno not in {errno.ENOTSUP, errno.EOPNOTSUPP}:
+                    raise
 
     @staticmethod
     def _toml_value(value: Any) -> str:
