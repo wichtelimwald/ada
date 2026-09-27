@@ -99,8 +99,8 @@ boundary.
 | --- | --- | --- | --- | --- |
 | MVP-00 | Core foundation | done | — | PydanticAI boundary, Cedar/AdaGuard, DBOS action semantics, local Ollama, modular monolith baseline |
 | MVP-10 | File-native Memory baseline | done | MVP-00 | Current Markdown authority, `memory/` vs `learning/`, seed-once personality, conservative promotion/forget baseline |
-| MVP-20 | Memory semantics, safe writes and versioning | ready | MVP-10 | Close baseline residuals; define correction/forget/id semantics; safe Git-style history/edit capture/concurrency |
-| MVP-30 | Memory Broker, protection domains and encryption | blocked | MVP-20 | Enforce private/shared domains, request-scoped broker access, encrypted-at-rest per-domain storage/history |
+| MVP-20 | Memory semantics, safe writes and versioning | done | MVP-10 | Close baseline residuals; define correction/forget/id semantics; safe Git-style history/edit capture/concurrency |
+| MVP-30 | Memory Broker, protection domains and encryption | ready | MVP-20 | Enforce private/shared domains, request-scoped broker access, encrypted-at-rest per-domain storage/history |
 | MVP-40 | Learning pipeline and retrieval | blocked | MVP-20, MVP-30 | Trusted learning validation, class A-D handling, lifecycle rules, current-only retrieval; start simple and measure before richer RAG |
 | MVP-50 | Chat + Family Memory | blocked | MVP-40 | Identity/audience-aware local chat using real protected family Memory and learning |
 | MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Can proceed in parallel with Memory; connect real provider for read/create/update/cancel and preserve durable action semantics |
@@ -134,6 +134,9 @@ tombstone, development-only chat opt-in, independent review and target-Mac tests
 household data.
 
 ### MVP-20 — Memory semantics, safe writes and versioning
+
+**Outcome:** complete; merged PR #41 implements the accepted safe-write/versioning
+semantics and passed independent review plus Linux and target-Mac validation.
 
 **Goal:** turn the development file adapter into a well-defined, recoverable
 authoritative write/versioning layer before adding real protection domains.

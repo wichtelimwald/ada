@@ -1,6 +1,6 @@
 # MVP-20 — Memory semantics, safe writes and versioning
 
-Status: implementation
+Status: done
 Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-10
 Owner PR: #41
@@ -12,17 +12,20 @@ authoritative write layer before protection domains are introduced in MVP-30.
 
 ## Current state / evidence
 
-- ADR-0008 accepts Markdown/current-file authority and Git-style history as a
-  compatible recovery mechanism while normal retrieval remains current-state only.
-- MVP-10 already provides explicit Memory vs learning areas, seed-once personality,
-  conservative promotion and a current-state forget tombstone.
-- The research control under `research/memory/control/` demonstrates useful
-  Markdown + Git behavior and, more importantly, the stale-write, Git-lock and
-  path-scoping failures that production code must close.
-- Current generic entry APIs accept semantic caller-supplied slugs, overwriting
-  writes do not expose a revision token, reads still have a symlink TOCTOU window,
-  directory durability is incomplete, and Git history is not wired into runtime
-  writes.
+MVP-20 is complete and merged via PR #41.
+
+- ADR-0010 is accepted and implements Git CLI history behind Ada-owned adapters
+  while current Markdown remains the only semantic Memory authority.
+- Generic Memory IDs are opaque UUIDv4 values; create/correction/forget semantics,
+  applied/partial write outcomes, stale-write detection and current tombstones are
+  implemented.
+- File access/publication uses fd-based no-follow reads, create-only publication,
+  serialized Ada writers, file/directory durability, macOS `F_FULLFSYNC`, and an
+  `O_EXCL` fallback for filesystems without hard-link support.
+- Ada history commits contain exactly Ada's verified bytes; out-of-band edits are
+  captured separately and normal reads never consult Git history.
+- Independent review findings were resolved before merge. Accepted residuals R1/R2
+  and later promotion revision binding remain explicit follow-ups below.
 
 ## Scope
 
@@ -159,10 +162,18 @@ python -m unittest tests.test_file_memory
 sh scripts/validate.sh
 ```
 
-Target-Mac validation must additionally exercise a real Git CLI, out-of-band manual
-edit capture, stale correction rejection, repeated forget and personality bootstrap
-racing two processes/threads. No validation claim is made until tied to the exact
-commit.
+Final validation was completed on the exact PR head
+`65d091861452d3e9fac3ca50d4387fe817566d09` before merge:
+
+- Linux x86_64: `tests.test_file_memory` 48/48 PASS; `scripts/validate.sh`
+  131/131 PASS; Linux probe suite 19/19 PASS including the exFAT/no-hard-link path.
+- Target Mac: macOS 26.6.2 arm64, Python 3.14.6, Apple Git 2.54.0, APFS;
+  `tests.test_file_memory` 48 PASS (1 expected skip), `scripts/validate.sh`
+  131 PASS (1 expected skip), `ada doctor` OK.
+- A real FAT16/no-hard-link lifecycle probe on the target Mac passed create,
+  correction, forget, repeated forget and reopen.
+
+PR #41 was then squash-merged to `main`.
 
 ## Review focus
 
@@ -192,8 +203,8 @@ commit.
   promotes the evidence content current at promotion time.
 - Packaging must decide how Git is provisioned for non-developer installations.
 - Durability: Git history uses Git's default fsync behavior (the newest history
-  commit can be lost on power loss while current Markdown stays durable), and the
-  macOS directory `F_FULLFSYNC` path still needs target-Mac validation on APFS and
-  FAT.
+  commit can be lost on power loss while current Markdown stays durable). The
+  current-file macOS `F_FULLFSYNC` path has been validated on APFS and the
+  no-hard-link fallback lifecycle on a real FAT16 volume.
 
 These follow-ups are tracked in `docs/todo.md`.
