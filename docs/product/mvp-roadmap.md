@@ -155,9 +155,13 @@ authoritative write/versioning layer before adding real protection domains.
 - create-only behavior on storage without hard-link support;
 - idempotent/repeated forget semantics, including an explicit already-forgotten result rather than treating it as a fresh state change.
 
-**DoD:** deterministic tests prove no silent overwrite, stale re-promotion,
-history rehydration, lost human correction, or ambiguous write outcome for the
-supported local storage profile.
+**DoD:** deterministic tests prove no silent overwrite of a human correction
+that is already visible at Ada's final pre-publication revision check, no stale
+re-promotion, no history rehydration, and no ambiguous write outcome for the
+supported local storage profile. A non-cooperating human save that lands after
+that final check but before same-working-tree publication is a documented MVP-20
+residual; MVP-30 must evaluate the commit-based multi-workspace model and remove
+obsolete shared-working-tree safeguards if that model is selected.
 
 ### MVP-30 — Memory Broker, protection domains and encryption
 
