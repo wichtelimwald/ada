@@ -4,8 +4,9 @@ Status: implementation
 Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-00 (done)
 Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR, merged);
-S1-S3 implementation PR: TBD-UPDATE-AFTER-PR-OPENED. Further implementation PRs
-follow for S4-S5 and S6-S7 (roadmap stays `ready` until S7).
+S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (draft).
+Further implementation PRs follow for S4-S5 and S6-S7 (roadmap stays `ready`
+until S7).
 
 ## Goal
 
@@ -298,8 +299,10 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
 ## Validation
 
 S1-S3 evidence: `scripts/validate.sh` passes (compile, unit tests, `ada
-doctor`) with 31 new tests (132 total) on the exact commit of the S1-S3
-implementation PR. Items below tagged S4+ remain open for later PRs.
+doctor`) with 31 new tests (132 total); exact validation-to-commit binding is
+recorded in [PR #44](https://github.com/wichtelimwald/ada/pull/44), not
+duplicated here as it will go stale. Items below tagged S4+ remain open for
+later PRs.
 
 - `scripts/validate.sh` (compile, unit tests, `ada doctor`).
 - Contract suite against every `CalendarPort` adapter.
