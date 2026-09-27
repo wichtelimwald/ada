@@ -58,8 +58,9 @@ class MemoryWriteAppliedError(FileMemoryError):
     """Current files already reflect Ada's write, but the operation did not finish.
 
     ``applied_paths`` are already current; ``unapplied_paths`` still need
-    reconciliation; ``entry_id`` names an entry the operation created. Do not
-    treat this as "nothing happened" or retry blindly.
+    reconciliation; ``entry_id`` names an entry the operation created.
+    ``durability_confirmed`` is False when an applied change may not yet be on
+    stable storage. Do not treat this as "nothing happened" or retry blindly.
     """
 
     current_state_applied = True
@@ -71,11 +72,13 @@ class MemoryWriteAppliedError(FileMemoryError):
         applied_paths: tuple[str, ...],
         unapplied_paths: tuple[str, ...] = (),
         entry_id: str | None = None,
+        durability_confirmed: bool = True,
     ) -> None:
         super().__init__(message)
         self.applied_paths = applied_paths
         self.unapplied_paths = unapplied_paths
         self.entry_id = entry_id
+        self.durability_confirmed = durability_confirmed
 
 
 class MemoryHistoryCommitError(MemoryWriteAppliedError):
@@ -84,6 +87,10 @@ class MemoryHistoryCommitError(MemoryWriteAppliedError):
 
 class MemoryPartialWriteError(MemoryWriteAppliedError):
     """A multi-file write published part of its current state, then stopped."""
+
+
+class MemoryDurabilityError(MemoryWriteAppliedError):
+    """A link/replace/unlink is already current, but syncing it failed."""
 
 
 class MemoryChangedAfterWriteError(MemoryWriteAppliedError, MemoryConflictError):
@@ -334,11 +341,19 @@ class FileMemoryStore:
                 supports_memory_id=established.entry_id,
             )
 
-            memory_revision = self._write_entry(
-                memory_path,
-                established,
-                create_only=True,
-            )
+            try:
+                memory_revision = self._write_entry(
+                    memory_path,
+                    established,
+                    create_only=True,
+                )
+            except MemoryDurabilityError as exc:
+                raise self._stopped_write(
+                    "promotion",
+                    exc,
+                    done=(),
+                    pending=(memory_path, learning_path),
+                ) from exc
             try:
                 # Link the evidence only while the new Memory is still Ada's.
                 self._read_revision(memory_path, memory_revision)
@@ -348,12 +363,11 @@ class FileMemoryStore:
                     expected_revision=evidence_snapshot.revision,
                 )
             except FileMemoryError as exc:
-                raise MemoryPartialWriteError(
-                    "promotion established current Memory but could not update "
-                    "retained learning evidence; current Memory wins and the "
-                    "operation requires reconciliation",
-                    applied_paths=(self._history_path(memory_path),),
-                    unapplied_paths=(self._history_path(learning_path),),
+                raise self._stopped_write(
+                    "promotion",
+                    exc,
+                    done=(memory_path,),
+                    pending=(learning_path,),
                 ) from exc
 
             self._capture_ada_write(
@@ -471,12 +485,24 @@ class FileMemoryStore:
             if memory_entry is None and not learning_exists:
                 return ForgetResult.NOT_FOUND
 
-            tombstone_revision = self._write_forget_tombstone(
-                learning_path,
-                entry_id,
-                create_only=not learning_exists,
-                expected_revision=learning_revision,
-            )
+            try:
+                tombstone_revision = self._write_forget_tombstone(
+                    learning_path,
+                    entry_id,
+                    create_only=not learning_exists,
+                    expected_revision=learning_revision,
+                )
+            except MemoryDurabilityError as exc:
+                raise self._stopped_write(
+                    "forget",
+                    exc,
+                    done=(),
+                    pending=(
+                        (learning_path,)
+                        if memory_entry is None
+                        else (learning_path, memory_path)
+                    ),
+                ) from exc
             if memory_entry is not None:
                 try:
                     # Remove Memory only while the tombstone is still Ada's.
@@ -486,12 +512,11 @@ class FileMemoryStore:
                         expected_revision=memory_revision,
                     )
                 except FileMemoryError as exc:
-                    raise MemoryPartialWriteError(
-                        "forget published the tombstone but could not remove "
-                        "current Memory; the entry is hidden, and the Memory "
-                        "file requires reconciliation",
-                        applied_paths=(self._history_path(learning_path),),
-                        unapplied_paths=(self._history_path(memory_path),),
+                    raise self._stopped_write(
+                        "forget",
+                        exc,
+                        done=(learning_path,),
+                        pending=(memory_path,),
                     ) from exc
 
             self._capture_ada_write(
@@ -662,6 +687,7 @@ class FileMemoryStore:
             f"{entry.content}\n",
             create_only=create_only,
             expected_revision=expected_revision,
+            entry_id=entry.entry_id if create_only else None,
         )
 
     def _read_entry(
@@ -820,6 +846,7 @@ class FileMemoryStore:
         *,
         create_only: bool = False,
         expected_revision: str | None = None,
+        entry_id: str | None = None,
     ) -> str:
         header = "\n".join(
             f"{key} = {self._toml_value(value)}"
@@ -837,6 +864,7 @@ class FileMemoryStore:
             text.encode("utf-8"),
             create_only=create_only,
             expected_revision=expected_revision,
+            entry_id=entry_id,
         )
 
     def _atomic_write(
@@ -846,11 +874,13 @@ class FileMemoryStore:
         *,
         create_only: bool,
         expected_revision: str | None,
+        entry_id: str | None = None,
     ) -> str:
         self._ensure_directory(path.parent)
         directory_fd = self._open_directory_fd(path.parent)
         temp_name = f".ada-memory-tmp-{uuid4().hex}"
         temp_exists = False
+        published = False
         try:
             temp_fd = os.open(
                 temp_name,
@@ -907,9 +937,9 @@ class FileMemoryStore:
                         path,
                         data,
                     )
+                published = True
                 os.unlink(temp_name, dir_fd=directory_fd)
                 temp_exists = False
-                self._sync_directory_fd(directory_fd)
             else:
                 os.replace(
                     temp_name,
@@ -917,11 +947,20 @@ class FileMemoryStore:
                     src_dir_fd=directory_fd,
                     dst_dir_fd=directory_fd,
                 )
+                published = True
                 temp_exists = False
-                self._sync_directory_fd(directory_fd)
+            self._sync_directory_fd(directory_fd)
         except MemoryAlreadyExistsError:
             raise
         except (OSError, UnicodeError) as exc:
+            if published:
+                raise MemoryDurabilityError(
+                    f"Memory file {path} is current, but syncing its "
+                    "publication failed; durability is unconfirmed",
+                    applied_paths=(self._history_path(path),),
+                    entry_id=entry_id,
+                    durability_confirmed=False,
+                ) from exc
             raise FileMemoryError(
                 f"cannot write Memory file {path}"
             ) from exc
@@ -929,8 +968,8 @@ class FileMemoryStore:
             if temp_exists:
                 try:
                     os.unlink(temp_name, dir_fd=directory_fd)
-                except FileNotFoundError:
-                    pass
+                except OSError:
+                    pass  # a stale hidden temp is removed on the next open
             os.close(directory_fd)
 
         return sha256(data).hexdigest()
@@ -1024,6 +1063,7 @@ class FileMemoryStore:
         expected_revision: str | None = None,
     ) -> None:
         directory_fd = self._open_directory_fd(path.parent)
+        removed = False
         try:
             self._assert_regular_entry(directory_fd, path)
             if expected_revision is not None:
@@ -1038,10 +1078,18 @@ class FileMemoryStore:
                         f"and will not be removed: {path}"
                     )
             os.unlink(path.name, dir_fd=directory_fd)
+            removed = True
             self._sync_directory_fd(directory_fd)
         except FileMemoryError:
             raise
         except OSError as exc:
+            if removed:
+                raise MemoryDurabilityError(
+                    f"Memory file {path} is already removed, but syncing the "
+                    "removal failed; durability is unconfirmed",
+                    applied_paths=(self._history_path(path),),
+                    durability_confirmed=False,
+                ) from exc
             raise FileMemoryError(
                 f"cannot remove Memory file {path}"
             ) from exc
@@ -1250,6 +1298,40 @@ class FileMemoryStore:
                 applied_paths=applied_paths,
                 entry_id=entry_id,
             ) from exc
+
+    def _stopped_write(
+        self,
+        operation: str,
+        exc: FileMemoryError,
+        *,
+        done: tuple[Path, ...],
+        pending: tuple[Path, ...],
+    ) -> MemoryWriteAppliedError:
+        """Describe a multi-file write that stopped once ``done`` was current.
+
+        A ``MemoryDurabilityError`` means the failing step's own change is
+        current too; only its durability is unconfirmed.
+        """
+
+        applied = tuple(self._history_path(path) for path in done)
+        unapplied = tuple(self._history_path(path) for path in pending)
+        durable = True
+        if isinstance(exc, MemoryDurabilityError):
+            applied += exc.applied_paths
+            unapplied = tuple(
+                path for path in unapplied if path not in exc.applied_paths
+            )
+            durable = False
+        error_type = MemoryPartialWriteError if unapplied else MemoryDurabilityError
+        return error_type(
+            f"{operation} stopped after current Memory changed "
+            f"(applied: {', '.join(applied)}; not applied: "
+            f"{', '.join(unapplied) or 'none'}; durability confirmed: "
+            f"{durable}); reconcile before retrying: {exc}",
+            applied_paths=applied,
+            unapplied_paths=unapplied,
+            durability_confirmed=durable,
+        )
 
     @staticmethod
     def _history_call(operation: Any) -> Any:

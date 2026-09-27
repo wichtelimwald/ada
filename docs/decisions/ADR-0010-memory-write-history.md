@@ -55,9 +55,11 @@ Before an Ada write, the history adapter captures already-present out-of-band
 changes under `memory/` and `learning/`. The write then rechecks its expected
 revision and fails on staleness. A successful Ada write is captured immediately.
 Once current files have changed, any later failure (a concurrent change, a history
-failure, or a multi-file write that stopped halfway) is reported as an applied
-outcome (`current_state_applied`, applied/unapplied paths, and the ID of a newly
-created entry), never as "nothing happened".
+failure, a failed directory sync after link/replace/unlink, or a multi-file write
+that stopped halfway) is reported as an applied outcome (`current_state_applied`,
+applied/unapplied paths, the ID of a newly created entry, and
+`durability_confirmed=False` when the change is current but its sync failed),
+never as "nothing happened".
 
 Ordinary human editors are not required to use Ada's lock. The optimistic revision
 is therefore the semantic conflict boundary: a human edit observed before the Ada

@@ -18,6 +18,7 @@ from ada.adapters.file_memory import (
     FileMemoryStore,
     MemoryChangedAfterWriteError,
     MemoryConflictError,
+    MemoryDurabilityError,
     MemoryHistoryCommitError,
     MemoryPartialWriteError,
     MemoryWriteAppliedError,
@@ -53,6 +54,22 @@ def _git(root: str | Path, *args: str) -> str:
         },
     )
     return result.stdout.strip()
+
+
+def _failing_directory_sync(directory: Path):
+    """Fail the durability sync of one directory with EIO; sync others."""
+
+    info = os.stat(directory)
+    target = (info.st_dev, info.st_ino)
+    real_sync = FileMemoryStore._sync_directory_fd
+
+    def sync(fd: int) -> None:
+        current = os.fstat(fd)
+        if (current.st_dev, current.st_ino) == target:
+            raise OSError(errno.EIO, "synthetic directory sync failure")
+        real_sync(fd)
+
+    return sync
 
 
 class FileMemoryTests(unittest.TestCase):
@@ -1304,11 +1321,166 @@ class FileMemoryTests(unittest.TestCase):
                     "ada.adapters.file_memory.fcntl.fcntl",
                     side_effect=unsupported_on_directories(errno.EIO),
                 ):
-                    with self.assertRaises(FileMemoryError):
+                    with self.assertRaises(MemoryDurabilityError):
                         store.remember_explicit(
                             kind=MemoryKind.FACT,
                             content="An I/O error must not look durable.",
                         )
+
+    def test_directory_sync_failure_after_create_is_applied(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            with patch(
+                "ada.adapters.file_memory.os.link",
+                side_effect=OSError(errno.EIO, "synthetic link failure"),
+            ):
+                with self.assertRaises(FileMemoryError) as before:
+                    store.remember_explicit(
+                        kind=MemoryKind.FACT,
+                        content="Never published.",
+                    )
+            self.assertFalse(before.exception.current_state_applied)
+            self.assertEqual(list(store.memory_dir.glob("m-*.md")), [])
+
+            with patch.object(
+                store,
+                "_sync_directory_fd",
+                side_effect=_failing_directory_sync(store.memory_dir),
+            ):
+                with self.assertRaises(MemoryDurabilityError) as caught:
+                    store.remember_explicit(
+                        kind=MemoryKind.FACT,
+                        content="Published before the sync failed.",
+                    )
+
+            error = caught.exception
+            self.assertTrue(error.current_state_applied)
+            self.assertFalse(error.durability_confirmed)
+            generic_files = list(store.memory_dir.glob("m-*.md"))
+            self.assertEqual(len(generic_files), 1)
+            self.assertEqual(error.entry_id, generic_files[0].stem)
+            self.assertEqual(
+                error.applied_paths,
+                (f"memory/{generic_files[0].name}",),
+            )
+            self.assertEqual(error.unapplied_paths, ())
+            current = store.load_memory_entry(error.entry_id)
+            assert current is not None
+            self.assertEqual(current.content, "Published before the sync failed.")
+            self.assertEqual(list(store.memory_dir.glob(".ada-memory-tmp-*")), [])
+
+    def test_directory_sync_failure_after_replace_is_applied(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            entry = store.remember_explicit(kind=MemoryKind.FACT, content="Before.")
+            snapshot = store.load_memory_snapshot(entry.entry_id)
+            assert snapshot is not None
+
+            with patch.object(
+                store,
+                "_sync_directory_fd",
+                side_effect=_failing_directory_sync(store.memory_dir),
+            ):
+                with self.assertRaises(MemoryDurabilityError) as caught:
+                    store.correct_explicit(
+                        entry.entry_id,
+                        content="After.",
+                        expected_revision=snapshot.revision,
+                    )
+
+            error = caught.exception
+            self.assertTrue(error.current_state_applied)
+            self.assertFalse(error.durability_confirmed)
+            self.assertEqual(error.applied_paths, (f"memory/{entry.entry_id}.md",))
+            self.assertEqual(error.unapplied_paths, ())
+            current = store.load_memory_entry(entry.entry_id)
+            assert current is not None
+            self.assertEqual(current.content, "After.")
+
+            # Promotion's second step is also a replace: both files are current.
+            observed = store.record_learning(
+                kind=MemoryKind.FACT,
+                evidence_origin=EvidenceOrigin.OBSERVED_FACT,
+                content="Promoted evidence.",
+            )
+            with patch.object(
+                store,
+                "_sync_directory_fd",
+                side_effect=_failing_directory_sync(store.learning_dir),
+            ):
+                with self.assertRaises(MemoryDurabilityError) as promoted:
+                    store.promote_learning(
+                        observed.entry_id,
+                        confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+                    )
+
+            self.assertNotIsInstance(promoted.exception, MemoryPartialWriteError)
+            self.assertEqual(
+                promoted.exception.applied_paths,
+                (
+                    f"memory/{observed.entry_id}.md",
+                    f"learning/{observed.entry_id}.md",
+                ),
+            )
+            self.assertEqual(promoted.exception.unapplied_paths, ())
+            evidence = store.load_learning_entry(
+                observed.entry_id,
+                include_inactive=True,
+            )
+            assert evidence is not None
+            self.assertEqual(evidence.supports_memory_id, observed.entry_id)
+
+    def test_directory_sync_failure_after_forget_unlink_is_applied(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            entry = store.remember_explicit(kind=MemoryKind.FACT, content="Forget me.")
+            memory_path = store.memory_dir / f"{entry.entry_id}.md"
+            learning_path = store.learning_dir / f"{entry.entry_id}.md"
+
+            with patch.object(
+                store,
+                "_sync_directory_fd",
+                side_effect=_failing_directory_sync(store.memory_dir),
+            ):
+                with self.assertRaises(MemoryDurabilityError) as caught:
+                    store.forget(entry.entry_id)
+
+            error = caught.exception
+            self.assertNotIsInstance(error, MemoryPartialWriteError)
+            self.assertTrue(error.current_state_applied)
+            self.assertFalse(error.durability_confirmed)
+            self.assertEqual(
+                error.applied_paths,
+                (f"learning/{entry.entry_id}.md", f"memory/{entry.entry_id}.md"),
+            )
+            self.assertEqual(error.unapplied_paths, ())
+            self.assertFalse(memory_path.exists())
+            self.assertIn('lifecycle = "forgotten"', learning_path.read_text())
+            self.assertEqual(
+                store.forget(entry.entry_id),
+                ForgetResult.ALREADY_FORGOTTEN,
+            )
+
+            # A failed tombstone sync happens before Memory removal: partial.
+            other = store.remember_explicit(kind=MemoryKind.FACT, content="Keep.")
+            with patch.object(
+                store,
+                "_sync_directory_fd",
+                side_effect=_failing_directory_sync(store.learning_dir),
+            ):
+                with self.assertRaises(MemoryPartialWriteError) as partial:
+                    store.forget(other.entry_id)
+
+            self.assertFalse(partial.exception.durability_confirmed)
+            self.assertEqual(
+                partial.exception.applied_paths,
+                (f"learning/{other.entry_id}.md",),
+            )
+            self.assertEqual(
+                partial.exception.unapplied_paths,
+                (f"memory/{other.entry_id}.md",),
+            )
+            self.assertTrue((store.memory_dir / f"{other.entry_id}.md").exists())
 
     def test_id_allocation_never_consults_git_history(self) -> None:
         with TemporaryDirectory() as temp:

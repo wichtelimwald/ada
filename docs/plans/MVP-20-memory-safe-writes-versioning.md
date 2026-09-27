@@ -145,7 +145,9 @@ revisit how Git is provisioned before a consumer release.
   Ada's bytes, so a concurrent edit is never recorded under an Ada commit.
 - Git lock/history failures do not cause the Memory write to be reported as a clean
   success. Any failure after current files changed is a `MemoryWriteAppliedError`
-  (`current_state_applied`, applied/unapplied paths, new entry ID for creates).
+  (`current_state_applied`, applied/unapplied paths, new entry ID for creates);
+  a failed directory sync after link/replace/unlink additionally reports
+  `durability_confirmed=False`.
 - Tests prove current reads never rehydrate from Git history.
 
 ## Validation
