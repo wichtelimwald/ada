@@ -171,6 +171,11 @@ supported local storage profile.
 - encryption-at-rest/key ownership and unlock behavior;
 - encrypted Git-style history/versioning per domain without making Git an auth
   boundary;
+- concurrency/synchronization model for human-edited and Ada-edited Memory,
+  explicitly evaluating separate Git worktrees/clones with commit-based
+  synchronization and expected base commits so divergent edits become conflicts
+  rather than silent last-writer-wins; define commit ownership, conflict handling,
+  offline behavior and private/local transport without assuming a cloud remote;
 - separately configurable source/document providers per domain;
 - backup/restore responsibilities for encrypted vaults;
 - cross-domain negative tests and residual threat model.
