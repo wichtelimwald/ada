@@ -1,0 +1,199 @@
+# MVP-20 — Memory semantics, safe writes and versioning
+
+Status: implementation
+Roadmap: docs/product/mvp-roadmap.md
+Depends on: MVP-10
+Owner PR: #41
+
+## Goal
+
+Turn the development file-native Memory adapter into a deterministic, recoverable
+authoritative write layer before protection domains are introduced in MVP-30.
+
+## Current state / evidence
+
+- ADR-0008 accepts Markdown/current-file authority and Git-style history as a
+  compatible recovery mechanism while normal retrieval remains current-state only.
+- MVP-10 already provides explicit Memory vs learning areas, seed-once personality,
+  conservative promotion and a current-state forget tombstone.
+- The research control under `research/memory/control/` demonstrates useful
+  Markdown + Git behavior and, more importantly, the stale-write, Git-lock and
+  path-scoping failures that production code must close.
+- Current generic entry APIs accept semantic caller-supplied slugs, overwriting
+  writes do not expose a revision token, reads still have a symlink TOCTOU window,
+  directory durability is incomplete, and Git history is not wired into runtime
+  writes.
+
+## Scope
+
+- Generate opaque random IDs for generic Memory/learning entries.
+- Separate create from explicit correction; corrections keep the logical entry ID
+  and require the caller's expected revision.
+- Make repeated forgetting explicit and idempotent.
+- Treat malformed established Memory as an integrity error and preserve it.
+- Enforce area/lifecycle validity before an entry can be returned as current.
+- Serialize Ada writers and detect stale same-file writes.
+- Use fd-based no-follow reads and durable file + directory publication on the
+  supported local POSIX profile.
+- Make personality bootstrap create-only/no-clobber under concurrency.
+- Record current-file changes in per-root Git history, including out-of-band human
+  edits observed before Ada writes, while normal Memory reads never consult history.
+- Commit only Memory paths intentionally owned by the history adapter.
+
+## Non-goals
+
+- Private/shared protection domains, encryption and broker authorization (MVP-30).
+- Automatic learning/staleness, contradiction resolution and retrieval/RAG (MVP-40).
+- Permanent historical purge/backup erasure.
+- A generic force-forget API. If established Memory is malformed, MVP-20 requires
+  explicit repair before ordinary forgetting; a future force path must be bound to
+  a separately authorized recovery action.
+- Network/distributed filesystems or Windows semantics. This slice targets the
+  current local macOS/Linux profile.
+
+## Accepted decisions
+
+ADR-0010 is accepted for MVP-20:
+
+1. History implementation: external Git CLI behind an Ada-owned adapter.
+2. Generic identity: UUIDv4-derived opaque IDs; no semantic/time-bearing slugs.
+3. Correction identity: correction updates the same logical ID and Git preserves
+   prior content.
+4. Concurrency contract: Ada writers serialize locally and correction uses an
+   optimistic content revision; stale writes fail with a conflict instead of
+   overwriting current human state. The remaining shared-working-tree race is a
+   documented MVP-20 limitation; MVP-30 evaluates the stronger commit-based
+   multi-workspace model and removes obsolete MVP-20 machinery if selected.
+
+No product/authority decision is introduced by these implementation choices.
+
+## Reuse / dependency evidence
+
+The existing research control already proves that Git matches the accepted history
+shape. Current maintained implementation options were re-checked before coding:
+
+- Git CLI: established external tool; GPLv2; no Python runtime dependency is added.
+  `git commit --only <pathspec>` explicitly disregards staged contents for other
+  paths, which matches path-restricted capture of out-of-band edits. Ada's own
+  writes are committed with Git plumbing from a temporary index so the commit holds
+  exactly Ada's bytes.
+- GitPython 3.1.x: BSD-3-Clause, but still requires Git and adds Python dependencies.
+- Dulwich 1.2.x: Apache-2.0 OR GPL-2.0-or-later and can avoid a Git executable, but
+  adds a new runtime package and a larger Python implementation surface.
+- pygit2 1.20.x: GPLv2 with linking exception and native libgit2 bindings, adding
+  native distribution/review surface.
+
+For MVP-20 the Git CLI is the KISS choice: Ada already needs Git-style semantics,
+the target development environment has Git, and no extra package/native library is
+required. The dependency remains replaceable behind Ada-owned code. Packaging must
+revisit how Git is provisioned before a consumer release.
+
+## Security / privacy / authority
+
+- Git is history/recovery, not authentication, authorization or current Memory.
+- Forgotten/superseded content may remain in Git history; permanent purge is a
+  separate explicit operation.
+- Normal load APIs read only current files.
+- External Git commands run pinned to the root's own `.git`, with global/system
+  config and user-level ignore/attributes files disabled, literal pathspecs,
+  fixed synthetic commit identity and no credential/network operation.
+- Ada writes are serialized with a local lock; unexplained Git lock failures stop
+  the operation and are never auto-deleted.
+- No-follow fd reads reject symlinked files; directory roots remain restricted to
+  the configured Memory root.
+- Malformed current established Memory fails closed and is never silently replaced
+  by a tombstone.
+
+## Interfaces and data ownership
+
+- `FileMemoryStore` remains the file-native adapter and authoritative current-state
+  owner for this development profile.
+- `GitMemoryHistory` owns only version-history capture for that root.
+- `MemorySnapshot` exposes an opaque revision for safe correction; the revision is
+  storage concurrency metadata, not user Memory.
+- Source-owned calendar/contact/document facts remain outside this step.
+
+## Implementation slices
+
+1. Add the step plan and ADR-0010.
+2. Add opaque ID generation, snapshot/revision and explicit correction/forget result
+   semantics.
+3. Harden reads/writes, locking, create-only publication and durability.
+4. Add the Git history adapter and capture external edits before Ada-originated
+   writes plus Ada writes immediately afterwards.
+5. Add deterministic negative/concurrency/history tests and update durable docs.
+
+## Acceptance / Definition of Done
+
+- Create and correction are distinct APIs; a stale correction cannot overwrite a
+  newer human edit that is already visible at Ada's final pre-publication revision
+  check. A non-cooperating save that lands after that check but before
+  same-working-tree publication is the documented R1 residual (ADR-0010); MVP-30
+  owns the stronger model.
+- Generic IDs are opaque UUIDv4 values; allocation never returns an ID present in
+  current files, including a forget tombstone, and never consults Git history.
+- Repeated forget returns an explicit already-forgotten result.
+- Malformed established Memory remains on disk and forgetting it fails visibly.
+- Invalid area/lifecycle combinations are rejected or excluded from current loads.
+- Personality bootstrap cannot clobber a concurrently created profile.
+- Symlinked files are rejected at open time.
+- Successful writes fsync file content and the containing directory (with
+  `F_FULLFSYNC` on macOS); create-only publication has an `O_EXCL` fallback when
+  hard links are unavailable.
+- Human edits present before an Ada write are committed separately before the Ada
+  change; Ada writes are committed promptly, path-restricted and with exactly
+  Ada's bytes, so a concurrent edit is never recorded under an Ada commit.
+- Git lock/history failures do not cause the Memory write to be reported as a clean
+  success. Any failure after current files changed is a `MemoryWriteAppliedError`
+  (`current_state_applied`, applied/unapplied paths, new entry ID for creates);
+  a failed directory sync after link/replace/unlink additionally reports
+  `durability_confirmed=False`.
+- Tests prove current reads never rehydrate from Git history.
+
+## Validation
+
+Required on the exact PR head before completion:
+
+```sh
+python -m unittest tests.test_file_memory
+sh scripts/validate.sh
+```
+
+Target-Mac validation must additionally exercise a real Git CLI, out-of-band manual
+edit capture, stale correction rejection, repeated forget and personality bootstrap
+racing two processes/threads. No validation claim is made until tied to the exact
+commit.
+
+## Review focus
+
+- Any path where a human edit can be overwritten without a revision conflict.
+- Git index/pathspec leakage or hook/config execution.
+- Symlink/path traversal races.
+- Crash states between file publication and history commit.
+- History accidentally influencing current retrieval.
+- Semantic IDs or sensitive content in tombstone/reference metadata.
+
+## Follow-ups
+
+- MVP-30 owns encrypted per-domain history and broker-enforced protection domains.
+  It must keep history metadata (`.git` config/attributes) unwritable by untrusted
+  vault editors or sync tools, because repo-local Git config can execute commands
+  as Ada (ADR-0010 limitation). It must also evaluate separate human/editor and Ada
+  Git worktrees/clones with commit-based synchronization as the stronger concurrency
+  model for protected Memory. If selected, synchronization must preserve divergent
+  commits as explicit merge/conflict state, never silently reconcile with
+  last-writer-wins, force reset/push, or an implicit public/cloud remote. MVP-30
+  must then simplify the implementation by removing MVP-20 shared-working-tree
+  race handling that the selected model makes obsolete instead of stacking both
+  concurrency models indefinitely.
+- MVP-40 owns automatic lifecycle transitions, contradiction/currentness resolution
+  and derived retrieval. Its explicit-user confirmation binding must also bind
+  promotion to the evidence revision the user saw; MVP-20 `promote_learning`
+  promotes the evidence content current at promotion time.
+- Packaging must decide how Git is provisioned for non-developer installations.
+- Durability: Git history uses Git's default fsync behavior (the newest history
+  commit can be lost on power loss while current Markdown stays durable), and the
+  macOS directory `F_FULLFSYNC` path still needs target-Mac validation on APFS and
+  FAT.
+
+These follow-ups are tracked in `docs/todo.md`.
