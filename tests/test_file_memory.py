@@ -17,6 +17,7 @@ from ada.adapters.file_memory import (
     FileMemoryStore,
     MemoryConflictError,
     MemoryHistoryCommitError,
+    MemoryPartialWriteError,
 )
 from ada.adapters.git_memory_history import GitMemoryHistoryError
 from ada.bootstrap.personality import (
@@ -882,6 +883,66 @@ class FileMemoryTests(unittest.TestCase):
                 "Current state was published.",
                 generic_files[0].read_text(encoding="utf-8"),
             )
+
+    def test_partial_promotion_has_explicit_applied_outcome(self) -> None:
+        with TemporaryDirectory() as temp:
+            store = FileMemoryStore(temp)
+            observed = store.record_learning(
+                kind=MemoryKind.PREFERENCE,
+                evidence_origin=EvidenceOrigin.BEHAVIORAL_OBSERVATION,
+                content="Before late evidence edit.",
+            )
+            learning_path = store.learning_dir / f"{observed.entry_id}.md"
+            original_write_entry = store._write_entry
+
+            def write_with_late_evidence_edit(path, *args, **kwargs):
+                if path == learning_path:
+                    learning_path.write_text(
+                        learning_path.read_text(encoding="utf-8").replace(
+                            "Before late evidence edit.",
+                            "Late human evidence edit wins.",
+                        ),
+                        encoding="utf-8",
+                    )
+                return original_write_entry(path, *args, **kwargs)
+
+            with patch.object(
+                store,
+                "_write_entry",
+                side_effect=write_with_late_evidence_edit,
+            ):
+                with self.assertRaises(MemoryPartialWriteError) as caught:
+                    store.promote_learning(
+                        observed.entry_id,
+                        confirmation_basis=ConfirmationBasis.EXPLICIT_USER,
+                    )
+
+            error = caught.exception
+            self.assertIsInstance(error, FileMemoryError)
+            self.assertTrue(error.current_state_applied)
+            self.assertEqual(
+                error.applied_paths,
+                (f"memory/{observed.entry_id}.md",),
+            )
+            self.assertEqual(
+                error.unapplied_paths,
+                (f"learning/{observed.entry_id}.md",),
+            )
+            self.assertIsInstance(error.__cause__, MemoryConflictError)
+
+            established = store.load_memory_entry(observed.entry_id)
+            self.assertIsNotNone(established)
+            assert established is not None
+            self.assertEqual(established.lifecycle, MemoryLifecycle.CONFIRMED)
+            self.assertEqual(established.content, "Before late evidence edit.")
+            retained = store.load_learning_entry(
+                observed.entry_id,
+                include_inactive=True,
+            )
+            self.assertIsNotNone(retained)
+            assert retained is not None
+            self.assertEqual(retained.content, "Late human evidence edit wins.")
+            self.assertIsNone(retained.supports_memory_id)
 
     def test_scalar_front_matter_types_fail_closed(self) -> None:
         with TemporaryDirectory() as temp:

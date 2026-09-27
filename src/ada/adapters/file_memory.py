@@ -56,6 +56,26 @@ class MemoryHistoryCommitError(FileMemoryError):
         self.current_state_applied = True
 
 
+class MemoryPartialWriteError(FileMemoryError):
+    """A multi-file write published part of its current state, then stopped.
+
+    ``applied_paths`` are already current; ``unapplied_paths`` still need
+    reconciliation. Do not treat this as "nothing happened" or retry blindly.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        applied_paths: tuple[str, ...],
+        unapplied_paths: tuple[str, ...],
+    ) -> None:
+        super().__init__(message)
+        self.applied_paths = applied_paths
+        self.unapplied_paths = unapplied_paths
+        self.current_state_applied = True
+
+
 @dataclass(frozen=True, slots=True)
 class MemorySnapshot:
     entry: MemoryEntry
@@ -364,10 +384,12 @@ class FileMemoryStore:
                 )
                 self._verify_revision(learning_path, learning_revision)
             except FileMemoryError as exc:
-                raise FileMemoryError(
+                raise MemoryPartialWriteError(
                     "promotion established current Memory but could not update "
                     "retained learning evidence; current Memory wins and the "
-                    "operation requires reconciliation"
+                    "operation requires reconciliation",
+                    applied_paths=(self._history_path(memory_path),),
+                    unapplied_paths=(self._history_path(learning_path),),
                 ) from exc
 
             self._capture_ada_write(
