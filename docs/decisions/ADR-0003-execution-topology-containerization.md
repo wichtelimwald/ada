@@ -121,7 +121,7 @@ Examples:
 
 - Email and WhatsApp are different `MessageChannelPort` adapters.
 - PydanticAI and a future agent framework are different `AgentRuntimePort` adapters.
-- Calendar providers are different `CalendarPort` adapters.
+- Calendar providers are different `CalendarPort` adapters. *(Refined by ADR-0009: CalDAV providers share one adapter with declarative provider profiles; only other calendar protocols get separate adapters.)*
 - Memory backends remain behind the later Memory boundary.
 
 A newly installed or discovered adapter, plugin, MCP server, or tool receives **no consequential authority automatically**.

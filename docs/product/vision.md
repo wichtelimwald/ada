@@ -49,12 +49,13 @@ Proceed through narrow end-to-end slices rather than selecting a comprehensive s
 
 Foundational runtime, topology, Guard, durable-execution, local-model,
 context-aware interpretation, and authoritative Memory architecture decisions
-are recorded in ADR-0002 through ADR-0008. The following remain deliberately
-open or only partially decided:
+are recorded in ADR-0002 through ADR-0008; calendar integration is decided in
+ADR-0009 but not yet implemented. The following remain deliberately open or
+only partially decided:
 
 - local interaction/UI implementation,
 - authoritative Memory implementation, including the accepted host-side Memory Broker and its protection-domain enforcement,
-- production email/calendar provider integration,
+- production email provider integration and the calendar implementation,
 - optional remote-model assistance,
 - remote-data boundary implementation,
 - packaging/update and broader deployment strategy,
