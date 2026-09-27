@@ -187,7 +187,7 @@ survives restart and restore.
 
 - trusted source/event -> evidence -> optional hypothesis -> Ada validation ->
   established Memory;
-- class A-D sensitivity policy and explicit-user confirmation binding;
+- class A-D sensitivity policy and explicit-user confirmation binding; promotion must be bound to the exact evidence revision the user confirmed, and changed evidence requires re-confirmation before it can become established Memory;
 - contradiction/correction/supersession rules;
 - lifecycle/staleness rules;
 - operational forgetting and no re-learning from pre-forget current evidence;
