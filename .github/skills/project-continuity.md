@@ -29,7 +29,10 @@ Persist material facts where they belong, preferably in the same focused PR:
 - product scope -> `docs/product/`;
 - security/privacy -> security/privacy documentation;
 - dependency/license/distribution evidence -> `NOTICE.md` and the relevant evidence document;
-- durable setup/workflow instructions -> the relevant setup/process document.
+- durable setup/workflow instructions -> the relevant setup/process document;
+- durable maintainer collaboration or working-mode preferences -> `.github/skills/maintainer-collaboration.md`.
+
+When a material reusable working rule, process lesson, or collaboration preference is established during a session, persist it in its canonical document in the same work cycle instead of leaving it only in chat. If it is unclear whether the lesson is durable or how broadly it should apply, briefly confirm the proposed rule with the maintainer before persisting it.
 
 Do not duplicate an existing canonical fact into `docs/handover.md`, `AGENTS.md`, Copilot instructions, or another prompt merely for convenience.
 
@@ -39,7 +42,7 @@ Perform one continuity check:
 
 1. Is the current PR description accurate about its actual head, blockers, validation, and merge gate?
 2. Are unresolved review findings visible on the PR?
-3. Did any decision, priority, security/privacy boundary, dependency/license conclusion, or durable setup instruction change? If yes, update its canonical source.
+3. Did any decision, priority, security/privacy boundary, dependency/license conclusion, durable setup instruction, or reusable collaboration/process rule change? If yes, update its canonical source.
 4. Did the continuation procedure or source-of-truth map change? Only then update `docs/handover.md`.
 5. Do not claim a test/review/merge result for a different commit than the one actually verified.
 
