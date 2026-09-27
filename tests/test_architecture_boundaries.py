@@ -23,6 +23,7 @@ class ArchitectureBoundaryTests(unittest.TestCase):
                 "ada.core.action_outcomes",
                 "ada.core.personality",
                 "ada.core.memory",
+                "ada.core.memory_access",
                 "ada.ports.agent_runtime",
                 "ada.ports.calendar",
                 "ada.ports.travel_time",
@@ -30,6 +31,7 @@ class ArchitectureBoundaryTests(unittest.TestCase):
                 "ada.ports.guard",
                 "ada.ports.durable_action",
                 "ada.ports.personality_memory",
+                "ada.ports.memory_broker",
             )
             framework_modules = ("pydantic_ai", "cedarpy", "dbos")
 
