@@ -153,6 +153,15 @@ Network/distributed filesystem semantics and Windows are not accepted by this AD
   via `core.fsmonitor`). MVP-20 assumes only the owning OS user can write the Memory
   root; protection domains must not leave history metadata writable by untrusted
   vault editors or sync tools.
+- The lost-update window above is specific to non-cooperating writers sharing one
+  working tree. MVP-30 must evaluate whether protected human/editor and Ada writes
+  instead use separate Git worktrees/clones with commit-based synchronization and an
+  expected-base-commit contract. In such a model divergent edits become explicit Git
+  history/merge conflicts instead of same-path publication races. The design must
+  forbid silent last-writer-wins, force-reset/force-push reconciliation, define who
+  commits human edits and resolves conflicts, and must not imply any cloud remote;
+  synchronization may remain entirely local/private. ADR-0010 does not select this
+  later concurrency model.
 - Packaging must revisit the external Git prerequisite.
 
 ## Re-open triggers
