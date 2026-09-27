@@ -51,9 +51,9 @@ authoritative write layer before protection domains are introduced in MVP-30.
 - Network/distributed filesystems or Windows semantics. This slice targets the
   current local macOS/Linux profile.
 
-## Open decisions
+## Accepted decisions
 
-Proposed by ADR-0010 in this step; maintainer acceptance remains part of PR review:
+ADR-0010 is accepted for MVP-20:
 
 1. History implementation: external Git CLI behind an Ada-owned adapter.
 2. Generic identity: UUIDv4-derived opaque IDs; no semantic/time-bearing slugs.
@@ -61,7 +61,9 @@ Proposed by ADR-0010 in this step; maintainer acceptance remains part of PR revi
    prior content.
 4. Concurrency contract: Ada writers serialize locally and correction uses an
    optimistic content revision; stale writes fail with a conflict instead of
-   overwriting current human state.
+   overwriting current human state. The remaining shared-working-tree race is a
+   documented MVP-20 limitation; MVP-30 evaluates the stronger commit-based
+   multi-workspace model and removes obsolete MVP-20 machinery if selected.
 
 No product/authority decision is introduced by these implementation choices.
 
