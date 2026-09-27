@@ -99,8 +99,8 @@ boundary.
 | --- | --- | --- | --- | --- |
 | MVP-00 | Core foundation | done | — | PydanticAI boundary, Cedar/AdaGuard, DBOS action semantics, local Ollama, modular monolith baseline |
 | MVP-10 | File-native Memory baseline | done | MVP-00 | Current Markdown authority, `memory/` vs `learning/`, seed-once personality, conservative promotion/forget baseline |
-| MVP-20 | Memory semantics, safe writes and versioning | ready | MVP-10 | Close baseline residuals; define correction/forget/id semantics; safe Git-style history/edit capture/concurrency |
-| MVP-30 | Memory Broker, protection domains and encryption | blocked | MVP-20 | Enforce private/shared domains, request-scoped broker access, encrypted-at-rest per-domain storage/history |
+| MVP-20 | Memory semantics, safe writes and versioning | done | MVP-10 | Close baseline residuals; define correction/forget/id semantics; safe Git-style history/edit capture/concurrency |
+| MVP-30 | Memory Broker, protection domains and encryption | ready | MVP-20 | Enforce private/shared domains, request-scoped broker access, encrypted-at-rest per-domain storage/history |
 | MVP-40 | Learning pipeline and retrieval | blocked | MVP-20, MVP-30 | Trusted learning validation, class A-D handling, lifecycle rules, current-only retrieval; start simple and measure before richer RAG |
 | MVP-50 | Chat + Family Memory | blocked | MVP-40 | Identity/audience-aware local chat using real protected family Memory and learning |
 | MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Can proceed in parallel with Memory; connect real provider for read/create/update/cancel and preserve durable action semantics |
@@ -135,6 +135,9 @@ household data.
 
 ### MVP-20 — Memory semantics, safe writes and versioning
 
+**Outcome:** complete; merged PR #41 implements the accepted safe-write/versioning
+semantics and passed independent review plus Linux and target-Mac validation.
+
 **Goal:** turn the development file adapter into a well-defined, recoverable
 authoritative write/versioning layer before adding real protection domains.
 
@@ -155,9 +158,13 @@ authoritative write/versioning layer before adding real protection domains.
 - create-only behavior on storage without hard-link support;
 - idempotent/repeated forget semantics, including an explicit already-forgotten result rather than treating it as a fresh state change.
 
-**DoD:** deterministic tests prove no silent overwrite, stale re-promotion,
-history rehydration, lost human correction, or ambiguous write outcome for the
-supported local storage profile.
+**DoD:** deterministic tests prove no silent overwrite of a human correction
+that is already visible at Ada's final pre-publication revision check, no stale
+re-promotion, no history rehydration, and no ambiguous write outcome for the
+supported local storage profile. A non-cooperating human save that lands after
+that final check but before same-working-tree publication is a documented MVP-20
+residual; MVP-30 must evaluate the commit-based multi-workspace model and remove
+obsolete shared-working-tree safeguards if that model is selected.
 
 ### MVP-30 — Memory Broker, protection domains and encryption
 
@@ -171,6 +178,14 @@ supported local storage profile.
 - encryption-at-rest/key ownership and unlock behavior;
 - encrypted Git-style history/versioning per domain without making Git an auth
   boundary;
+- concurrency/synchronization model for human-edited and Ada-edited Memory,
+  explicitly evaluating separate Git worktrees/clones with commit-based
+  synchronization and expected base commits so divergent edits become conflicts
+  rather than silent last-writer-wins; define commit ownership, conflict handling,
+  offline behavior and private/local transport without assuming a cloud remote;
+- KISS simplification review: if a commit-based multi-workspace model is selected,
+  identify and remove MVP-20 shared-working-tree concurrency machinery that is no
+  longer required rather than layering the new model on top of obsolete safeguards;
 - separately configurable source/document providers per domain;
 - backup/restore responsibilities for encrypted vaults;
 - cross-domain negative tests and residual threat model.
@@ -187,7 +202,7 @@ survives restart and restore.
 
 - trusted source/event -> evidence -> optional hypothesis -> Ada validation ->
   established Memory;
-- class A-D sensitivity policy and explicit-user confirmation binding;
+- class A-D sensitivity policy and explicit-user confirmation binding; promotion must be bound to the exact evidence revision the user confirmed, and changed evidence requires re-confirmation before it can become established Memory;
 - contradiction/correction/supersession rules;
 - lifecycle/staleness rules;
 - operational forgetting and no re-learning from pre-forget current evidence;

@@ -33,14 +33,14 @@ def load_bootstrap_personality() -> PersonalityProfile:
 def bootstrap_personality_memory(
     memory: PersonalityMemoryPort,
 ) -> PersonalityProfile:
-    """Seed empty Memory exactly once, then use Memory as the active source."""
+    """Seed empty Memory once without clobbering a concurrent human/Ada writer."""
 
     existing = memory.load_personality()
     if existing is not None:
         return existing
 
     seed = load_bootstrap_personality()
-    memory.save_personality(
+    memory.create_personality_if_absent(
         seed,
         reason="initial personality bootstrap from distribution seed",
     )
