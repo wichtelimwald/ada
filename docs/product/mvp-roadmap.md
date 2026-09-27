@@ -229,7 +229,8 @@ private content never appears in shared chat.
 retaining Ada-owned action semantics.
 
 **First provider:** IONOS Mail Business (maintainer decision, 2026-09-26);
-further providers must remain addable through separate adapters.
+further CalDAV providers are added through provider profiles, other protocols
+through separate adapters (ADR-0009).
 **Step plan:** [MVP-60](../plans/MVP-60-real-calendar-provider.md);
 architecture: ADR-0009 (accepted).
 

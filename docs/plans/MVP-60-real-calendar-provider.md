@@ -15,7 +15,8 @@ The first provider is **IONOS Mail Business** (maintainer decision,
 
 **Access model (maintainer decision, 2026-09-26):** Ada's single IONOS mailbox
 owns one calendar per family member plus one family calendar and shares them
-outward; family members subscribe. See ADR-0009 section 2 for the accepted MVP
+read-only with each family member's own mailbox in the same IONOS contract,
+where they appear automatically. See ADR-0009 section 3 for the accepted MVP
 trade-offs.
 
 ## Current state / evidence
@@ -72,8 +73,33 @@ was confirmed the same day.
 | D2 | Development credential store | macOS Keychain via `/usr/bin/security` on the Mac host; owner-only `0600` file only for synthetic accounts in dev containers | decided |
 | D3 | Update/cancel authority | Ada-created events within the grant; other events only with explicit per-action confirmation; Cedar policy decides; Ada records references of events it created | decided |
 | D4 | Travel-time source | configured approximate durations between registered places; unknown pairs reported as unknown | decided |
-| D5 | Durable payload retention | purge workflow after terminal outcome (`DBOS.delete_workflow`, SQLite `secure_delete`), keeping a minimal non-sensitive operation → event-reference record (also serves D3); revisit with MVP-30 encryption | decided |
+| D5 | Durable payload retention | purge the workflow state after a terminal outcome and keep a content-free operation record; details below (revised after review, 2026-09-27) | decided |
 | D6 | Who is busy for a family-calendar event | a family-calendar event counts as busy for every family member; participant tagging is a later refinement | decided |
+
+### D5 in detail: operation record and recoverable purge
+
+The existing operation-ID binding check reads the action binding from the DBOS
+workflow input; `DBOS.delete_workflow` removes that input. The purge therefore
+needs a replacement record and a crash-safe order:
+
+- **Operation record** (Ada-owned local store, no event content):
+  `operation_id`, action kind, **keyed action fingerprint** (HMAC-SHA-256 over
+  the canonical action binding with a per-installation key kept in the
+  Keychain; a plain hash of low-entropy fields such as title and time could be
+  brute-forced), provider event reference, terminal provider/business outcome
+  and resulting version. It also records which events Ada created (D3).
+- **Binding check:** consult the operation record first, the DBOS workflow
+  second. Reusing an operation ID with a different payload stays rejected after
+  the purge.
+- **Order:** terminal checkpoint → upsert operation record (idempotent) →
+  delete the DBOS workflow. A startup sweep completes both later steps for any
+  terminal workflow left behind by a crash.
+- **Residue:** a row delete is not the whole retention story. The sweep makes
+  deleted content unrecoverable from the SQLite main file and its WAL/journal
+  (`secure_delete` on the deleting connection where configurable, otherwise
+  `VACUUM` and `wal_checkpoint(TRUNCATE)`); validation searches all these
+  files for synthetic sentinel strings.
+- MVP-30 encryption may replace parts of this later.
 
 ## Reuse / dependency evidence
 
@@ -101,18 +127,22 @@ See the evaluation. Summary:
 - **Disclosure:** Ada sees every event in its calendars. Conflict checks use the
   availability view; details are disclosed only through
   `calendar.disclose.detail`, keyed by the calendar's configured audience.
-  Share links are distributed per person and treated as bearer secrets.
-  Appointments outside Ada's calendars are unknown to Ada — user-visible
-  limitation.
+  Calendars are shared read-only with family members' own mailboxes; the
+  provider enforces the role (M6). Appointments outside Ada's calendars are
+  unknown to Ada — user-visible limitation.
 - **Egress:** HTTPS to the configured provider origin only; `trust_env=False`;
   no redirects; timeouts; response-size cap; bounded time ranges.
 - **Untrusted content:** server XML (DOCTYPE rejected) and event text are data.
-  Descriptions are not read into model context by default.
+  Descriptions are not read into model context by default. Deterministic
+  complexity limits (components/properties per response, expanded occurrences
+  per series and per query, lazy expansion against that budget) fail closed;
+  a small recurrence rule must not turn into CPU or memory exhaustion.
 - **Failure modes:** not-sent → `failed`/not attempted; sent-but-unknown →
-  reconcile → `committed`/`failed`/`ambiguous`; concurrent change → explicit
-  conflict, never overwrite; provider unavailable → reported, no stale data.
-- **Durable state:** D5; SQLite free pages can retain deleted rows unless
-  `secure_delete`/VACUUM is applied.
+  reconcile per ADR-0009 section 6 → `committed` only with operation-marker
+  evidence, otherwise not-applied (retry with the same precondition) or
+  `ambiguous`; change after approval → explicit conflict, never overwrite;
+  provider unavailable → reported, no stale data.
+- **Durable state:** D5 (operation record, recoverable purge, residue checks).
 - **Residual risk:** one Ada credential and one provider account hold every
   family calendar (accepted MVP trade-off, ADR-0009 section 2).
 
@@ -130,9 +160,12 @@ Ada-owned (provider-neutral) additions; names are indicative:
   audience only) is derived for conflict checks. A `visibility` marker for
   provider-anonymized events is added only if inbound sharing is implemented.
 - Proposals: `UpdateCalendarEventProposal(event_ref, base_version, changes)` and
-  `CancelCalendarEventProposal(event_ref, base_version)`. The approved base
-  version is part of the action binding, so a replay after a human edit
-  becomes a conflict instead of a clobber.
+  `CancelCalendarEventProposal(event_ref, base_version)`; `base_version` holds
+  the approved entity tag and `SEQUENCE`. It is part of the action binding and
+  the only `If-Match` precondition Ada ever sends for that operation, so a
+  change after approval becomes a conflict instead of a clobber.
+- Operation marker: a non-semantic `X-` property derived from the
+  `OperationId`, written where the profile confirms preservation (IONOS: yes).
 - Capabilities: duplicate safety declared **per operation kind** (create,
   update, cancel).
 - `DurableActionPort`: update/cancel alongside create.
@@ -158,17 +191,21 @@ S6-S7 (roadmap `done` only in the last PR).
   forbid `httpx2`/`icalendar` imports in core/ports. No new dependency.
 - **S2 CalDAV read path:** transport hardening, `PROPFIND` listing/privileges,
   bounded `calendar-query` with window clamping and component post-filtering,
-  canonical-URL adoption, entity-tag normalization, iCalendar mapping, recurrence expansion (D1),
+  canonical-URL adoption, entity-tag normalization, iCalendar mapping,
+  recurrence expansion (D1) with deterministic complexity limits,
   all-day/time-zone/floating-time handling. Tests against an in-process fake
-  server (`httpx2` mock transport) that reproduces documented OX behavior.
+  server (`httpx2` mock transport) per provider profile.
 - **S3 CalDAV create:** deterministic non-semantic UID/resource name from
-  `OperationId`, create-only `PUT`, reconcile by `GET`, read-back comparison to
-  detect lossy provider changes (write responses carry no ETag); DBOS
-  crash/retry tests against the fake server.
-- **S4 Update/cancel:** durable workflows, `If-Match` with quoted-ETag
-  normalization, `SEQUENCE` stored + 1 and fresh `DTSTAMP`, 201/204 as success,
-  412 as concurrent change, reconciliation semantics, Cedar actions/policies
-  (D3). The fake server must reproduce the IONOS `SEQUENCE` rule.
+  `OperationId`, operation marker, create-only `PUT`, reconcile by `GET` and
+  marker, read-back comparison to detect lossy provider changes (write
+  responses carry no ETag); DBOS crash/retry tests against the fake server.
+- **S4 Update/cancel:** durable workflows following ADR-0009 section 6:
+  pre-write check against `base_version`, `If-Match: <base_version>` only,
+  base `SEQUENCE` + 1, fresh `DTSTAMP`, operation marker, 2xx as success,
+  definite 412 as conflict, reconciliation after an ambiguous send
+  (marker → committed; unchanged base → retry; otherwise ambiguous). Cedar
+  actions/policies (D3). The fake server can simulate a lost response after
+  commit and a human edit between approval and execution.
 - **S5 Conflict detection:** busy semantics, occurrences, travel table (D4),
   explicit unknown travel, availability-only inputs.
 - **S6 Operations:** credential source (D2), durable payload retention (D5),
@@ -187,11 +224,15 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
    checkpoint (forced process kill) recovers to exactly one event and reports
    `committed`.
 2. Re-submitting the same operation creates no duplicate; reusing an operation
-   ID for a different payload is rejected.
+   ID for a different payload is rejected, also after its workflow state was
+   purged (D5).
 3. A lost response that cannot be reconciled is reported as `ambiguous` and is
    not retried blindly (fake server; real provider where reproducible).
-4. An update after a concurrent webmail edit reports a conflict and preserves
-   the human edit; a replayed update never overwrites a newer version.
+4. An update or cancel whose event changed after approval (webmail edit)
+   reports a conflict without writing and preserves the human edit. A replay
+   never sends a newer entity tag than `base_version`. After a lost response,
+   Ada reports `committed` only with its operation marker on the event and
+   otherwise retries (unchanged base) or reports `ambiguous`.
 5. A cancel removes exactly the intended event; a repeated cancel reports the
    event as already absent, not as a fresh effect.
 6. Writes to a calendar configured as not writable fail closed before any
@@ -200,21 +241,35 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
    occurrence, and a travel-time conflict from configured durations; an unknown
    place pair is reported as unknown; another person's event counts as busy
    without disclosing its details to an audience that may not see them.
-8. An event created or changed by Ada appears in an outward subscription (P10
-   evidence; client refresh latency documented, not asserted).
+8. An event created or changed by Ada appears in a family member's shared,
+   read-only view of the calendar (manual check as in run 4; device refresh
+   latency documented, not asserted).
 9. No credential, event title or location appears in logs; ambient proxy
    variables are ignored; no request leaves for another origin.
-10. Durable state no longer holds event titles/locations after a terminal
-    outcome (D5).
+10. After a terminal outcome and the purge sweep — also after a crash between
+    the terminal checkpoint and the purge — neither the SQLite main file nor
+    its WAL/journal contains event titles or locations (sentinel search, D5).
 11. Recurring series, occurrences and events with attendees are refused for
     writes with a clear explanation.
+12. A pathological recurrence (for example `FREQ=SECONDLY`, a very large
+    `COUNT` or `RDATE` list) hits the complexity budget and fails closed for
+    that calendar without exhausting CPU or memory.
 
 ## Validation
 
 - `scripts/validate.sh` (compile, unit tests, `ada doctor`).
 - Contract suite against every `CalendarPort` adapter.
-- Fake-server tests for OX behaviors: canonical URL alias, `If-Match` 409,
-  ignored `comp-filter`, 400 on free/busy, query window, lossy round trip.
+- Fake-server fixture for the **IONOS profile**, matching the recorded runs:
+  create-only `PUT` (repeat 412, duplicate UID 403), stale or mismatched
+  `If-Match` → 412, blind overwrite without `If-Match` accepted, `SEQUENCE`
+  rule (lower → 412), unquoted `REPORT` entity tags, no `ETag` in write
+  responses, query window, canonical URL alias, lossy round trip. A separate
+  generic fixture (for example 409 when a server requires a missing
+  precondition, as noted for self-hosted OX) only where a test needs it.
+- Operation-record tests: binding enforced after purge; sweep after a crash
+  between terminal checkpoint and purge; residue search in SQLite main file
+  and WAL/journal.
+- Negative recurrence tests against the complexity budget.
 - DBOS crash tests extending `tests/dbos_crash_worker.py` for create, update
   and cancel.
 - Negative tests: DOCTYPE/oversized responses, redirects, proxy environment,
@@ -228,8 +283,11 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
 - Outcome truth: can any path report `committed` without provider evidence, or
   retry a write whose outcome is unknown?
 - Identity: UID/resource derivation is stable, non-semantic, collision-safe;
-  operation-ID binding also covers update/cancel base versions.
-- Concurrency: every overwrite and delete is ETag-conditional.
+  operation-ID binding also covers update/cancel base versions and survives
+  the purge; the keyed fingerprint does not leak low-entropy content.
+- Concurrency: every overwrite and delete is conditional on `base_version`
+  and never on a later-read entity tag.
+- Resource limits: recurrence expansion and parsing stay within the budget.
 - Egress and transport: no proxy, redirect, or origin escape; TLS verification.
 - Parsing: XML and iCalendar as untrusted input; time zones, DST, all-day,
   floating times, recurrence overrides.

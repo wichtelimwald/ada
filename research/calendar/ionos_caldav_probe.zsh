@@ -52,8 +52,12 @@ if [[ $ADA_PASS == *[\"\\]* || $ADA_USER == *[\"\\]* ]]; then
 fi
 
 WORK=$(mktemp -d -t ada-caldav-probe) || exit 1
-trap 'rm -rf -- "$WORK"' EXIT
-: > "$WORK/created"  # put_new runs in command substitutions; track via file
+# Every probe resource is recorded before its create attempt, so cleanup also
+# covers creates whose outcome was ambiguous (committed, response lost). The
+# EXIT trap runs the cleanup on normal exit, errors and interruption.
+: > "$WORK/created"
+trap 'exit 130' INT TERM
+trap '(( $+functions[cleanup_probe] )) && cleanup_probe; rm -rf -- "$WORK"' EXIT
 
 # Credentials reach curl through stdin (--config -), never through argv.
 dav() {
@@ -106,13 +110,27 @@ p11() { # label dtstamp(old|fresh) sequence(none|equal|plus1) etag(current|wrong
   report "P11-$label" "$code applied=$applied sequence ${before}->${S_SEQ:-absent}" "see README"
 }
 
-put_new() { # url file -> status; records created resources for cleanup
+put_new() { # url file -> status; records the resource for cleanup BEFORE the attempt
   local code
+  grep -qxF -- "$1" "$WORK/created" || print -r -- "$1" >> "$WORK/created"
   code=$(dav --dump-header "$WORK/last-put.hdr" --output /dev/null --write-out '%{http_code}' \
     -X PUT -H 'If-None-Match: *' -H 'Content-Type: text/calendar; charset=utf-8' \
     --data-binary "@$2" "$1")
-  [[ $code == 201 || $code == 204 ]] && print -r -- "$1" >> "$WORK/created"
   print -r -- "$code"
+}
+
+cleanup_probe() { # delete whatever exists at every recorded probe address
+  [[ -s $WORK/created ]] || return 0
+  print "== Cleanup"
+  local url etag
+  for url in ${(f)"$(<"$WORK/created")"}; do
+    etag=$(current_etag $url)
+    if [[ -n $etag ]]; then
+      report "cleanup ${url:t}" "$(http_code -X DELETE -H "If-Match: $etag" $url)" "204"
+    else
+      report "cleanup ${url:t}" "$(http_code -X DELETE $url)" "404 = never created or already deleted"
+    fi
+  done
 }
 
 current_etag() { # url -> quoted ETag or empty
@@ -275,14 +293,3 @@ print -r -- "user = \"$ADA_USER:$ADA_PASS\"" |
   curl --silent --proto '=imaps' --max-time 30 --config - --output /dev/null "imaps://$IMAP_HOST/"
 rc=$?
 report P9-imap-login-with-app-password "curl exit $rc" "67 = IMAP login denied (narrow credential), 0 = IMAP allowed (broad credential), other = inconclusive"
-
-print "== Cleanup"
-for url in ${(f)"$(<"$WORK/created")"}; do
-  etag=$(current_etag $url)
-  if [[ -n $etag ]]; then
-    report "cleanup ${url:t}" "$(http_code -X DELETE -H "If-Match: $etag" $url)" "204"
-  else
-    report "cleanup ${url:t}" "$(http_code -X DELETE $url)" "204 or 404"
-  fi
-done
-unset ADA_PASS

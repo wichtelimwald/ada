@@ -58,8 +58,10 @@ Requirements: macOS zsh, `curl`, `uuidgen`, BSD `date`, `security`, Python 3
 standard library (`ADA_PYTHON` may point to a specific interpreter). Optional
 environment variables: `ADA_PROBE_CONFIG` (other config file),
 `ADA_PROBE_IMAP_HOST` (default `imap.ionos.de`). The probe stops before any
-write if the calendar listing fails, deletes the events it created and prints
-the cleanup status.
+write if the calendar listing fails. It records every probe resource address
+**before** the create attempt and, on exit (also after an error or Ctrl-C),
+deletes whatever exists at those addresses — including events whose create
+outcome was ambiguous — and prints the cleanup status.
 
 ## What each result checks
 

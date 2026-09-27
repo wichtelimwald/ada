@@ -101,28 +101,54 @@ access for people the provider cannot share with.
 - **`recurring-ical-events`** (LGPL-3.0-or-later, with `x-wr-timezone`) for
   client-side recurrence expansion, used unmodified; NOTICE.md records the
   distribution obligations when they are added.
+- **Deterministic complexity limits** for untrusted calendar data, in addition
+  to size and time-window bounds: maximum components and properties per
+  response and maximum expanded occurrences per series and per query.
+  Recurrences are expanded lazily against that budget. Exceeding a limit fails
+  closed for the affected calendar with a user-visible explanation. The limits
+  never rely on a provider's current recurrence support.
 - python-caldav 3.x is not adopted: it hard-requires `icalendar-searcher`
   (AGPL-3.0-or-later) and a second HTTP/QUIC stack.
 
 ### 6. Write semantics
 
 These follow the standards (RFC 4791, RFC 5545, RFC 9110) and hold for every
-CalDAV provider; profiles only declare what a provider guarantees.
+CalDAV provider; profiles only declare what a provider guarantees. They apply
+ADR-0005: Ada never reports a stronger outcome than provider evidence supports.
 
+- **Approval binds a version.** An update or cancel proposal carries the
+  event reference and the version it was approved against (`base_version`:
+  entity tag and `SEQUENCE`). `base_version` is part of the action binding.
+- **Operation marker.** Where the profile confirms that the provider preserves
+  `X-` properties, every Ada write carries a non-semantic marker derived from
+  the `OperationId`. It is the operation-specific evidence for reconciliation,
+  not authority. Without it, Ada cannot prove its own update and such
+  reconciliation ends `ambiguous`.
 - **Create:** a deterministic, non-semantic UID and resource name derived from
   the `OperationId`; `PUT` with `If-None-Match: *`. A precondition failure is
-  resolved by reading the resource and confirming it is Ada's. The capability
-  is `IDEMPOTENT` where the profile confirms create-only semantics, otherwise
-  `RECONCILABLE`.
-- **Update:** read the current resource (entity tag and `SEQUENCE`), then write
-  with `If-Match` (entity tag normalized to the quoted form), `SEQUENCE`
-  incremented and a fresh `DTSTAMP`. A precondition failure means the event
-  changed since Ada read it: it is reported as a concurrent-change conflict and
-  never overwritten. Any 2xx status is success.
-- **Cancel:** conditional `DELETE`. After an ambiguous outcome, an absent
-  resource is reported as "already absent", not as a fresh effect.
-- After every write Ada re-reads the resource to obtain its version and to
-  detect provider-side changes to the stored data.
+  resolved by reading that resource: if it carries this operation's marker, the
+  earlier attempt committed; otherwise the outcome stays `ambiguous`. The
+  capability is `IDEMPOTENT` where the profile confirms create-only semantics,
+  otherwise `RECONCILABLE`.
+- **Update or cancel, first attempt:** read the resource. If its entity tag
+  differs from `base_version`, stop without writing and report a conflict:
+  the event changed after approval. Otherwise write with
+  `If-Match: <base_version>` (entity tag normalized to the quoted form) — never
+  with a newer entity tag read later. An update also sends the base `SEQUENCE`
+  + 1, a fresh `DTSTAMP` and the operation marker; a cancel is a conditional
+  `DELETE`. A definite precondition failure (412) means nothing was applied:
+  conflict. Any 2xx status is success.
+- **After an ambiguous send** (for example a timeout after the request left),
+  the re-read resource is reconciliation input, not a verdict:
+  - it carries this operation's marker (update) → `committed`;
+  - its entity tag still equals `base_version` → not applied; the durable
+    workflow may retry with the same precondition;
+  - it is absent after a cancel → the goal state holds, but Ada reports
+    "the event no longer exists" without claiming its own effect;
+  - anything else → `ambiguous`, no automatic retry. A later change by
+    someone else cannot be told apart from Ada's write followed by that change.
+- After every committed write Ada re-reads the resource to obtain its version
+  and to detect provider-side changes to the stored data.
 - **MVP write scope:** attendee-less, non-recurring events in Ada's configured
   calendars. Recurring series, single occurrences and events with attendees
   are read-only for Ada in the MVP and fail closed with a clear explanation.
@@ -142,7 +168,10 @@ CalDAV provider; profiles only declare what a provider guarantees.
 - No persistent calendar cache in the MVP; provider unavailability is
   reported, not papered over with stale data.
 - Durable workflow state does not retain event titles/locations after a
-  terminal outcome (ADR-0005 privacy rule; purge mechanism in the step plan).
+  terminal outcome (ADR-0005 privacy rule). Purging must not weaken operation
+  identity: a content-free operation record with a keyed action fingerprint
+  outlives the workflow state, and the purge is recoverable after a crash
+  (mechanism in the step plan).
 
 ### 8. Travel time
 

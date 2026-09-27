@@ -48,7 +48,7 @@ the maintainer chose the **Ada-owned calendar** access model (section 4).
 | OX App Suite itself supports **scoped** application passwords (CalDAV-only scopes `dav`, `read_caldav`, `write_caldav`). Whether IONOS exposes that choice is unknown. | [OX application passwords](https://documentation.open-xchange.com/appsuite/security/application_passwords.html), [OX 8.20 docs](https://documentation.open-xchange.com/8.20/middleware/login_and_sessions/application_passwords.html) | *probe* |
 | OX publishes all calendar folders of a user via CalDAV; whether IONOS includes calendars **shared with** the user is not documented. | [OX CalDAV/CardDAV](https://documentation.open-xchange.com/latest/middleware/miscellaneous/caldav_carddav.html) | *probe* (optional P5/P6) |
 | The Mail Business CalDAV host is `dav.mailbusiness.ionos.de`; calendar URLs use OX's opaque form `/caldav/<base64 of cal://0/N>`. | Ada mailbox webmail, observed by the maintainer 2026-09-26 | High |
-| OX can share calendar folders with external people as invited guests or through anonymous links; external calendar shares are documented as read-only, anonymous links can carry an expiry, and `?ical=true` returns iCalendar for subscriptions. Guests do not see other folders. Whether IONOS enables this for Mail Business is not documented. | [OX sharing and guest mode](https://documentation.open-xchange.com/7.10.5/middleware/miscellaneous/sharing_and_guest_mode.html) | *probe* (P10, M2, M3) |
+| OX documents sharing with invited external guests and anonymous links. **IONOS (runs 3–4):** shares only with mailboxes in the same contract, offers no guest password, and anonymous links lead to the web UI instead of iCalendar. A read-only share appears automatically in the recipient's account and devices. | [OX sharing and guest mode](https://documentation.open-xchange.com/7.10.5/middleware/miscellaneous/sharing_and_guest_mode.html); probe runs 3–4, M2, M3, M6 (section 10) | High |
 
 ### OX App Suite CalDAV behavior relevant to Ada
 
@@ -75,7 +75,7 @@ and the OX profile in python-caldav 3.3.1 `caldav/compatibility_hints.py`
 
 | Option | Description | Assessment |
 | --- | --- | --- |
-| **A0 Ada-owned calendars shared outward** | Ada's single mailbox holds one calendar per family member plus one family calendar (created once in webmail). Ada is the owner and regular writer; family members subscribe to the calendars shared with them. | **Selected for the MVP by the maintainer (2026-09-26).** Needs only one mailbox; Ada keeps full control; single writer keeps concurrency simple; no family credentials. Trade-offs: all family calendars in one account; separation between members depends on share distribution and AdaGuard; share links are bearer secrets; subscriptions are read-only and refresh on the client's schedule; Ada cannot see appointments kept elsewhere. Requires P10/M2/M3 confirmation. |
+| **A0 Ada-owned calendars shared read-only** | Ada's single mailbox holds one calendar per family member plus one family calendar (created once in webmail). Ada is the owner and regular writer; each calendar is shared read-only (Betrachter) with the relevant family members' own mailboxes in the same IONOS contract, where it appears automatically. | **Selected for the MVP by the maintainer (2026-09-26); confirmed by run 4 (M3) and M6** (read-only recipient cannot move events from iPhone/Mac). Needs only one mailbox for Ada; Ada keeps full control; single writer keeps concurrency simple; no family credentials. Trade-offs: all family calendars in one account; separation relies on provider roles and AdaGuard; only mailboxes in the same contract can receive shares; recipients see changes after their devices refresh; Ada cannot see appointments kept elsewhere. |
 | A1 Inbound sharing to Ada's mailbox | Family members with their own mailboxes in the same contract share selected calendars with Ada as read-only or write. | Later option. Owners keep control and source-side confidential/private semantics apply, but every member needs a paid mailbox. The probe keeps optional checks (P5, P6). |
 | A2 Per-member app passwords | Ada stores an app password for each family member's mailbox. | Rejected: Ada would hold family members' credentials, likely with mailbox-wide scope (P9), and would see private events. |
 | A3 macOS EventKit via Calendar.app | IONOS accounts configured in macOS; Ada reads/writes through EventKit. | Rejected for MVP: calendar permission covers every account in Calendar.app, requires a native host process (not container-compatible, ADR-0003), and hides provider outcome evidence behind macOS sync. |
@@ -215,9 +215,10 @@ probe now rejects non-CalDAV URLs and stops before any write if P1 fails.
 | M3 | Subscribing asks for a password. | Family members need their **own guest credentials**; Ada's credentials must never be used on family devices (they grant Ada's whole mailbox, P9). |
 | M4 | No email reached Ada; the invited address received the invitation email (maintainer's report; interpretation to be confirmed). | No unintended event notifications observed so far. |
 
-Consequence: the outward mechanism for the MVP is **one invited guest per
-family member with the Betrachter role**, not anonymous links. P12 checks guest
-visibility and refused writes with the guest's own credentials.
+Interim conclusion, **superseded by run 4**: invite each family member as a
+guest with the Betrachter role. Run 4 showed that IONOS offers no guest
+password and shares only within the contract; the selected model is A0 in
+section 4.
 
 ### Run 4 (2026-09-26) and manual observations
 
