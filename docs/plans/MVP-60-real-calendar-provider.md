@@ -1,9 +1,11 @@
 # MVP-60 — Real calendar provider and full calendar management
 
-Status: planning
+Status: implementation
 Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-00 (done)
-Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR); implementation PRs follow ADR acceptance
+Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR, merged);
+S1-S3 implementation PR: TBD-UPDATE-AFTER-PR-OPENED. Further implementation PRs
+follow for S4-S5 and S6-S7 (roadmap stays `ready` until S7).
 
 ## Goal
 
@@ -198,19 +200,44 @@ S6-S7 (roadmap `done` only in the last PR).
   outward share, runs the IONOS probe; results recorded in the PR and the
   evaluation; capabilities and limits fixed; ADR-0009 accepted. **Done
   2026-09-26** (runs 1–4, M6).
-- **S1 Domain and port:** types above, in-memory adapter updated, shared
-  `CalendarPort` contract test suite, architecture-boundary test extended to
-  forbid `httpx2`/`icalendar` imports in core/ports. No new dependency.
-- **S2 CalDAV read path:** transport hardening, `PROPFIND` listing/privileges,
-  bounded `calendar-query` with window clamping and component post-filtering,
-  canonical-URL adoption, entity-tag normalization, iCalendar mapping,
-  recurrence expansion (D1) with deterministic complexity limits,
-  all-day/time-zone/floating-time handling. Tests against an in-process fake
-  server (`httpx2` mock transport) per provider profile.
-- **S3 CalDAV create:** deterministic non-semantic UID/resource name from
-  `OperationId`, operation marker, create-only `PUT`, reconcile by `GET` and
-  marker, read-back comparison to detect lossy provider changes (write
-  responses carry no ETag); DBOS crash/retry tests against the fake server.
+- **S1 Domain and port: done.** `CalendarRef`/`CalendarAudience`/
+  `CalendarAccessMode`, `EventRef`, `EventVersion`, and the read-model
+  additions (`version`, `busy`, `all_day`, `recurring`, `has_attendees`) are
+  added to `src/ada/ports/calendar.py`. Scoping decision: the update/cancel
+  proposal types, `calendar.update`/`calendar.cancel` Cedar actions, the
+  per-operation-kind capability split, and the availability-view type are
+  deferred to S4/S5 rather than added unused now, to avoid dead code ahead of
+  their wiring; `EventRef`/`EventVersion` are exercised starting S2/S3 instead.
+  Shared contract suite: `tests/calendar_port_contract.py`, run against the
+  in-memory adapter (`tests/test_in_memory_calendar_contract.py`) and the new
+  CalDAV adapter (`tests/test_caldav_contract.py`). Architecture-boundary test
+  extended in `tests/test_architecture_boundaries.py` to forbid `httpx2`,
+  `icalendar`, `recurring_ical_events`, `x_wr_timezone` in core/ports.
+- **S2 CalDAV read path: done.** Generic adapter at
+  `src/ada/adapters/caldav/` (`profile.py` declarative `IONOS_PROFILE`,
+  `dav_client.py` hardened transport + `PROPFIND`/`REPORT`/`GET`/create-only
+  `PUT`, `mapping.py` iCalendar mapping + recurrence expansion + complexity
+  budget, `adapter.py` orchestration). `icalendar` 7.3.0,
+  `recurring-ical-events` 3.8.2, and `x-wr-timezone` 2.0.1 adopted after the
+  focused review in
+  `docs/research/caldav-parsing-dependencies-review.md` and recorded in
+  NOTICE.md. Tests: `tests/test_caldav_read_path.py` (window clamping,
+  canonical-URL adoption via the contract suite, entity-tag normalization,
+  recurrence expansion, all-day handling, the three complexity-budget limits,
+  DOCTYPE rejection, oversized-response rejection, wrong-origin-href
+  rejection, malformed iCalendar).
+- **S3 CalDAV create: done.** Deterministic non-semantic UID/resource name
+  and operation marker derived from `OperationId`
+  (`mapping.derive_event_uid`/`derive_resource_name`/`derive_operation_marker`),
+  create-only `PUT`, 412/403 reconciliation by `GET` + marker match, read-back
+  after create (no `ETag` in the IONOS create response). Tests:
+  `tests/test_caldav_create.py` (read-only/unconfigured calendar fail closed
+  before any request, duplicate-UID-under-different-resource, not-attempted
+  vs. ambiguous transport-failure classification) and
+  `tests/test_caldav_create_crash_recovery.py` (hard process kill after the
+  provider commit recovers to exactly one event via
+  `tests/dbos_caldav_crash_worker.py`, extending the pattern in
+  `tests/dbos_crash_worker.py`).
 - **S4 Update/cancel:** durable workflows following ADR-0009 section 6:
   pre-write check against `base_version`, `If-Match: <base_version>` only,
   base `SEQUENCE` + 1, fresh `DTSTAMP`, operation marker, 2xx as success,
@@ -269,6 +296,10 @@ detection with travel time. Concretely, on IONOS with synthetic calendars:
     that calendar without exhausting CPU or memory.
 
 ## Validation
+
+S1-S3 evidence: `scripts/validate.sh` passes (compile, unit tests, `ada
+doctor`) with 31 new tests (132 total) on the exact commit of the S1-S3
+implementation PR. Items below tagged S4+ remain open for later PRs.
 
 - `scripts/validate.sh` (compile, unit tests, `ada doctor`).
 - Contract suite against every `CalendarPort` adapter.

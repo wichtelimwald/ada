@@ -1,0 +1,404 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+from urllib.parse import urljoin, urlsplit
+from xml.etree import ElementTree
+
+import httpx2
+
+NS_DAV = "DAV:"
+NS_CALDAV = "urn:ietf:params:xml:ns:caldav"
+NS_CS = "http://calendarserver.org/ns/"
+
+
+class CalDAVConfigurationError(ValueError):
+    """The configured CalDAV origin/collection is invalid."""
+
+
+class CalDAVNotAttemptedError(RuntimeError):
+    """The request was never sent (connection/DNS/TLS failure, or a redirect)."""
+
+
+class CalDAVAmbiguousTransportError(RuntimeError):
+    """The request may have reached the server; its outcome is unknown."""
+
+
+class CalDAVProtocolError(RuntimeError):
+    """The server's response did not conform to the expected CalDAV shape."""
+
+
+class CalDAVResponseTooLargeError(RuntimeError):
+    """The response exceeded the configured size cap for this provider."""
+
+
+class CalDAVUnsafeXmlError(RuntimeError):
+    """The response contained a DOCTYPE declaration and was rejected unread."""
+
+
+def _tag(namespace: str, local: str) -> str:
+    return f"{{{namespace}}}{local}"
+
+
+def validate_https_origin(base_url: str) -> tuple[str, str]:
+    """Return (scheme, netloc) for a configured HTTPS-only provider origin."""
+
+    parsed = urlsplit(base_url)
+    if parsed.scheme != "https":
+        raise CalDAVConfigurationError("CalDAV base_url must use https")
+    if not parsed.netloc:
+        raise CalDAVConfigurationError("CalDAV base_url must include a host")
+    return parsed.scheme, parsed.netloc
+
+
+def resolve_same_origin_href(base_url: str, href: str) -> str:
+    """Join a server-reported href, rejecting any escape from the configured origin.
+
+    A malicious or misconfigured server must not be able to redirect Ada's
+    authenticated requests to another origin merely by echoing an absolute
+    href in a WebDAV response (ADR-0009 section 5/7: only the configured
+    provider origin).
+    """
+
+    scheme, netloc = validate_https_origin(base_url)
+    parsed_href = urlsplit(href)
+
+    if parsed_href.scheme or parsed_href.netloc:
+        if parsed_href.scheme != scheme or parsed_href.netloc != netloc:
+            raise CalDAVProtocolError(
+                f"server href {href!r} escapes the configured origin"
+            )
+        return href
+
+    return urljoin(base_url, href)
+
+
+def build_client(
+    *,
+    base_url: str,
+    auth: tuple[str, str],
+    timeout_seconds: float = 15.0,
+    transport: httpx2.BaseTransport | None = None,
+) -> httpx2.Client:
+    """Construct the hardened, proxy-independent CalDAV transport.
+
+    ``trust_env=False`` ignores ambient proxy/certificate environment
+    variables (same rationale as the reviewed local-Ollama transport).
+    Redirects are never followed; a 3xx response is surfaced to the caller
+    as an explicit protocol condition rather than silently chased.
+    """
+
+    validate_https_origin(base_url)
+    return httpx2.Client(
+        base_url=base_url,
+        auth=auth,
+        trust_env=False,
+        follow_redirects=False,
+        timeout=httpx2.Timeout(timeout_seconds),
+        transport=transport,
+    )
+
+
+def send_request(
+    client: httpx2.Client,
+    method: str,
+    url: str,
+    *,
+    headers: dict[str, str] | None = None,
+    content: bytes | None = None,
+) -> httpx2.Response:
+    """Send one request, classifying transport failures per ADR-0009 section 6.
+
+    Connection failures before a request is sent are "not attempted";
+    timeouts or transport errors after sending are ambiguous. A redirect is
+    never followed and is treated as not attempted (it indicates the
+    configured collection URL no longer matches the server, not a
+    transient condition safe to retry blindly).
+    """
+
+    try:
+        response = client.request(method, url, headers=headers, content=content)
+    except httpx2.ConnectError as exc:
+        raise CalDAVNotAttemptedError(str(exc)) from exc
+    except httpx2.ConnectTimeout as exc:
+        raise CalDAVNotAttemptedError(str(exc)) from exc
+    except httpx2.TimeoutException as exc:
+        raise CalDAVAmbiguousTransportError(str(exc)) from exc
+    except httpx2.TransportError as exc:
+        raise CalDAVAmbiguousTransportError(str(exc)) from exc
+
+    if response.status_code in (301, 302, 303, 307, 308):
+        raise CalDAVNotAttemptedError(
+            f"unexpected redirect response {response.status_code}"
+        )
+    return response
+
+
+def read_capped_body(response: httpx2.Response, *, max_bytes: int) -> bytes:
+    """Read a response body, failing closed on an untrusted oversized body."""
+
+    declared = response.headers.get("content-length")
+    if declared is not None:
+        try:
+            declared_bytes = int(declared)
+        except ValueError:
+            declared_bytes = None
+        if declared_bytes is not None and declared_bytes > max_bytes:
+            raise CalDAVResponseTooLargeError(
+                f"response declared {declared_bytes} bytes, exceeds cap {max_bytes}"
+            )
+
+    content = response.content
+    if len(content) > max_bytes:
+        raise CalDAVResponseTooLargeError(
+            f"response body is {len(content)} bytes, exceeds cap {max_bytes}"
+        )
+    return content
+
+
+def parse_safe_xml(content: bytes) -> ElementTree.Element:
+    """Parse untrusted server XML, rejecting DOCTYPE declarations outright.
+
+    CalDAV/WebDAV responses never legitimately need a DOCTYPE. Rejecting it
+    unconditionally (ADR-0009 section 5) avoids entity-expansion and
+    external-entity classes of attack without adding a parsing dependency.
+    """
+
+    if b"<!doctype" in content.lower():
+        raise CalDAVUnsafeXmlError("XML response contains a rejected DOCTYPE")
+    try:
+        return ElementTree.fromstring(content)
+    except ElementTree.ParseError as exc:
+        raise CalDAVProtocolError(f"malformed XML response: {exc}") from exc
+
+
+def normalize_etag(raw: str) -> str:
+    """Normalize an entity tag to its quoted form (RFC 7232).
+
+    IONOS reports the ``GET`` header quoted but the ``REPORT`` ``getetag``
+    property unquoted (evaluation section 10, probe P4j); Ada must compare
+    and send only the normalized quoted form.
+    """
+
+    value = raw.strip()
+    prefix = ""
+    if value.startswith("W/"):
+        prefix = "W/"
+        value = value[2:].strip()
+    if not (value.startswith('"') and value.endswith('"') and len(value) >= 2):
+        value = f'"{value}"'
+    return prefix + value
+
+
+def format_time_range_bound(value: datetime) -> str:
+    """Render a UTC datetime as the basic ISO form CalDAV time-range expects."""
+
+    return value.strftime("%Y%m%dT%H%M%SZ")
+
+
+@dataclass(frozen=True, slots=True)
+class CollectionInfo:
+    """Result of a ``PROPFIND`` privilege/ctag check on one configured collection."""
+
+    href: str
+    privileges: frozenset[str]
+    ctag: str | None
+
+
+def propfind_collection(
+    client: httpx2.Client,
+    *,
+    base_url: str,
+    collection_path: str,
+    max_response_bytes: int,
+) -> CollectionInfo:
+    """Depth-0 ``PROPFIND`` for privileges, ctag, and the canonical href.
+
+    Ada configures collection URLs explicitly (no discovery, ADR-0009
+    section 2); this call still adopts whatever href the server echoes back
+    as the operative address for later requests (evaluation section 3:
+    "the collection also has an opaque canonical URL besides the requested
+    alias").
+    """
+
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<D:propfind xmlns:D="DAV:" xmlns:CS="http://calendarserver.org/ns/">'
+        "<D:prop>"
+        "<D:resourcetype/>"
+        "<D:current-user-privilege-set/>"
+        "<CS:getctag/>"
+        "</D:prop>"
+        "</D:propfind>"
+    ).encode("utf-8")
+
+    response = send_request(
+        client,
+        "PROPFIND",
+        collection_path,
+        headers={
+            "Content-Type": 'application/xml; charset="utf-8"',
+            "Depth": "0",
+        },
+        content=body,
+    )
+    if response.status_code != 207:
+        raise CalDAVProtocolError(
+            f"PROPFIND on {collection_path!r} returned {response.status_code}"
+        )
+
+    content = read_capped_body(response, max_bytes=max_response_bytes)
+    root = parse_safe_xml(content)
+
+    resp_elem = root.find(_tag(NS_DAV, "response"))
+    if resp_elem is None:
+        raise CalDAVProtocolError("PROPFIND multistatus has no response element")
+
+    href_elem = resp_elem.find(_tag(NS_DAV, "href"))
+    if href_elem is None or not (href_elem.text or "").strip():
+        raise CalDAVProtocolError("PROPFIND response is missing a href")
+    href = resolve_same_origin_href(base_url, href_elem.text.strip())
+
+    privileges: set[str] = set()
+    for privilege_elem in resp_elem.iter(_tag(NS_DAV, "privilege")):
+        for child in privilege_elem:
+            local = child.tag.rsplit("}", 1)[-1]
+            privileges.add(local)
+
+    ctag_elem = resp_elem.find(f".//{_tag(NS_CS, 'getctag')}")
+    ctag = ctag_elem.text.strip() if ctag_elem is not None and ctag_elem.text else None
+
+    return CollectionInfo(href=href, privileges=frozenset(privileges), ctag=ctag)
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarQueryEntry:
+    """One raw (unparsed) entry returned by a ``calendar-query`` REPORT."""
+
+    href: str
+    etag: str | None
+    calendar_data: bytes
+
+
+def calendar_query(
+    client: httpx2.Client,
+    *,
+    base_url: str,
+    collection_href: str,
+    start: datetime,
+    end: datetime,
+    max_response_bytes: int,
+) -> list[CalendarQueryEntry]:
+    """Bounded ``REPORT calendar-query`` for VEVENT components in [start, end).
+
+    ``comp-filter`` is not trusted to actually restrict the response
+    (evaluation section 3: "comp-filter and is-not-defined filters are
+    silently ignored" on OX); callers must still post-filter components.
+    """
+
+    body = (
+        '<?xml version="1.0" encoding="utf-8"?>'
+        '<C:calendar-query xmlns:D="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+        "<D:prop><D:getetag/><C:calendar-data/></D:prop>"
+        '<C:filter><C:comp-filter name="VCALENDAR">'
+        '<C:comp-filter name="VEVENT">'
+        f'<C:time-range start="{format_time_range_bound(start)}" '
+        f'end="{format_time_range_bound(end)}"/>'
+        "</C:comp-filter></C:comp-filter></C:filter>"
+        "</C:calendar-query>"
+    ).encode("utf-8")
+
+    response = send_request(
+        client,
+        "REPORT",
+        collection_href,
+        headers={
+            "Content-Type": 'application/xml; charset="utf-8"',
+            "Depth": "1",
+        },
+        content=body,
+    )
+    if response.status_code != 207:
+        raise CalDAVProtocolError(
+            f"REPORT calendar-query on {collection_href!r} "
+            f"returned {response.status_code}"
+        )
+
+    content = read_capped_body(response, max_bytes=max_response_bytes)
+    root = parse_safe_xml(content)
+
+    entries: list[CalendarQueryEntry] = []
+    for resp_elem in root.findall(_tag(NS_DAV, "response")):
+        href_elem = resp_elem.find(_tag(NS_DAV, "href"))
+        if href_elem is None or not (href_elem.text or "").strip():
+            continue
+        href = resolve_same_origin_href(base_url, href_elem.text.strip())
+
+        data_elem = resp_elem.find(f".//{_tag(NS_CALDAV, 'calendar-data')}")
+        if data_elem is None or not data_elem.text:
+            continue
+
+        etag_elem = resp_elem.find(f".//{_tag(NS_DAV, 'getetag')}")
+        etag = (
+            normalize_etag(etag_elem.text)
+            if etag_elem is not None and etag_elem.text
+            else None
+        )
+
+        entries.append(
+            CalendarQueryEntry(
+                href=href,
+                etag=etag,
+                calendar_data=data_elem.text.encode("utf-8"),
+            )
+        )
+
+    return entries
+
+
+@dataclass(frozen=True, slots=True)
+class GetResourceResult:
+    calendar_data: bytes
+    etag: str | None
+
+
+def get_resource(
+    client: httpx2.Client,
+    resource_href: str,
+    *,
+    max_response_bytes: int,
+) -> GetResourceResult | None:
+    """``GET`` one event resource; ``None`` when the provider reports 404."""
+
+    response = send_request(client, "GET", resource_href)
+    if response.status_code == 404:
+        return None
+    if response.status_code != 200:
+        raise CalDAVProtocolError(
+            f"GET {resource_href!r} returned {response.status_code}"
+        )
+
+    content = read_capped_body(response, max_bytes=max_response_bytes)
+    raw_etag = response.headers.get("etag")
+    etag = normalize_etag(raw_etag) if raw_etag else None
+    return GetResourceResult(calendar_data=content, etag=etag)
+
+
+def put_create_only(
+    client: httpx2.Client,
+    resource_href: str,
+    *,
+    body: bytes,
+) -> httpx2.Response:
+    """Create-only ``PUT`` (``If-None-Match: *``); never overwrites a resource."""
+
+    return send_request(
+        client,
+        "PUT",
+        resource_href,
+        headers={
+            "If-None-Match": "*",
+            "Content-Type": "text/calendar; charset=utf-8",
+        },
+        content=body,
+    )

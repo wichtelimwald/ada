@@ -50,6 +50,10 @@ For Ada development:
 
 - **DBOS 3.0.0** — MIT License. Used behind Ada's durable-action port as the initial durable-execution substrate selected by ADR-0005.
 
+- **icalendar 7.3.0** — BSD-2-Clause (Plone Foundation). RFC 5545 parsing/serialization for the CalDAV adapter (ADR-0009, MVP-60). Its [focused dependency review](docs/research/caldav-parsing-dependencies-review.md) records provenance, the two closed DoS advisories (both fixed below the adopted version), the installed wheel license, and transitive scope (`tzdata` Apache-2.0; `python-dateutil`/`six` already resolved).
+- **recurring-ical-events 3.8.2** — LGPL-3.0-or-later. Client-side recurrence expansion for the CalDAV read path, used unmodified as a separately installed package (decision D1, MVP-60 step plan). Same LGPL obligation class as the existing `psycopg-binary` path below; see the [dependency review](docs/research/caldav-parsing-dependencies-review.md) for the distribution-obligation analysis.
+- **x-wr-timezone 2.0.1** — LGPL-3.0-or-later. Direct dependency of `recurring-ical-events`; same review and obligations.
+
 Apache-2.0 components remain Apache-2.0. Ada's project-owned code remains MIT; third-party code is not relicensed as Ada MIT code. Required license and NOTICE material must be preserved when distribution obligations apply.
 
 ## Existing transitive license findings and release scope
@@ -63,6 +67,8 @@ paths (the independently installed Ada-only graph remains to be checked):
 | --- | --- | --- |
 | `dbos` → `psycopg` → `psycopg-binary` | 3.3.6 / 3.3.6, LGPL-3.0-only | The binary wheel bundles native client libraries, including `libpq` and OpenSSL. Inspect each exact platform wheel and its bundled licenses/source and applicable LGPL obligations before redistributing it. |
 | `pydantic-ai-slim` → `tiktoken` → `requests` → `certifi` | 2026.7.22, MPL-2.0 | Review the actual certificate bundle and package notices/source access if included in an Ada-distributed artifact. |
+| Ada → `recurring-ical-events` (direct) | 3.8.2, LGPL-3.0-or-later | Pure-Python wheel, used unmodified. Confirm LGPL sections 4/5 (source availability, replaceability) are satisfied before any prebuilt image/installer bundles it; see the [dependency review](docs/research/caldav-parsing-dependencies-review.md). |
+| Ada → `recurring-ical-events` → `x-wr-timezone` | 2.0.1, LGPL-3.0-or-later | Same obligation as above; same review. |
 
 These paths explain why direct MIT/Apache-2.0 licenses alone did not close the
 earlier license gate. Installed Mac file names and package metadata do not

@@ -9,6 +9,53 @@ from ada.core.action_outcomes import ProviderCapability
 from ada.core.actions import CreateCalendarEventProposal
 
 
+class CalendarAudience(str, Enum):
+    """Who a configured calendar's disclosure/busy semantics are scoped to."""
+
+    PERSON = "person"
+    FAMILY = "family"
+
+
+class CalendarAccessMode(str, Enum):
+    """Ada's configured write permission for one calendar (ADR-0009 section 3)."""
+
+    READ = "read"
+    WRITE = "write"
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarRef:
+    """Ada calendar key mapped to one configured provider collection.
+
+    ``provider_collection`` is an opaque handle interpreted only by the
+    adapter (for example a CalDAV collection URL); it never carries a
+    provider-specific type across this boundary.
+    """
+
+    calendar_id: str
+    provider_collection: str
+    audience: CalendarAudience
+    access_mode: CalendarAccessMode
+
+
+class EventVersion(str):
+    """Opaque provider version for one event resource (a normalized entity tag)."""
+
+    def __new__(cls, value: str) -> "EventVersion":
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("event version must not be empty")
+        return str.__new__(cls, normalized)
+
+
+@dataclass(frozen=True, slots=True)
+class EventRef:
+    """Provider-neutral address for one event resource within a calendar."""
+
+    calendar_id: str
+    resource_name: str
+
+
 @dataclass(frozen=True, slots=True)
 class CalendarEvent:
     event_id: str
@@ -17,6 +64,12 @@ class CalendarEvent:
     end: datetime
     calendar_id: str
     location: str | None = None
+    event_ref: EventRef | None = None
+    version: EventVersion | None = None
+    busy: bool = True
+    all_day: bool = False
+    recurring: bool = False
+    has_attendees: bool = False
 
 
 class CalendarCreateStatus(str, Enum):
