@@ -22,6 +22,8 @@ class GitMemoryHistory:
     _OWNED_ROOTS = frozenset({"memory", "learning"})
     _OWNERSHIP_MARKER = "ada-memory-history-v1"
     _OWNERSHIP_CONTENT = "Ada file-native Memory history v1\n"
+    _INIT_MARKER = ".ada-memory-git-init-v1"
+    _INIT_CONTENT = "Ada Memory Git initialization v1\n"
 
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -46,6 +48,12 @@ class GitMemoryHistory:
             raise GitMemoryHistoryError(
                 f"Memory Git path is not a directory: {git_dir}"
             )
+        ownership_marker = git_dir / self._OWNERSHIP_MARKER
+        if os.path.lexists(ownership_marker):
+            self._require_ownership_marker(git_dir)
+            return
+        if self._has_valid_init_marker():
+            return
         self._require_ownership_marker(git_dir)
 
     def ensure_initialized(self) -> None:
@@ -60,6 +68,7 @@ class GitMemoryHistory:
             )
 
         if not git_dir.exists():
+            self._ensure_init_marker()
             with TemporaryDirectory(prefix="ada-git-template-") as template:
                 self._run(
                     "init",
@@ -67,8 +76,29 @@ class GitMemoryHistory:
                     extra_env={"GIT_TEMPLATE_DIR": template},
                 )
             self._create_ownership_marker(git_dir)
+            self._remove_init_marker()
         else:
-            self._require_ownership_marker(git_dir)
+            ownership_marker = git_dir / self._OWNERSHIP_MARKER
+            if os.path.lexists(ownership_marker):
+                self._require_ownership_marker(git_dir)
+                if self._has_valid_init_marker():
+                    self._remove_init_marker()
+            elif self._has_valid_init_marker():
+                head = self._run(
+                    "rev-parse",
+                    "--verify",
+                    "HEAD",
+                    check=False,
+                )
+                if head.returncode == 0:
+                    raise GitMemoryHistoryError(
+                        "interrupted Ada Memory Git initialization unexpectedly "
+                        "contains history; refusing repository"
+                    )
+                self._create_ownership_marker(git_dir)
+                self._remove_init_marker()
+            else:
+                self._require_ownership_marker(git_dir)
 
         head = self._run(
             "rev-parse",
@@ -84,6 +114,64 @@ class GitMemoryHistory:
                 "-m",
                 "Initialize Ada Memory history",
             )
+
+    def _ensure_init_marker(self) -> None:
+        marker = self.root / self._INIT_MARKER
+        if self._has_valid_init_marker():
+            return
+        try:
+            with marker.open("x", encoding="utf-8") as handle:
+                handle.write(self._INIT_CONTENT)
+                handle.flush()
+                os.fsync(handle.fileno())
+            self._sync_directory(self.root)
+        except (FileExistsError, OSError) as exc:
+            raise GitMemoryHistoryError(
+                "cannot establish Ada Memory Git initialization marker"
+            ) from exc
+
+    def _has_valid_init_marker(self) -> bool:
+        marker = self.root / self._INIT_MARKER
+        if marker.is_symlink():
+            raise GitMemoryHistoryError(
+                f"Memory Git initialization marker must not be a symlink: {marker}"
+            )
+        try:
+            content = marker.read_text(encoding="utf-8")
+        except FileNotFoundError:
+            return False
+        except (OSError, UnicodeError) as exc:
+            raise GitMemoryHistoryError(
+                "cannot verify Ada Memory Git initialization marker"
+            ) from exc
+        if content != self._INIT_CONTENT:
+            raise GitMemoryHistoryError(
+                "Memory Git initialization marker is invalid; refusing repository"
+            )
+        return True
+
+    def _remove_init_marker(self) -> None:
+        marker = self.root / self._INIT_MARKER
+        try:
+            marker.unlink()
+            self._sync_directory(self.root)
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise GitMemoryHistoryError(
+                "cannot remove Ada Memory Git initialization marker"
+            ) from exc
+
+    @staticmethod
+    def _sync_directory(path: Path) -> None:
+        fd = os.open(
+            path,
+            os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW,
+        )
+        try:
+            os.fsync(fd)
+        finally:
+            os.close(fd)
 
     def _create_ownership_marker(self, git_dir: Path) -> None:
         marker = git_dir / self._OWNERSHIP_MARKER
