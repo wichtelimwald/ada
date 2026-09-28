@@ -4,6 +4,7 @@ import importlib.util
 from pathlib import Path
 import plistlib
 import unittest
+from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -47,10 +48,15 @@ class MVP30S2ProbeTests(unittest.TestCase):
         )
 
     def test_missing_distinct_runtime_user_is_not_treated_as_evidence(self) -> None:
-        status, readable = self.probe.distinct_user_can_read(
-            Path("/tmp/does-not-matter"),
-            "__ada_mvp30_s2_user_that_must_not_exist__",
-        )
+        with mock.patch.object(
+            self.probe.pwd,
+            "getpwnam",
+            side_effect=KeyError("synthetic missing user"),
+        ):
+            status, readable = self.probe.distinct_user_can_read(
+                Path("/tmp/does-not-matter"),
+                "synthetic-missing-user",
+            )
 
         self.assertEqual(status, "skipped:runtime-user-not-found")
         self.assertIsNone(readable)
