@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import plistlib
 import platform
+import pwd
 import secrets
 import shutil
 import subprocess
