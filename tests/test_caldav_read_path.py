@@ -465,6 +465,26 @@ class CalDAVReadPathTests(unittest.TestCase):
                 end=datetime(2026, 11, 1, tzinfo=timezone.utc),
             )
 
+    def test_report_malformed_content_encoding_is_a_typed_protocol_error(
+        self,
+    ) -> None:
+        # response.iter_bytes() also performs HTTP content decoding.
+        # httpx2.DecodingError (raised for malformed gzip/deflate/brotli/zstd
+        # content) is a RequestError but *not* a TransportError, so it is a
+        # distinct case from the timeout/transport failure above and needs
+        # its own translation -- here to a protocol error, since a malformed
+        # encoding is a malformed-response condition, not a connectivity one.
+        server = build_fake_server()
+        server.report_malformed_content_encoding = True
+        adapter = build_adapter(server)
+        self.addCleanup(adapter.close)
+
+        with self.assertRaises(CalDAVProtocolError):
+            adapter.list_events(
+                start=datetime(2026, 10, 1, tzinfo=timezone.utc),
+                end=datetime(2026, 11, 1, tzinfo=timezone.utc),
+            )
+
     def test_daily_rule_with_byhour_byminute_bysecond_fails_closed(self) -> None:
         # Before the fix, a DAILY period was treated as producing at most
         # one occurrence per day regardless of BY* parts, so a large COUNT

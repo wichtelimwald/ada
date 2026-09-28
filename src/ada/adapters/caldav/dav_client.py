@@ -211,7 +211,14 @@ def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> bytes:
     ``iter_bytes()`` itself (the request was already sent and a response was
     already received; only the body did not finish) is classified the same
     way as any other post-send transport failure instead of leaking the raw
-    ``httpx2`` exception through this module's typed boundary.
+    ``httpx2`` exception through this module's typed boundary. ``iter_bytes()``
+    also performs HTTP content decoding (gzip/deflate/brotli/zstd); malformed
+    encoded content raises ``httpx2.DecodingError``, which -- unlike a
+    timeout -- is a ``RequestError`` but not a ``TransportError`` in httpx2,
+    so it needs its own translation to stay inside this module's typed
+    boundary. It is a malformed-response condition, not a connectivity one,
+    so it becomes ``CalDAVProtocolError`` rather than the ambiguous-transport
+    error.
     """
 
     declared = response.headers.get("content-length")
@@ -235,6 +242,10 @@ def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> bytes:
                     f"response body exceeds the {max_bytes}-byte cap"
                 )
             chunks.append(chunk)
+    except httpx2.DecodingError as exc:
+        raise CalDAVProtocolError(
+            f"response content could not be decoded: {exc}"
+        ) from exc
     except (httpx2.TimeoutException, httpx2.TransportError) as exc:
         raise CalDAVAmbiguousTransportError(
             f"reading the response body failed: {exc}"

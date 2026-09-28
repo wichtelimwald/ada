@@ -129,6 +129,8 @@ class FakeIonosCalDAVServer:
         self.stream_normal_responses = False
         self.report_body_read_failure: Exception | None = None
         self.put_response_body_read_failure: Exception | None = None
+        self.report_malformed_content_encoding = False
+        self.get_malformed_content_encoding = False
 
         # Observability for assertions.
         self.received_time_ranges: list[tuple[datetime, datetime]] = []
@@ -271,6 +273,24 @@ class FakeIonosCalDAVServer:
                 stream=_RaisingByteStream(self.report_body_read_failure),
             )
 
+        if self.report_malformed_content_encoding:
+            # A declared Content-Encoding that the body does not actually
+            # match: httpx2 raises httpx2.DecodingError while decoding
+            # during iter_bytes(), distinct from a timeout/transport failure.
+            # Must be a genuinely streamed response (like
+            # report_body_read_failure above) -- httpx2.Response(content=...)
+            # decodes eagerly inside __init__, which would raise here in the
+            # fake server itself instead of later in the real client-side
+            # iter_bytes() call this is meant to exercise.
+            return httpx2.Response(
+                207,
+                headers={
+                    "Content-Type": "application/xml",
+                    "Content-Encoding": "gzip",
+                },
+                stream=_ChunkedByteStream(b"not actually gzip-encoded content"),
+            )
+
         entries = []
         # Matches the observed OX/IONOS behavior: comp-filter/time-range are
         # not enforced server-side, so every stored resource is returned and
@@ -299,6 +319,20 @@ class FakeIonosCalDAVServer:
         for collection in self._collections.values():
             resource = collection.resources.get(path)
             if resource is not None:
+                if self.get_malformed_content_encoding:
+                    # See report_malformed_content_encoding above: must be a
+                    # genuinely streamed response, not content=, or httpx2
+                    # decodes eagerly in the fake server's own __init__.
+                    return httpx2.Response(
+                        200,
+                        headers={
+                            "Content-Type": "text/calendar",
+                            "Content-Encoding": "gzip",
+                        },
+                        stream=_ChunkedByteStream(
+                            b"not actually gzip-encoded content"
+                        ),
+                    )
                 return httpx2.Response(
                     200,
                     content=resource.body,

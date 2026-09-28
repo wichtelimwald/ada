@@ -245,6 +245,33 @@ class CalDAVCreateTests(unittest.TestCase):
         )
         self.assertIsNone(result.event)
 
+    def test_read_back_with_malformed_content_encoding_after_2xx_still_reports_committed(
+        self,
+    ) -> None:
+        # The 201 PUT already committed the write. The read-back GET then
+        # returns 200 with a malformed Content-Encoding (httpx2.DecodingError
+        # during body decoding) rather than a timeout -- a distinct failure
+        # mode from the transport-failure case above, but it must be handled
+        # the same way: COMMITTED stands, no raw exception escapes, and only
+        # the deterministic reference is reported, not a claimed verified
+        # event.
+        server = build_fake_server()
+        server.get_malformed_content_encoding = True
+        adapter = build_adapter(server)
+        self.addCleanup(adapter.close)
+
+        result = adapter.create_event(
+            _proposal(), operation_id="op-readback-malformed-encoding"
+        )
+
+        self.assertEqual(result.status, CalendarCreateStatus.COMMITTED)
+        assert result.event_ref is not None
+        self.assertEqual(
+            result.event_ref.resource_name,
+            derive_resource_name("op-readback-malformed-encoding"),
+        )
+        self.assertIsNone(result.event)
+
     def test_put_response_body_read_failure_still_reports_committed(self) -> None:
         # The create path never uses the PUT response body -- once the 201
         # status/headers are known, ADR-0009 section 6 already proves the
