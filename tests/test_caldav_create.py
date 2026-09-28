@@ -159,19 +159,60 @@ class CalDAVCreateTests(unittest.TestCase):
 
         self.assertEqual(result.status, CalendarCreateStatus.AMBIGUOUS)
 
-    def test_read_back_failure_after_2xx_is_ambiguous(self) -> None:
-        # The provider already committed (2xx); Ada's own read-back GET then
-        # fails. That must not escape as a raw exception, and must not
-        # report anything weaker than the provider's own evidence.
+    def test_read_back_failure_after_2xx_still_reports_committed(self) -> None:
+        # ADR-0009 section 6: "Any 2xx status is success" -- the provider
+        # already committed the write. Ada's own read-back GET then fails,
+        # but that is a verification problem, not evidence the write didn't
+        # happen: it must not escape as a raw exception, and must not
+        # downgrade an already-known commit to ambiguous.
+        proposal = _proposal()
         adapter, _server = _adapter_with_method_override(
             "GET", httpx2.ReadTimeout("simulated failure reading back the event")
         )
         self.addCleanup(adapter.close)
 
-        result = adapter.create_event(_proposal(), operation_id="op-readback-fails")
+        result = adapter.create_event(proposal, operation_id="op-readback-fails")
 
-        self.assertEqual(result.status, CalendarCreateStatus.AMBIGUOUS)
-        self.assertEqual(result.error_code, "post_write_verification_failed")
+        self.assertEqual(result.status, CalendarCreateStatus.COMMITTED)
+        assert result.event is not None
+        # Built from what Ada already knows it sent, not from a guessed
+        # provider-assigned version -- the version stays unknown/unverified.
+        self.assertEqual(result.event.title, proposal.title)
+        self.assertEqual(result.event.start, proposal.start)
+        self.assertEqual(result.event.end, proposal.end)
+        self.assertIsNone(result.event.version)
+
+    def test_read_back_returning_not_found_after_2xx_still_reports_committed(
+        self,
+    ) -> None:
+        # The provider says the write succeeded (2xx) but an immediate GET
+        # reports the resource missing. The 2xx is still the evidence that
+        # matters; this must not be reinterpreted as ambiguous either.
+        proposal = _proposal()
+        server = build_fake_server()
+
+        def dispatch(request: httpx2.Request) -> httpx2.Response:
+            if request.method == "GET":
+                return httpx2.Response(404, content=b"not found")
+            return server(request)
+
+        adapter = CalDAVCalendarAdapter(
+            base_url=BASE_URL,
+            auth=FAKE_AUTH,
+            calendars=(default_family_ref(),),
+            profile=IONOS_PROFILE,
+            transport=httpx2.MockTransport(dispatch),
+        )
+        self.addCleanup(adapter.close)
+
+        result = adapter.create_event(
+            proposal, operation_id="op-readback-not-found"
+        )
+
+        self.assertEqual(result.status, CalendarCreateStatus.COMMITTED)
+        assert result.event is not None
+        self.assertEqual(result.event.title, proposal.title)
+        self.assertIsNone(result.event.version)
 
     def test_reconciliation_failure_after_412_is_ambiguous(self) -> None:
         # PUT gets 412 (someone/something already created it); the

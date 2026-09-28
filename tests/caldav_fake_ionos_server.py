@@ -13,6 +13,26 @@ def _xml_escape(value: str) -> str:
     return saxutils.escape(value)
 
 
+class _ChunkedByteStream(httpx2.SyncByteStream):
+    """Yields a known body in small chunks, without a ``Content-Length``
+    header, so a caller can be proven to genuinely stream an ordinary
+    (non-oversized) response end to end rather than only exercising the
+    already-materialized ``content=`` mock shortcut.
+    """
+
+    def __init__(self, body: bytes, *, chunk_size: int = 16) -> None:
+        self._body = body
+        self._chunk_size = chunk_size
+        self.closed = False
+
+    def __iter__(self):
+        for start in range(0, len(self._body), self._chunk_size):
+            yield self._body[start : start + self._chunk_size]
+
+    def close(self) -> None:
+        self.closed = True
+
+
 class _UnboundedByteStream(httpx2.SyncByteStream):
     """Yields many chunks, without any ``Content-Length`` header.
 
@@ -84,6 +104,7 @@ class FakeIonosCalDAVServer:
         self.last_unbounded_stream: _UnboundedByteStream | None = None
         self.wrong_origin_href: str | None = None
         self.force_redirect_methods: frozenset[str] = frozenset()
+        self.stream_normal_responses = False
 
         # Observability for assertions.
         self.received_time_ranges: list[tuple[datetime, datetime]] = []
@@ -116,6 +137,17 @@ class FakeIonosCalDAVServer:
         value = f"e{self._next_etag_id}"
         self._next_etag_id += 1
         return value
+
+    def _multistatus_response(self, body: bytes) -> httpx2.Response:
+        if self.stream_normal_responses:
+            return httpx2.Response(
+                207,
+                headers={"Content-Type": "application/xml"},
+                stream=_ChunkedByteStream(body),
+            )
+        return httpx2.Response(
+            207, content=body, headers={"Content-Type": "application/xml"}
+        )
 
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
         if self.inject_doctype:
@@ -186,9 +218,7 @@ class FakeIonosCalDAVServer:
             "</D:response>"
             "</D:multistatus>"
         ).encode("utf-8")
-        return httpx2.Response(
-            207, content=body, headers={"Content-Type": "application/xml"}
-        )
+        return self._multistatus_response(body)
 
     def _collection_for_href(self, href_path: str) -> _Collection | None:
         for collection in self._collections.values():
@@ -229,9 +259,7 @@ class FakeIonosCalDAVServer:
             + "".join(entries)
             + "</D:multistatus>"
         ).encode("utf-8")
-        return httpx2.Response(
-            207, content=body, headers={"Content-Type": "application/xml"}
-        )
+        return self._multistatus_response(body)
 
     def _get(self, path: str) -> httpx2.Response:
         for collection in self._collections.values():

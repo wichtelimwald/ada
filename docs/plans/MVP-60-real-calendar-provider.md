@@ -234,16 +234,26 @@ S6-S7 (roadmap `done` only in the last PR).
   after create (no `ETag` in the IONOS create response). A 403 (duplicate
   UID under a different resource name) intentionally stays `ambiguous`
   without a GET: it cannot happen from Ada's own deterministic naming, and
-  resolving it would need a UID-based search, out of MVP scope. Read-back/
-  reconciliation failures after an already-sent write (2xx or 412) are
-  caught and mapped to a typed ambiguous outcome rather than escaping as an
-  exception. Tests: `tests/test_caldav_create.py` (read-only/unconfigured
-  calendar fail closed before any request, duplicate-UID-under-different-
-  resource stays ambiguous, not-attempted vs. ambiguous transport-failure
-  classification including a redirect after PUT, post-write
-  read-back/reconciliation fault injection) and
-  `tests/test_caldav_create_crash_recovery.py` (hard process kill after the
-  provider commit recovers to exactly one event via
+  resolving it would need a UID-based search, out of MVP scope. Per ADR-0009
+  section 6 ("any 2xx status is success"), a 2xx `PUT` is unconditionally
+  `COMMITTED`: if the post-write read-back GET then fails or unexpectedly
+  reports the resource missing, the reported event falls back to
+  `mapping.calendar_event_from_proposal` (what Ada itself already knows it
+  sent, resource name included; `version` stays `None`, never a guessed
+  provider value) rather than downgrading to `ambiguous`. A 412 whose
+  reconciling GET fails, by contrast, correctly stays `ambiguous` — the
+  provider's own response there was already inconclusive. No case lets a
+  read-back/reconciliation exception escape as a raw exception. Tests:
+  `tests/test_caldav_create.py` (read-only/unconfigured calendar fail closed
+  before any request, duplicate-UID-under-different-resource stays
+  ambiguous, not-attempted vs. ambiguous transport-failure classification
+  including a redirect after PUT, 2xx read-back failure/404 still reports
+  committed, 412 reconciliation fault injection stays ambiguous),
+  `tests/test_caldav_create_durable_action.py` (the same 2xx-read-back-
+  failure case through the real `DBOSDurableCalendarActions` layer, proving
+  the durable-action outcome is also `COMMITTED`, not just the adapter's
+  own return value), and `tests/test_caldav_create_crash_recovery.py` (hard
+  process kill after the provider commit recovers to exactly one event via
   `tests/dbos_caldav_crash_worker.py`, extending the pattern in
   `tests/dbos_crash_worker.py`).
 - **S4 Update/cancel:** durable workflows following ADR-0009 section 6:
@@ -316,8 +326,15 @@ ignored `BYHOUR`/`BYMINUTE`/`BYSECOND`, budgets enforced only after
 expansion, a write-redirect misclassified as not-attempted, a non-UTC
 time-range bound, floating-time silently treated as UTC, an all-day event
 without `DTEND` collapsing to zero duration, and post-write read-back/
-reconciliation exceptions escaping the typed outcome contract. Items below
-tagged S4+ remain open for later PRs.
+reconciliation exceptions escaping the typed outcome contract. A second
+review round then found and this PR also fixed: a streamed response body
+that was consumed for its size cap but discarded rather than retained
+(`httpx2.ResponseNotRead` on a genuinely streamed response), a successful
+2xx create that was incorrectly downgraded to `ambiguous` when read-back
+failed instead of staying `committed` per ADR-0009 section 6, and a query
+window that could clamp to a non-empty interval still entirely outside the
+provider-supported range instead of returning no events for a
+non-overlapping request. Items below tagged S4+ remain open for later PRs.
 
 - `scripts/validate.sh` (compile, unit tests, `ada doctor`).
 - Contract suite against every `CalendarPort` adapter.

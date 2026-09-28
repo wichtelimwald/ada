@@ -59,6 +59,74 @@ class CalDAVReadPathTests(unittest.TestCase):
         self.assertEqual(clamped_start, now - IONOS_PROFILE.query_window_before)
         self.assertEqual(clamped_end, now + IONOS_PROFILE.query_window_after)
 
+    def test_query_wholly_before_supported_window_sends_no_request(self) -> None:
+        server = build_fake_server()
+        now = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        adapter = build_adapter(server, clock=lambda: now)
+        self.addCleanup(adapter.close)
+        floor = now - IONOS_PROFILE.query_window_before
+
+        events = adapter.list_events(
+            start=floor - timedelta(days=10),
+            end=floor - timedelta(days=5),
+        )
+
+        self.assertEqual(events, ())
+        self.assertEqual(server.received_time_ranges, [])
+
+    def test_query_wholly_after_supported_window_sends_no_request(self) -> None:
+        server = build_fake_server()
+        now = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        adapter = build_adapter(server, clock=lambda: now)
+        self.addCleanup(adapter.close)
+        ceiling = now + IONOS_PROFILE.query_window_after
+
+        events = adapter.list_events(
+            start=ceiling + timedelta(days=5),
+            end=ceiling + timedelta(days=10),
+        )
+
+        self.assertEqual(events, ())
+        self.assertEqual(server.received_time_ranges, [])
+
+    def test_query_overlapping_only_the_lower_boundary_is_clamped_to_the_floor(
+        self,
+    ) -> None:
+        server = build_fake_server()
+        now = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        adapter = build_adapter(server, clock=lambda: now)
+        self.addCleanup(adapter.close)
+        floor = now - IONOS_PROFILE.query_window_before
+
+        adapter.list_events(
+            start=floor - timedelta(days=5),
+            end=floor + timedelta(days=5),
+        )
+
+        self.assertEqual(len(server.received_time_ranges), 2)
+        clamped_start, clamped_end = server.received_time_ranges[0]
+        self.assertEqual(clamped_start, floor)
+        self.assertEqual(clamped_end, floor + timedelta(days=5))
+
+    def test_query_overlapping_only_the_upper_boundary_is_clamped_to_the_ceiling(
+        self,
+    ) -> None:
+        server = build_fake_server()
+        now = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        adapter = build_adapter(server, clock=lambda: now)
+        self.addCleanup(adapter.close)
+        ceiling = now + IONOS_PROFILE.query_window_after
+
+        adapter.list_events(
+            start=ceiling - timedelta(days=5),
+            end=ceiling + timedelta(days=5),
+        )
+
+        self.assertEqual(len(server.received_time_ranges), 2)
+        clamped_start, clamped_end = server.received_time_ranges[0]
+        self.assertEqual(clamped_start, ceiling - timedelta(days=5))
+        self.assertEqual(clamped_end, ceiling)
+
     def test_propfind_exposes_reported_privileges_for_the_startup_cross_check(
         self,
     ) -> None:
@@ -344,6 +412,35 @@ class CalDAVReadPathTests(unittest.TestCase):
             stream.chunks_yielded * 4096, IONOS_PROFILE.max_response_bytes + 4096 * 2
         )
         self.assertTrue(stream.closed)
+
+    def test_genuinely_streamed_propfind_and_report_bodies_are_usable(self) -> None:
+        # A genuinely streamed httpx2 response does not populate `.content`
+        # merely by being fully iterated; accessing it directly afterward
+        # raises httpx2.ResponseNotRead. This proves the ordinary (small,
+        # within-cap) PROPFIND/REPORT path works end to end against a real
+        # SyncByteStream, not only against the fake server's usual
+        # already-materialized `content=` responses.
+        server = build_fake_server()
+        server.stream_normal_responses = True
+        server.seed_resource(
+            FAMILY_PATH,
+            "streamed.ics",
+            _ical(
+                "streamed-1@example",
+                "DTSTART:20261012T160000Z\r\nDTEND:20261012T163000Z\r\n"
+                "SUMMARY:Streamed event\r\n",
+            ),
+        )
+        adapter = build_adapter(server)
+        self.addCleanup(adapter.close)
+
+        events = adapter.list_events(
+            start=datetime(2026, 10, 1, tzinfo=timezone.utc),
+            end=datetime(2026, 11, 1, tzinfo=timezone.utc),
+        )
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0].title, "Streamed event")
 
     def test_daily_rule_with_byhour_byminute_bysecond_fails_closed(self) -> None:
         # Before the fix, a DAILY period was treated as producing at most

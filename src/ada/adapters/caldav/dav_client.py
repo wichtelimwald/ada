@@ -102,6 +102,24 @@ def build_client(
 _SAFE_METHODS = frozenset({"GET", "PROPFIND", "REPORT"})
 
 
+@dataclass(frozen=True, slots=True)
+class DavResponse:
+    """One fully (but boundedly) read CalDAV response.
+
+    Ada-owned wrapper around the transport's streamed response: the body has
+    already been read once, incrementally, and capped while reading. Callers
+    never touch ``httpx2``'s own streaming state and can read ``.content``
+    any number of times without risking ``httpx2.ResponseNotRead`` (which a
+    genuinely streamed response raises if ``.content`` is accessed instead of
+    ``.read()``/an exhausted ``.iter_bytes()``) or reading the network stream
+    twice.
+    """
+
+    status_code: int
+    headers: httpx2.Headers
+    content: bytes
+
+
 def send_request(
     client: httpx2.Client,
     method: str,
@@ -110,14 +128,15 @@ def send_request(
     headers: dict[str, str] | None = None,
     content: bytes | None = None,
     max_response_bytes: int,
-) -> httpx2.Response:
+) -> DavResponse:
     """Send one request, classifying transport failures per ADR-0009 section 6.
 
     Connection failures before a request is sent are "not attempted";
     timeouts or transport errors after sending are ambiguous. The response
     body is read incrementally and capped while reading (never materialized
-    fully first), so an untrusted or misbehaving response cannot exhaust
-    memory regardless of whether the caller inspects the body.
+    fully first via ``httpx2``'s own buffering ``.content``/``.read()``
+    shortcut), so an untrusted or misbehaving response cannot exhaust memory
+    regardless of whether the caller inspects the body.
 
     A redirect is never followed. For a safe (read) method that is simply a
     protocol/configuration condition ("not attempted": nothing unsafe
@@ -153,20 +172,26 @@ def send_request(
         )
 
     try:
-        _consume_capped(response, max_bytes=max_response_bytes)
+        body = _consume_capped(response, max_bytes=max_response_bytes)
     except BaseException:
         response.close()
         raise
-    return response
+
+    result = DavResponse(
+        status_code=response.status_code, headers=response.headers, content=body
+    )
+    response.close()
+    return result
 
 
-def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> None:
+def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> bytes:
     """Read a streamed response body, aborting as soon as it exceeds the cap.
 
     Reads incrementally via ``iter_bytes()`` rather than the buffering
     ``.content``/``.read()`` shortcut, so an oversized or falsely-labeled
     response is capped while reading, not after it is already fully in
-    memory.
+    memory. The accepted (within-cap) chunks are retained and returned so a
+    genuinely streamed response's body is not lost after being consumed.
     """
 
     declared = response.headers.get("content-length")
@@ -181,12 +206,15 @@ def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> None:
             )
 
     total = 0
+    chunks: list[bytes] = []
     for chunk in response.iter_bytes():
         total += len(chunk)
         if total > max_bytes:
             raise CalDAVResponseTooLargeError(
                 f"response body exceeds the {max_bytes}-byte cap"
             )
+        chunks.append(chunk)
+    return b"".join(chunks)
 
 
 def parse_safe_xml(content: bytes) -> ElementTree.Element:
@@ -440,7 +468,7 @@ def put_create_only(
     *,
     body: bytes,
     max_response_bytes: int,
-) -> httpx2.Response:
+) -> DavResponse:
     """Create-only ``PUT`` (``If-None-Match: *``); never overwrites a resource."""
 
     return send_request(

@@ -113,17 +113,28 @@ class CalDAVCalendarAdapter:
         self._collection_cache[ref.calendar_id] = info
         return info
 
-    def _clamp_window(
+    def _intersect_window(
         self, start: datetime, end: datetime
-    ) -> tuple[datetime, datetime]:
+    ) -> tuple[datetime, datetime] | None:
+        """The intersection of ``[start, end)`` with the profile's supported
+        query window around "now", or ``None`` when they do not overlap at
+        all (for example a request entirely before or after the provider's
+        supported range). Clamping only the individual bounds and repairing
+        an inverted result afterward can silently produce a *non-empty*
+        interval that still lies entirely outside the supported window
+        (for example ``[+400d, +400d]`` when the ceiling is ``+365d``); an
+        explicit intersection avoids that by construction.
+        """
+
         now = self._clock()
         floor = now - self._profile.query_window_before
         ceiling = now + self._profile.query_window_after
-        clamped_start = max(start, floor)
-        clamped_end = min(end, ceiling)
-        if clamped_end < clamped_start:
-            clamped_end = clamped_start
-        return clamped_start, clamped_end
+
+        intersection_start = max(start, floor)
+        intersection_end = min(end, ceiling)
+        if intersection_start >= intersection_end:
+            return None
+        return intersection_start, intersection_end
 
     def list_events(
         self,
@@ -131,7 +142,12 @@ class CalDAVCalendarAdapter:
         start: datetime,
         end: datetime,
     ) -> Sequence[CalendarEvent]:
-        clamped_start, clamped_end = self._clamp_window(start, end)
+        window = self._intersect_window(start, end)
+        if window is None:
+            # No overlap with the provider-supported window at all: no
+            # collection needs to be resolved and no REPORT needs to be sent.
+            return ()
+        clamped_start, clamped_end = window
 
         events: list[CalendarEvent] = []
         # Per-query budget: shared across every collection queried by this
@@ -228,23 +244,22 @@ class CalDAVCalendarAdapter:
             )
 
         if response.status_code in (200, 201, 204):
-            # The provider has already committed the write (2xx); a failure
-            # to then read it back is a verification problem, never grounds
-            # to report anything weaker than "committed, reference unknown".
+            # ADR-0009 section 6: "Any 2xx status is success" -- the write is
+            # already proven, unconditionally. Read-back only verifies/
+            # enriches the stored version; it must never downgrade an
+            # already-known commit to ambiguous, whether it fails outright or
+            # (unexpectedly) reports the resource missing. Either way, Ada
+            # already knows what it asked the provider to store.
+            known_event = mapping.calendar_event_from_proposal(
+                proposal, calendar_id=ref.calendar_id, resource_name=resource_name
+            )
             try:
                 event = self._read_back(ref.calendar_id, resource_href, resource_name)
             except _RECOVERABLE_VERIFICATION_ERRORS:
-                return CalendarCreateResult(
-                    status=CalendarCreateStatus.AMBIGUOUS,
-                    error_code="post_write_verification_failed",
-                )
-            if event is None:
-                return CalendarCreateResult(
-                    status=CalendarCreateStatus.AMBIGUOUS,
-                    error_code="provider_missing_reference",
-                )
+                event = None
             return CalendarCreateResult(
-                status=CalendarCreateStatus.COMMITTED, event=event
+                status=CalendarCreateStatus.COMMITTED,
+                event=event if event is not None else known_event,
             )
 
         if response.status_code == 412:
