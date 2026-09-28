@@ -28,6 +28,7 @@ from ada.ports.calendar import (
     CalendarCreateStatus,
     CalendarEvent,
     CalendarRef,
+    EventRef,
     EventVersion,
 )
 
@@ -248,10 +249,12 @@ class CalDAVCalendarAdapter:
             # already proven, unconditionally. Read-back only verifies/
             # enriches the stored version; it must never downgrade an
             # already-known commit to ambiguous, whether it fails outright or
-            # (unexpectedly) reports the resource missing. Either way, Ada
-            # already knows what it asked the provider to store.
-            known_event = mapping.calendar_event_from_proposal(
-                proposal, calendar_id=ref.calendar_id, resource_name=resource_name
+            # (unexpectedly) reports the resource missing. But the provider
+            # owns events: without a successful read-back Ada must not report
+            # its own proposal as if it were verified provider state, only
+            # the deterministic reference it already knows.
+            event_ref = EventRef(
+                calendar_id=ref.calendar_id, resource_name=resource_name
             )
             try:
                 event = self._read_back(ref.calendar_id, resource_href, resource_name)
@@ -259,7 +262,8 @@ class CalDAVCalendarAdapter:
                 event = None
             return CalendarCreateResult(
                 status=CalendarCreateStatus.COMMITTED,
-                event=event if event is not None else known_event,
+                event_ref=event_ref,
+                event=event,
             )
 
         if response.status_code == 412:
@@ -268,7 +272,11 @@ class CalDAVCalendarAdapter:
             )
             if existing is not None:
                 return CalendarCreateResult(
-                    status=CalendarCreateStatus.COMMITTED, event=existing
+                    status=CalendarCreateStatus.COMMITTED,
+                    event_ref=EventRef(
+                        calendar_id=ref.calendar_id, resource_name=resource_name
+                    ),
+                    event=existing,
                 )
             return CalendarCreateResult(
                 status=CalendarCreateStatus.AMBIGUOUS,

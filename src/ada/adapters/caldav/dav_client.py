@@ -171,6 +171,19 @@ def send_request(
             "after a write request was already sent"
         )
 
+    if not is_safe:
+        # A write's response body is never used by any caller (the status
+        # code is already the provider evidence, ADR-0009 section 6). Once
+        # headers arrive that evidence is final; reading an unneeded body
+        # must not be able to put it at risk of an unrelated body-read
+        # failure (for example a timeout partway through an empty/short
+        # body).
+        result = DavResponse(
+            status_code=response.status_code, headers=response.headers, content=b""
+        )
+        response.close()
+        return result
+
     try:
         body = _consume_capped(response, max_bytes=max_response_bytes)
     except BaseException:
@@ -192,6 +205,13 @@ def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> bytes:
     response is capped while reading, not after it is already fully in
     memory. The accepted (within-cap) chunks are retained and returned so a
     genuinely streamed response's body is not lost after being consumed.
+
+    Only called for safe (read) requests -- see ``send_request`` -- whose
+    caller actually needs the body. A timeout/transport error raised by
+    ``iter_bytes()`` itself (the request was already sent and a response was
+    already received; only the body did not finish) is classified the same
+    way as any other post-send transport failure instead of leaking the raw
+    ``httpx2`` exception through this module's typed boundary.
     """
 
     declared = response.headers.get("content-length")
@@ -207,13 +227,18 @@ def _consume_capped(response: httpx2.Response, *, max_bytes: int) -> bytes:
 
     total = 0
     chunks: list[bytes] = []
-    for chunk in response.iter_bytes():
-        total += len(chunk)
-        if total > max_bytes:
-            raise CalDAVResponseTooLargeError(
-                f"response body exceeds the {max_bytes}-byte cap"
-            )
-        chunks.append(chunk)
+    try:
+        for chunk in response.iter_bytes():
+            total += len(chunk)
+            if total > max_bytes:
+                raise CalDAVResponseTooLargeError(
+                    f"response body exceeds the {max_bytes}-byte cap"
+                )
+            chunks.append(chunk)
+    except (httpx2.TimeoutException, httpx2.TransportError) as exc:
+        raise CalDAVAmbiguousTransportError(
+            f"reading the response body failed: {exc}"
+        ) from exc
     return b"".join(chunks)
 
 

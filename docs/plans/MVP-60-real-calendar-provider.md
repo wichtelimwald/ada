@@ -236,22 +236,36 @@ S6-S7 (roadmap `done` only in the last PR).
   without a GET: it cannot happen from Ada's own deterministic naming, and
   resolving it would need a UID-based search, out of MVP scope. Per ADR-0009
   section 6 ("any 2xx status is success"), a 2xx `PUT` is unconditionally
-  `COMMITTED`: if the post-write read-back GET then fails or unexpectedly
-  reports the resource missing, the reported event falls back to
-  `mapping.calendar_event_from_proposal` (what Ada itself already knows it
-  sent, resource name included; `version` stays `None`, never a guessed
-  provider value) rather than downgrading to `ambiguous`. A 412 whose
-  reconciling GET fails, by contrast, correctly stays `ambiguous` — the
-  provider's own response there was already inconclusive. No case lets a
-  read-back/reconciliation exception escape as a raw exception. Tests:
+  `COMMITTED`. The provider owns events, though: `CalendarCreateResult`
+  separates the deterministic `event_ref` Ada already knows the moment the
+  2xx status is known from the *verified* `event`, populated only once
+  read-back actually succeeds. When read-back fails or (unexpectedly)
+  reports the resource missing, the result stays `COMMITTED` with
+  `event_ref` set and `event` absent — never the proposal reported as if it
+  were verified provider state; `DBOSDurableCalendarActions` records the
+  deterministic reference directly in that case rather than requiring a
+  fabricated event. A 412 whose reconciling GET fails, by contrast,
+  correctly stays `ambiguous` — the provider's own response there was
+  already inconclusive. A write's response body is never read at all (its
+  status alone is the provider evidence), so a body-read failure on the PUT
+  response cannot affect the outcome; for read requests
+  (`PROPFIND`/`REPORT`/`GET`) a body-read failure after the response headers
+  already arrived (for example a timeout partway through streaming) is
+  classified as `CalDAVAmbiguousTransportError` like any other post-send
+  transport failure, never leaked as a raw `httpx2` exception. Tests:
   `tests/test_caldav_create.py` (read-only/unconfigured calendar fail closed
   before any request, duplicate-UID-under-different-resource stays
   ambiguous, not-attempted vs. ambiguous transport-failure classification
-  including a redirect after PUT, 2xx read-back failure/404 still reports
+  including a redirect after PUT, 2xx read-back success reports a verified
+  event, 2xx read-back failure/404 stays committed with only the
+  deterministic reference, a PUT response body read failure still reports
   committed, 412 reconciliation fault injection stays ambiguous),
-  `tests/test_caldav_create_durable_action.py` (the same 2xx-read-back-
-  failure case through the real `DBOSDurableCalendarActions` layer, proving
-  the durable-action outcome is also `COMMITTED`, not just the adapter's
+  `tests/test_caldav_read_path.py` (a REPORT body read failure after the
+  response headers were already received is a typed ambiguous-transport
+  error, not a raw exception), `tests/test_caldav_create_durable_action.py`
+  (the same 2xx-read-back-failure case through the real
+  `DBOSDurableCalendarActions` layer, proving the durable-action outcome is
+  also `COMMITTED` with the deterministic reference, not just the adapter's
   own return value), and `tests/test_caldav_create_crash_recovery.py` (hard
   process kill after the provider commit recovers to exactly one event via
   `tests/dbos_caldav_crash_worker.py`, extending the pattern in
@@ -334,7 +348,18 @@ that was consumed for its size cap but discarded rather than retained
 failed instead of staying `committed` per ADR-0009 section 6, and a query
 window that could clamp to a non-empty interval still entirely outside the
 provider-supported range instead of returning no events for a
-non-overlapping request. Items below tagged S4+ remain open for later PRs.
+non-overlapping request. A third review round then found and this PR also
+fixed: a body-read failure occurring after the response headers/status were
+already received (for example a timeout while streaming a REPORT body) that
+bypassed the typed transport-failure classification and could leak a raw
+`httpx2` exception — write requests now never read their own (unused)
+response body at all, and read requests classify a body-read failure the
+same way as any other post-send transport failure — and a `COMMITTED` 2xx
+create with a failed read-back that reported the *proposal* data as if it
+were verified provider state; `CalendarCreateResult` now separates the
+deterministic `event_ref` Ada already knows from the *verified* `event`,
+populated only once read-back actually succeeds. Items below tagged S4+
+remain open for later PRs.
 
 - `scripts/validate.sh` (compile, unit tests, `ada doctor`).
 - Contract suite against every `CalendarPort` adapter.

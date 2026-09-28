@@ -9,6 +9,7 @@ import httpx2
 from dbos import DBOS, DBOSConfig
 
 from ada.adapters.caldav.adapter import CalDAVCalendarAdapter
+from ada.adapters.caldav.mapping import derive_resource_name
 from ada.adapters.caldav.profile import IONOS_PROFILE
 from ada.adapters.dbos_durable_actions import DBOSDurableCalendarActions
 from ada.core.action_outcomes import (
@@ -64,6 +65,11 @@ class CalDAVCreateDurableActionTests(unittest.TestCase):
     def test_read_back_failure_after_2xx_still_reports_committed_end_to_end(
         self,
     ) -> None:
+        # Per ADR-0009 section 6, a 2xx PUT is COMMITTED even though the
+        # required read-back then fails; the durable layer must report the
+        # deterministic provider reference Ada already knows without
+        # fabricating a verified provider event to obtain one.
+        operation_id = "op-caldav-readback-fails-durable"
         server = build_fake_server()
 
         def dispatch(request: httpx2.Request) -> httpx2.Response:
@@ -87,7 +93,7 @@ class CalDAVCreateDurableActionTests(unittest.TestCase):
         DBOS.launch()
 
         request = DurableCalendarCreate(
-            operation_id=OperationId("op-caldav-readback-fails-durable"),
+            operation_id=OperationId(operation_id),
             proposal=_proposal(),
             authorization=AuthorizationEvidence(
                 policy_version="test-policy-v1",
@@ -99,6 +105,10 @@ class CalDAVCreateDurableActionTests(unittest.TestCase):
 
         self.assertEqual(result.provider.status, ProviderOutcomeStatus.COMMITTED)
         self.assertEqual(result.business.status, BusinessOutcomeStatus.COMMITTED)
+        # The deterministic reference, not a fabricated verified event.
+        self.assertEqual(
+            result.provider.provider_reference, derive_resource_name(operation_id)
+        )
 
 
 if __name__ == "__main__":

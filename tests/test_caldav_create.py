@@ -159,12 +159,39 @@ class CalDAVCreateTests(unittest.TestCase):
 
         self.assertEqual(result.status, CalendarCreateStatus.AMBIGUOUS)
 
+    def test_read_back_success_after_2xx_reports_committed_with_verified_event(
+        self,
+    ) -> None:
+        # The ordinary path: 2xx PUT, then a successful read-back. Both the
+        # deterministic reference and the provider-verified event are
+        # available.
+        server = build_fake_server()
+        adapter = build_adapter(server)
+        self.addCleanup(adapter.close)
+        proposal = _proposal()
+
+        result = adapter.create_event(proposal, operation_id="op-readback-succeeds")
+
+        self.assertEqual(result.status, CalendarCreateStatus.COMMITTED)
+        assert result.event_ref is not None
+        self.assertEqual(result.event_ref.calendar_id, "family")
+        self.assertEqual(
+            result.event_ref.resource_name,
+            derive_resource_name("op-readback-succeeds"),
+        )
+        assert result.event is not None
+        self.assertEqual(result.event.title, proposal.title)
+        self.assertIsNotNone(result.event.version)
+
     def test_read_back_failure_after_2xx_still_reports_committed(self) -> None:
         # ADR-0009 section 6: "Any 2xx status is success" -- the provider
         # already committed the write. Ada's own read-back GET then fails,
         # but that is a verification problem, not evidence the write didn't
         # happen: it must not escape as a raw exception, and must not
-        # downgrade an already-known commit to ambiguous.
+        # downgrade an already-known commit to ambiguous. The provider owns
+        # events, though: without a successful read-back Ada may only report
+        # the deterministic reference it already knows, never the proposal
+        # data as if it were verified provider state.
         proposal = _proposal()
         adapter, _server = _adapter_with_method_override(
             "GET", httpx2.ReadTimeout("simulated failure reading back the event")
@@ -174,20 +201,21 @@ class CalDAVCreateTests(unittest.TestCase):
         result = adapter.create_event(proposal, operation_id="op-readback-fails")
 
         self.assertEqual(result.status, CalendarCreateStatus.COMMITTED)
-        assert result.event is not None
-        # Built from what Ada already knows it sent, not from a guessed
-        # provider-assigned version -- the version stays unknown/unverified.
-        self.assertEqual(result.event.title, proposal.title)
-        self.assertEqual(result.event.start, proposal.start)
-        self.assertEqual(result.event.end, proposal.end)
-        self.assertIsNone(result.event.version)
+        assert result.event_ref is not None
+        self.assertEqual(result.event_ref.calendar_id, "family")
+        self.assertEqual(
+            result.event_ref.resource_name, derive_resource_name("op-readback-fails")
+        )
+        self.assertIsNone(result.event)
 
     def test_read_back_returning_not_found_after_2xx_still_reports_committed(
         self,
     ) -> None:
         # The provider says the write succeeded (2xx) but an immediate GET
         # reports the resource missing. The 2xx is still the evidence that
-        # matters; this must not be reinterpreted as ambiguous either.
+        # matters; this must not be reinterpreted as ambiguous either, and
+        # (as above) Ada may only report the deterministic reference, not a
+        # claimed verified event.
         proposal = _proposal()
         server = build_fake_server()
 
@@ -210,9 +238,36 @@ class CalDAVCreateTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, CalendarCreateStatus.COMMITTED)
-        assert result.event is not None
-        self.assertEqual(result.event.title, proposal.title)
-        self.assertIsNone(result.event.version)
+        assert result.event_ref is not None
+        self.assertEqual(
+            result.event_ref.resource_name,
+            derive_resource_name("op-readback-not-found"),
+        )
+        self.assertIsNone(result.event)
+
+    def test_put_response_body_read_failure_still_reports_committed(self) -> None:
+        # The create path never uses the PUT response body -- once the 201
+        # status/headers are known, ADR-0009 section 6 already proves the
+        # commit. A failure while streaming that (unused) body must not be
+        # able to turn a known commit into anything weaker or raise a raw
+        # exception.
+        server = build_fake_server()
+        server.put_response_body_read_failure = httpx2.ReadTimeout(
+            "simulated failure while streaming the PUT response body"
+        )
+        adapter = build_adapter(server)
+        self.addCleanup(adapter.close)
+
+        result = adapter.create_event(
+            _proposal(), operation_id="op-put-body-read-fails"
+        )
+
+        self.assertEqual(result.status, CalendarCreateStatus.COMMITTED)
+        assert result.event_ref is not None
+        self.assertEqual(
+            result.event_ref.resource_name,
+            derive_resource_name("op-put-body-read-fails"),
+        )
 
     def test_reconciliation_failure_after_412_is_ambiguous(self) -> None:
         # PUT gets 412 (someone/something already created it); the

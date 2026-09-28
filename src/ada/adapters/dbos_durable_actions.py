@@ -11,8 +11,24 @@ from ada.core.action_outcomes import (
     business_outcome_from_provider,
 )
 from ada.core.actions import calendar_create_action_binding
-from ada.ports.calendar import CalendarCreateStatus, CalendarPort
+from ada.ports.calendar import CalendarCreateResult, CalendarCreateStatus, CalendarPort
 from ada.ports.durable_action import DurableCalendarCreate
+
+
+def _provider_reference(result: CalendarCreateResult) -> str | None:
+    """The known provider reference for a ``COMMITTED`` result, if any.
+
+    A verified ``event`` (read-back succeeded) is preferred; otherwise the
+    deterministic ``event_ref`` Ada already knows from the write itself
+    (ADR-0009 section 6) is enough to record which resource was created --
+    it does not require fabricating a provider-owned ``CalendarEvent``.
+    """
+
+    if result.event is not None:
+        return result.event.event_id
+    if result.event_ref is not None:
+        return result.event_ref.resource_name
+    return None
 
 
 @DBOS.dbos_class()
@@ -126,9 +142,10 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
         )
 
         if result.status is CalendarCreateStatus.COMMITTED:
-            if result.event is None:
+            reference = _provider_reference(result)
+            if reference is None:
                 return self._ambiguous(request, "provider_missing_reference")
-            return self._committed(request, result.event.event_id)
+            return self._committed(request, reference)
 
         if result.status is CalendarCreateStatus.REJECTED:
             provider = ProviderOutcome(
@@ -151,8 +168,10 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
                 request.proposal,
                 operation_id=operation_id,
             )
-            if retry.status is CalendarCreateStatus.COMMITTED and retry.event:
-                return self._committed(request, retry.event.event_id)
+            if retry.status is CalendarCreateStatus.COMMITTED:
+                reference = _provider_reference(retry)
+                if reference is not None:
+                    return self._committed(request, reference)
             if retry.status is CalendarCreateStatus.REJECTED:
                 provider = ProviderOutcome(
                     status=ProviderOutcomeStatus.FAILED,

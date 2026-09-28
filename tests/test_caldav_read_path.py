@@ -9,6 +9,7 @@ import httpx2
 
 from ada.adapters.caldav.adapter import CalDAVCalendarAdapter
 from ada.adapters.caldav.dav_client import (
+    CalDAVAmbiguousTransportError,
     CalDAVConfigurationError,
     CalDAVNotAttemptedError,
     CalDAVProtocolError,
@@ -441,6 +442,28 @@ class CalDAVReadPathTests(unittest.TestCase):
 
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0].title, "Streamed event")
+
+    def test_report_body_read_failure_is_a_typed_ambiguous_transport_error(
+        self,
+    ) -> None:
+        # The REPORT request was already sent and its headers/status already
+        # received (unlike a failure during client.send() itself, which the
+        # earlier try/except already classified); only the body then fails
+        # while streaming. That must still surface as Ada's own typed
+        # transport error, never as a raw httpx2 exception escaping the
+        # dav_client boundary.
+        server = build_fake_server()
+        server.report_body_read_failure = httpx2.ReadTimeout(
+            "simulated failure while streaming the REPORT body"
+        )
+        adapter = build_adapter(server)
+        self.addCleanup(adapter.close)
+
+        with self.assertRaises(CalDAVAmbiguousTransportError):
+            adapter.list_events(
+                start=datetime(2026, 10, 1, tzinfo=timezone.utc),
+                end=datetime(2026, 11, 1, tzinfo=timezone.utc),
+            )
 
     def test_daily_rule_with_byhour_byminute_bysecond_fails_closed(self) -> None:
         # Before the fix, a DAILY period was treated as producing at most

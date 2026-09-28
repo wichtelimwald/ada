@@ -80,7 +80,18 @@ class CalendarCreateStatus(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class CalendarCreateResult:
+    """``event_ref`` is the deterministic provider reference Ada already
+    knows once ``status`` is ``COMMITTED``: it never depends on read-back
+    succeeding. ``event`` is the *verified* provider-owned event data; it is
+    only present once a read-back actually confirmed it. A ``COMMITTED``
+    result with ``event_ref`` set but ``event`` still ``None`` means "the
+    provider accepted the write, but Ada has not verified what it stored" --
+    that must not be confused with verified provider state (the provider
+    owns events; ADR-0009 section 6).
+    """
+
     status: CalendarCreateStatus
+    event_ref: EventRef | None = None
     event: CalendarEvent | None = None
     error_code: str | None = None
 

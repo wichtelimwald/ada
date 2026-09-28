@@ -484,35 +484,3 @@ def build_create_ical(
 
     calendar.add_component(event)
     return calendar.to_ical()
-
-
-def calendar_event_from_proposal(
-    proposal: CreateCalendarEventProposal,
-    *,
-    calendar_id: str,
-    resource_name: str,
-) -> CalendarEvent:
-    """The event Ada already knows it asked the provider to create.
-
-    Used only when a provider 2xx (ADR-0009 section 6: "any 2xx status is
-    success") proves the write happened, but a subsequent read-back cannot
-    then verify the stored version. It is built entirely from facts Ada
-    already has -- its own deterministic resource name and the exact
-    proposal it sent -- never by guessing provider-assigned data such as an
-    entity tag: ``version`` stays ``None`` rather than being fabricated.
-    """
-
-    return CalendarEvent(
-        event_id=resource_name,
-        title=proposal.title,
-        start=proposal.start.astimezone(timezone.utc),
-        end=proposal.end.astimezone(timezone.utc),
-        calendar_id=calendar_id,
-        location=proposal.location,
-        event_ref=EventRef(calendar_id=calendar_id, resource_name=resource_name),
-        version=None,
-        busy=True,
-        all_day=False,
-        recurring=False,
-        has_attendees=False,
-    )

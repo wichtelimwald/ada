@@ -33,6 +33,28 @@ class _ChunkedByteStream(httpx2.SyncByteStream):
         self.closed = True
 
 
+class _RaisingByteStream(httpx2.SyncByteStream):
+    """Yields nothing and raises while being iterated.
+
+    Simulates a body-read failure (for example a timeout) that happens
+    *after* the response headers/status were already received and returned
+    by ``client.send(..., stream=True)`` -- distinct from a failure during
+    ``client.send()`` itself, which the existing fault injectors (a raised
+    exception from the transport callable) already cover.
+    """
+
+    def __init__(self, exc: Exception) -> None:
+        self._exc = exc
+        self.closed = False
+
+    def __iter__(self):
+        raise self._exc
+        yield b""  # pragma: no cover - makes this a generator function
+
+    def close(self) -> None:
+        self.closed = True
+
+
 class _UnboundedByteStream(httpx2.SyncByteStream):
     """Yields many chunks, without any ``Content-Length`` header.
 
@@ -105,6 +127,8 @@ class FakeIonosCalDAVServer:
         self.wrong_origin_href: str | None = None
         self.force_redirect_methods: frozenset[str] = frozenset()
         self.stream_normal_responses = False
+        self.report_body_read_failure: Exception | None = None
+        self.put_response_body_read_failure: Exception | None = None
 
         # Observability for assertions.
         self.received_time_ranges: list[tuple[datetime, datetime]] = []
@@ -237,6 +261,16 @@ class FakeIonosCalDAVServer:
                 (_parse_caldav_time(match.group(1)), _parse_caldav_time(match.group(2)))
             )
 
+        if self.report_body_read_failure is not None:
+            # Headers/status are genuinely returned; only the body fails
+            # while being streamed, proving a post-send body-read failure is
+            # classified rather than leaked raw (dav_client._consume_capped).
+            return httpx2.Response(
+                207,
+                headers={"Content-Type": "application/xml"},
+                stream=_RaisingByteStream(self.report_body_read_failure),
+            )
+
         entries = []
         # Matches the observed OX/IONOS behavior: comp-filter/time-range are
         # not enforced server-side, so every stored resource is returned and
@@ -293,6 +327,16 @@ class FakeIonosCalDAVServer:
                 return httpx2.Response(403, content=b"duplicate UID")
 
         collection.resources[path] = _StoredResource(body=request.content, uid=uid)
+        if self.put_response_body_read_failure is not None:
+            # The write already committed (the resource is stored above);
+            # only the unused response body fails while being streamed, to
+            # prove a create's outcome cannot depend on reading a write
+            # response body no caller needs.
+            return httpx2.Response(
+                201,
+                headers={"Content-Type": "text/calendar"},
+                stream=_RaisingByteStream(self.put_response_body_read_failure),
+            )
         # IONOS reports no ETag in the create response (probe P2); the
         # adapter must GET afterward to learn the version.
         return httpx2.Response(201, content=b"")
