@@ -3,7 +3,7 @@
 Status: implementation  
 Roadmap: docs/product/mvp-roadmap.md  
 Depends on: MVP-20  
-Owner PR: #46
+Owner PR: S1 #46 (merged); S2 TBD
 
 ## Goal
 
@@ -14,7 +14,7 @@ when intentionally unlocked.
 
 ## Current state / evidence
 
-- MVP-20 is done on main via PR #41.
+- MVP-20 is done on main via PR #41.\n- S1 is complete on main via PR #46 (squash `3c5c6d4`): broker/domain contract, fail-closed scope binding, non-authoritative MemoryScope boundary, and worktree-safe validation.
 - ADR-0008 already selects a host-side Memory Broker and private-by-default,
   independently protected Memory domains.
 - ADR-0010 provides safe current-file semantics and Git recovery history, but leaves
