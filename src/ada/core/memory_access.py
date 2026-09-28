@@ -34,6 +34,14 @@ class ProtectionDomainRef:
 
     Storage paths, encryption keys and provider credentials deliberately do not
     cross this Ada-owned boundary.
+
+    This is broker-internal, non-authoritative metadata, not a bearer
+    capability: equality is defined only by the opaque ``domain_id``/``kind``
+    fields below, and constructing or possessing an instance grants no storage
+    access by itself. Only ``ada.ports.memory_broker`` and its broker-side
+    implementations may treat resolution of this type as authoritative; no
+    other module may import it (enforced by
+    ``tests.test_architecture_boundaries``).
     """
 
     domain_id: str
@@ -81,7 +89,17 @@ class MemoryAccessContext:
 
 @dataclass(frozen=True, slots=True)
 class MemoryScope:
-    """Resolved broker scope with no filesystem, key or credential material."""
+    """Resolved broker scope with no filesystem, key or credential material.
+
+    This is broker-internal, non-authoritative metadata returned by
+    ``MemoryBrokerPort.resolve_scope()`` for deterministic S1 testing. It is not
+    an authorization capability: nothing outside the broker boundary may accept
+    a ``MemoryScope`` (or the domain IDs inside it) as proof of storage access.
+    A future storage operation must re-present the trusted
+    ``MemoryAccessContext`` to the broker rather than reuse a previously
+    resolved scope. See ADR-0011, "MemoryScope is not an authorization
+    capability".
+    """
 
     domains: tuple[ProtectionDomainRef, ...]
 

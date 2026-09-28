@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import pathlib
+import re
 import subprocess
 import sys
 import textwrap
 import unittest
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 
 class ArchitectureBoundaryTests(unittest.TestCase):
@@ -60,6 +64,33 @@ class ArchitectureBoundaryTests(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stderr or result.stdout)
+
+    def test_memory_scope_is_confined_to_the_broker_boundary(self) -> None:
+        """Guard PR #46 finding M1: MemoryScope/ProtectionDomainRef must never
+        become a de facto authorization capability by being threaded through
+        ordinary runtime/storage-adapter code outside the broker boundary."""
+        allowed = {
+            REPO_ROOT / "src" / "ada" / "core" / "memory_access.py",
+            REPO_ROOT / "src" / "ada" / "ports" / "memory_broker.py",
+            REPO_ROOT / "src" / "ada" / "adapters" / "in_memory_memory_broker.py",
+        }
+        token = re.compile(r"\b(MemoryScope|ProtectionDomainRef)\b")
+
+        offenders = []
+        for path in (REPO_ROOT / "src" / "ada").rglob("*.py"):
+            if path in allowed:
+                continue
+            if token.search(path.read_text(encoding="utf-8")):
+                offenders.append(str(path.relative_to(REPO_ROOT)))
+
+        self.assertEqual(
+            offenders,
+            [],
+            "MemoryScope/ProtectionDomainRef must stay inside the broker "
+            "boundary (ada.core.memory_access, ada.ports.memory_broker, "
+            "ada.adapters.in_memory_memory_broker); found references in: "
+            + ", ".join(offenders),
+        )
 
     def test_pydantic_adapter_returns_ada_owned_result(self) -> None:
         from ada.adapters.pydantic_ai import PydanticAIRuntime

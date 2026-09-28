@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import fields
+import typing
 import unittest
 
 from ada.adapters.in_memory_memory_broker import (
@@ -15,7 +16,7 @@ from ada.core.memory_access import (
     ProtectionDomainKind,
     ProtectionDomainRef,
 )
-from ada.ports.memory_broker import MemoryScopeDeniedError
+from ada.ports.memory_broker import MemoryBrokerPort, MemoryScopeDeniedError
 
 
 def _domain(hex_digit: str, kind: ProtectionDomainKind) -> ProtectionDomainRef:
@@ -155,6 +156,32 @@ class MemoryBrokerContractTests(unittest.TestCase):
         scope = self.broker.resolve_scope(self.self_read)
 
         self.assertNotIn(self.other_private, scope.domains)
+
+    def test_resolve_scope_is_keyed_only_by_trusted_context_not_by_scope(
+        self,
+    ) -> None:
+        """Guard PR #46 finding M1: the broker port must take a trusted
+        MemoryAccessContext as its only input, never a caller-supplied
+        MemoryScope/domain ID that could be replayed as an authorization
+        capability."""
+        hints = typing.get_type_hints(MemoryBrokerPort.resolve_scope)
+        parameter_hints = {
+            name: hint for name, hint in hints.items() if name != "return"
+        }
+
+        self.assertEqual(parameter_hints, {"context": MemoryAccessContext})
+
+    def test_caller_constructed_scope_cannot_be_presented_to_the_broker(
+        self,
+    ) -> None:
+        """A caller can freely build a MemoryScope naming any configured
+        domain, but the broker only recognizes a trusted MemoryAccessContext:
+        presenting a forged scope where a context is expected still fails
+        closed rather than being accepted as proof of access."""
+        forged = MemoryScope((self.private, self.shared))
+
+        with self.assertRaises(MemoryScopeDeniedError):
+            self.broker.resolve_scope(forged)  # type: ignore[arg-type]
 
 
 if __name__ == "__main__":

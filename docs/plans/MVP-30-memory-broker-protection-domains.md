@@ -51,10 +51,17 @@ when intentionally unlocked.
 These remain blockers for ADR-0011 acceptance, not invitations to guess:
 
 1. target-Mac Keychain access-control shape for a broker process;
-2. exact platform encrypted-image command/format after the macOS probe;
-3. whether ADR-0010's final late non-cooperating-save race is accepted as an MVP
+2. the concrete OS-level enforcement mechanism (for example a distinct service
+   identity/POSIX user, filesystem ACLs, a code-signing-scoped Keychain
+   access-control list, or an app-sandbox/entitlement boundary) that prevents a
+   same-user ordinary Ada runtime process from directly reading an unrelated
+   domain's unlocked plaintext mount or retrieving its Keychain secret; no
+   mechanism is assumed until proven by the S2 target-Mac negative probes
+   (see ADR-0011 point 2 and "Review focus" below);
+3. exact platform encrypted-image command/format after the macOS probe;
+4. whether ADR-0010's final late non-cooperating-save race is accepted as an MVP
    residual or closed through a separately designed synchronization slice;
-4. broker lifecycle/startup ownership for the final packaged product (MVP-90 may own
+5. broker lifecycle/startup ownership for the final packaged product (MVP-90 may own
    packaging, but MVP-30 must prove restart behavior).
 
 ## Reuse / dependency evidence
@@ -101,6 +108,15 @@ S1 introduces:
 - MemoryScope: exact broker-resolved domain set;
 - MemoryBrokerPort.resolve_scope(): fail-closed domain resolution.
 
+MemoryScope/ProtectionDomainRef are broker-internal, non-authoritative metadata
+returned only for S1's deterministic contract testing. They are not an
+authorization capability: nothing outside the broker boundary (S1
+InMemoryMemoryBroker, later the S2 production broker) may accept a resolved
+scope or domain ID as proof of storage access. A future storage operation must
+re-present the trusted MemoryAccessContext to the broker itself. See ADR-0011,
+"MemoryScope is not an authorization capability", and the import-boundary
+regression test in tests/test_architecture_boundaries.py.
+
 The S1 InMemoryMemoryBroker is contract/test infrastructure only. It is not a
 production security boundary and must never be used with real household Memory.
 
@@ -120,6 +136,15 @@ provider credentials entirely behind the host-side broker/provider adapters.
 
 ### S2 — Host process + encrypted-vault provider probe
 
+- decide and target-Mac-validate the concrete OS-level enforcement mechanism
+  for same-user process isolation (open decision 2 above) **before**
+  implementing the encrypted-vault provider; do not assume Unix-socket IPC
+  permissions alone isolate a mounted vault or a Keychain item from the
+  ordinary Ada runtime process;
+- add the two required negative target-Mac probes run from the ordinary
+  runtime process: it must fail to read an unrelated domain's unlocked
+  plaintext mount, and it must fail to retrieve an unrelated domain's
+  Keychain secret;
 - implement local-only broker IPC with restrictive permissions;
 - define EncryptedVaultProvider behind the adapter boundary;
 - target-Mac synthetic probe for encrypted create/unlock/lock/restart;
@@ -177,6 +202,11 @@ S1:
     python -m unittest tests.test_architecture_boundaries
     sh scripts/validate.sh
 
+`scripts/validate.sh` derives the repository root from its own location and
+puts that worktree's `src/` ahead of `PYTHONPATH`, then asserts the `ada`
+import actually resolves there, so validation cannot silently pass/fail
+against a different, stale Ada checkout (PR #46 M3).
+
 Later slices add target-Mac platform probes and restart/restore tests. Validation
 evidence is commit-specific and belongs in the PR.
 
@@ -186,11 +216,18 @@ evidence is commit-specific and belongs in the PR.
 - accidental path/key leakage across the broker port;
 - confused-deputy behavior between actor and audience;
 - treating the broker as an authorization engine;
+- a resolved MemoryScope/domain ID being accepted anywhere as proof of storage
+  access instead of re-presenting MemoryAccessContext to the broker (PR #46 M1);
 - any normal runtime process that still receives all vault credentials;
+- an assumed-but-unproven OS enforcement mechanism for same-user isolation of
+  mounted vaults/Keychain secrets between the broker and the ordinary runtime
+  (PR #46 M2; see ADR-0011 point 2 and open decision 2 above);
 - plaintext Git objects/config outside encrypted broker-controlled storage;
 - Keychain access broader than the broker needs;
 - mount/unlock crash cleanup and stale mounted volumes;
-- silent last-writer-wins or an unjustified claim that Git solves human-edit races.
+- silent last-writer-wins or an unjustified claim that Git solves human-edit races;
+- validation commands/scripts that can silently resolve `ada` from a different
+  checkout instead of the current worktree (PR #46 M3).
 
 ## Follow-ups
 

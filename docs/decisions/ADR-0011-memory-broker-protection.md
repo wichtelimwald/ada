@@ -51,6 +51,38 @@ permissions. Do not open a TCP/network listener merely for convenience.
 The exact message serialization is an implementation detail and must remain behind
 the Ada-owned port.
 
+#### Unresolved: same-user OS enforcement for mounted vaults and Keychain secrets
+
+A separate broker process is necessary but not sufficient. If the broker and the
+ordinary Ada runtime run under the same macOS user/security context, Unix-domain
+socket permissions restrict who can talk to the broker over IPC, but they do
+**not** by themselves prevent the ordinary runtime from directly reading an
+unrelated domain's already-unlocked plaintext mount on disk, nor from directly
+querying the platform credential store for that domain's Keychain item. Both are
+same-user, same-machine resources unless a distinct OS-level enforcement
+mechanism scopes them to the broker specifically.
+
+This is an explicitly **unresolved** problem, not a solved one. No enforcement
+mechanism is adopted by this ADR. Before S2 implements the encrypted-vault
+provider, S2 must run a target-Mac decision gate that selects and validates a
+concrete OS-level enforcement mechanism — for example a distinct service
+identity/POSIX user for the broker, filesystem ACLs on the mount point, a
+code-signing-scoped Keychain access-control list restricted to the broker
+binary, an app-sandbox/entitlement boundary, or another equivalent, tested
+mechanism. Do not invent or assume a solution ahead of that probe.
+
+S2 must add, at minimum, these negative target-Mac probes, run from the
+ordinary (non-broker) Ada runtime process:
+
+- the ordinary runtime process cannot read an unrelated domain's unlocked
+  plaintext mount;
+- the ordinary runtime process cannot retrieve an unrelated domain's Keychain
+  secret.
+
+Until both probes pass on the target Mac, this ADR remains Proposed and the
+topology provides encryption at rest without the claimed runtime domain
+isolation.
+
 ### 3. Use one encrypted current-Memory vault per protection domain
 
 On the first supported macOS MVP, adapt the platform encrypted-volume capability
@@ -108,6 +140,31 @@ source/document provider when those providers are introduced. A provider for one
 domain must not widen another domain. This ADR does not define source retrieval
 APIs ahead of the MVP-40 scenarios.
 
+### 8. MemoryScope is not an authorization capability
+
+`MemoryBrokerPort.resolve_scope()` returns `MemoryScope`/`ProtectionDomainRef`.
+These are ordinary, caller-constructible Ada dataclasses so the S1 deterministic
+test adapter can be exercised without a live broker process. That is safe only
+because the invariant below is explicit and enforced, not merely assumed:
+
+- `MemoryScope`/`ProtectionDomainRef` are broker-internal, non-authoritative
+  metadata, never a bearer capability or proof of storage access;
+- only broker-side code (the S1 `InMemoryMemoryBroker` test adapter, and the
+  S2 production broker process behind the IPC boundary) may treat a resolved
+  scope as authoritative;
+- a future storage/provider operation (S2+) must re-present the trusted
+  `MemoryAccessContext` to the broker boundary itself and receive a scoped
+  operation/result from it, rather than accept a previously resolved
+  `MemoryScope` or domain ID as sufficient proof of access. This matches the
+  stronger statement in point 2 above that the ordinary runtime receives
+  scoped Memory operations/results, not domain lists to act on directly.
+
+`tests.test_architecture_boundaries` enforces the import boundary: no module
+outside `ada.core.memory_access`, `ada.ports.memory_broker`, and
+`ada.adapters.in_memory_memory_broker` may reference `MemoryScope` or
+`ProtectionDomainRef`. This ADR does not yet define the S2+ storage-operation
+API shape; that remains future work, deliberately out of S1 scope.
+
 ## Consequences
 
 ### Positive
@@ -134,6 +191,13 @@ APIs ahead of the MVP-40 scenarios.
 ## Validation required before acceptance
 
 - independent architecture/security review of the broker binding contract;
+- a decided and target-Mac-validated OS-level enforcement mechanism (service
+  identity / ACL / code-signing Keychain access control / equivalent) for
+  same-user process isolation of mounted vaults and Keychain secrets (see
+  point 2);
+- the two required negative target-Mac probes from the ordinary runtime
+  process: it cannot read an unrelated domain's unlocked plaintext mount, and
+  it cannot retrieve an unrelated domain's Keychain secret;
 - target-Mac encrypted vault create/unlock/lock/restart probe with synthetic data;
 - proof that unrelated domains cannot be opened through normal broker requests;
 - proof that the normal Ada runtime receives no key/root for an unrelated domain;
