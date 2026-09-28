@@ -14,7 +14,8 @@ when intentionally unlocked.
 
 ## Current state / evidence
 
-- MVP-20 is done on main via PR #41.\n- S1 is complete on main via PR #46 (squash `3c5c6d4`): broker/domain contract, fail-closed scope binding, non-authoritative MemoryScope boundary, and worktree-safe validation.
+- MVP-20 is done on main via PR #41.
+- S1 is complete on main via PR #46 (squash `3c5c6d4`): broker/domain contract, fail-closed scope binding, non-authoritative MemoryScope boundary, and worktree-safe validation.
 - ADR-0008 already selects a host-side Memory Broker and private-by-default,
   independently protected Memory domains.
 - ADR-0010 provides safe current-file semantics and Git recovery history, but leaves
@@ -23,6 +24,8 @@ when intentionally unlocked.
   <root>/.git; no protection-domain broker or encryption exists yet.
 - docs/research/memory-protection-evaluation.md evaluates maintained/platform
   protection mechanisms. ADR-0011 records the proposed topology.
+- docs/research/macos-broker-isolation-evaluation.md narrows the S2 macOS
+  enforcement candidates and defines the target-Mac decision probes.
 
 ## Scope
 
@@ -136,6 +139,15 @@ provider credentials entirely behind the host-side broker/provider adapters.
 
 ### S2 — Host process + encrypted-vault provider probe
 
+S2 starts with a probe/decision slice; production broker/vault code must not be
+written until the two isolation negatives have a credible mechanism.
+
+- run `research/memory/mvp-30-s2/probe_encrypted_vault.py` on the target Mac to
+  validate AES-256/APFS create/attach/detach/reattach mechanics and record the
+  expected same-user direct-read result (same-user read succeeds, proving that
+  process separation alone is insufficient);
+- compare the smallest credible enforcement candidates documented in
+  `docs/research/macos-broker-isolation-evaluation.md`;
 - decide and target-Mac-validate the concrete OS-level enforcement mechanism
   for same-user process isolation (open decision 2 above) **before**
   implementing the encrypted-vault provider; do not assume Unix-socket IPC
@@ -207,7 +219,13 @@ puts that worktree's `src/` ahead of `PYTHONPATH`, then asserts the `ada`
 import actually resolves there, so validation cannot silently pass/fail
 against a different, stale Ada checkout (PR #46 M3).
 
-Later slices add target-Mac platform probes and restart/restore tests. Validation
+S2 Probe A:
+
+    python3 research/memory/mvp-30-s2/probe_encrypted_vault.py
+
+An optional distinct-identity sub-probe may be run only with an explicitly chosen
+existing test account; a skipped result is not security evidence. Later S2 probes
+cover Keychain isolation and the selected process identity model. Validation
 evidence is commit-specific and belongs in the PR.
 
 ## Review focus
