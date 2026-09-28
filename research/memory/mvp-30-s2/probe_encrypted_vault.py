@@ -76,6 +76,13 @@ def python_can_read(path: Path) -> bool:
 
 
 def distinct_user_can_read(path: Path, runtime_user: str) -> tuple[str, bool | None]:
+    try:
+        account = pwd.getpwnam(runtime_user)
+    except KeyError:
+        return ("skipped:runtime-user-not-found", None)
+    if account.pw_uid == os.getuid():
+        return ("skipped:runtime-user-is-current-user", None)
+
     sudo = shutil.which("sudo")
     if sudo is None:
         return ("skipped:sudo-unavailable", None)
@@ -101,6 +108,7 @@ def distinct_user_can_read(path: Path, runtime_user: str) -> tuple[str, bool | N
 
 
 def attach(image: Path, mountpoint: Path, password: str) -> str:
+    mountpoint.mkdir(mode=0o700, exist_ok=True)
     result = run(
         [
             "/usr/bin/hdiutil",
@@ -135,7 +143,7 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
         "machine": platform.machine(),
         "python": platform.python_version(),
         "same_user_unlocked_read": None,
-        "distinct_runtime_user": runtime_user,
+        "distinct_runtime_user_requested": runtime_user is not None,
         "distinct_user_probe": "not-requested",
         "distinct_user_unlocked_read": None,
         "detach_reattach_persistence": False,
@@ -147,6 +155,10 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
 
     with tempfile.TemporaryDirectory(prefix="ada-mvp30-s2-") as temp_dir:
         root = Path(temp_dir)
+        # TemporaryDirectory is normally 0700. Make only the parent traversable so
+        # an optional distinct-user read reaches the mounted volume and tests the
+        # volume's ownership/mode rather than failing early on the temp parent.
+        root.chmod(0o711)
         image = root / "synthetic-vault.sparsebundle"
         mountpoint = root / "mount"
         mountpoint.mkdir(mode=0o700)
@@ -183,6 +195,10 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
             secret_file = mountpoint / "synthetic-private.txt"
             secret_file.write_bytes(marker)
             secret_file.chmod(0o600)
+            vault_stat = mountpoint.stat()
+            report["vault_root_uid"] = vault_stat.st_uid
+            report["vault_root_gid"] = vault_stat.st_gid
+            report["vault_root_mode"] = oct(vault_stat.st_mode & 0o777)
 
             # Expected to be True: same-user process separation alone is not a
             # filesystem protection boundary once the vault is unlocked.
