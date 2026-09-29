@@ -37,7 +37,15 @@ class ArchitectureBoundaryTests(unittest.TestCase):
                 "ada.ports.personality_memory",
                 "ada.ports.memory_broker",
             )
-            framework_modules = ("pydantic_ai", "cedarpy", "dbos")
+            framework_modules = (
+                "pydantic_ai",
+                "cedarpy",
+                "dbos",
+                "httpx2",
+                "icalendar",
+                "recurring_ical_events",
+                "x_wr_timezone",
+            )
 
             for module_name in target_modules:
                 importlib.import_module(module_name)
