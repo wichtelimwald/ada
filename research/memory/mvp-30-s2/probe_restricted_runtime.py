@@ -5,12 +5,13 @@ Research-only. This script NEVER invokes sudo.
 
 "prepare" creates only synthetic state:
 - a temporary encrypted APFS sparse bundle mounted for the current user;
-- a synthetic Keychain item whose random value never leaves process memory;
-- a tiny shell check that an explicitly chosen existing restricted account can run.
+- a synthetic Keychain item whose random value is sent to macOS security(1) only
+  over stdin (security -i), never argv/environment/files/output;
+- a tiny shell check for an explicitly chosen existing restricted account.
 
 It prints the ONE identity-switch command for the maintainer to execute manually.
-"cleanup" then removes the synthetic Keychain item, detaches the vault, and deletes
-the temporary workspace without sudo.
+"cleanup" removes the synthetic Keychain item, detaches the vault, and deletes the
+temporary workspace without sudo.
 """
 
 from __future__ import annotations
@@ -35,10 +36,9 @@ class ProbeError(RuntimeError):
     pass
 
 
-HERE = Path(__file__).resolve().parent
-KEYCHAIN_SWIFT = HERE / "keychain_probe.swift"
 WORKSPACE_PREFIX = "ada-mvp30-s2-identity-"
 STATE_NAME = "probe-state.json"
+SECURITY = Path("/usr/bin/security")
 
 
 def choose_runtime_user(requested: str | None) -> str:
@@ -56,33 +56,64 @@ def choose_runtime_user(requested: str | None) -> str:
     raise ProbeError("no suitable existing distinct runtime account found")
 
 
-def compile_keychain_helper(output: Path) -> None:
-    xcrun = shutil.which("xcrun")
-    if xcrun is None:
-        raise ProbeError("xcrun is unavailable; Xcode Command Line Tools are required")
-    result = vault.run([xcrun, "--find", "swiftc"], check=False)
-    if result.returncode != 0:
-        raise ProbeError("swiftc is unavailable via xcrun")
-    swiftc = result.stdout.decode().strip()
-    if not swiftc:
-        raise ProbeError("xcrun returned an empty swiftc path")
-
-    vault.run([swiftc, str(KEYCHAIN_SWIFT), "-o", str(output)])
-    output.chmod(0o755)
+def require_security_tool() -> None:
+    if not SECURITY.exists():
+        raise ProbeError("/usr/bin/security is unavailable")
 
 
-def helper(
-    executable: Path,
-    operation: str,
-    service: str,
-    account: str,
-) -> int:
+def keychain_add(service: str, account: str, password: str) -> None:
+    # security(1) interactive mode reads commands from stdin. service/account are
+    # generated fixed-safe tokens and password is random hex, so no shell quoting
+    # or command interpolation is involved.
+    command = (
+        f"add-generic-password -a {account} -s {service} -w {password}\n"
+    ).encode("ascii")
     result = vault.run(
-        [str(executable), operation, service, account],
+        [str(SECURITY), "-q", "-i"],
+        input_bytes=command,
         check=False,
         timeout=20,
     )
-    return result.returncode
+    if result.returncode != 0:
+        stderr = result.stderr.decode("utf-8", errors="replace").strip()
+        raise ProbeError(
+            "current-user synthetic Keychain add failed"
+            + (f": {stderr}" if stderr else "")
+        )
+
+
+def keychain_read(service: str, account: str) -> bool:
+    # -w emits the secret to stdout. Capture it and discard it; never print it.
+    result = vault.run(
+        [
+            str(SECURITY),
+            "find-generic-password",
+            "-a",
+            account,
+            "-s",
+            service,
+            "-w",
+        ],
+        check=False,
+        timeout=20,
+    )
+    return result.returncode == 0
+
+
+def keychain_delete(service: str, account: str) -> bool:
+    result = vault.run(
+        [
+            str(SECURITY),
+            "delete-generic-password",
+            "-a",
+            account,
+            "-s",
+            service,
+        ],
+        check=False,
+        timeout=20,
+    )
+    return result.returncode == 0
 
 
 def create_vault(image: Path, password: str) -> None:
@@ -118,7 +149,6 @@ def write_restricted_check(
     *,
     runtime_user: str,
     private_file: Path,
-    helper_bin: Path,
     service: str,
     account: str,
 ) -> None:
@@ -128,7 +158,10 @@ set +e
 /bin/cat {shlex.quote(str(private_file))} >/dev/null 2>&1
 vault_rc=$?
 
-{shlex.quote(str(helper_bin))} read {shlex.quote(service)} {shlex.quote(account)} >/dev/null 2>&1
+{shlex.quote(str(SECURITY))} find-generic-password \
+  -a {shlex.quote(account)} \
+  -s {shlex.quote(service)} \
+  -w >/dev/null 2>&1
 keychain_rc=$?
 
 printf '%s\\n' \
@@ -137,8 +170,7 @@ printf '%s\\n' \
   "vault_read_exit=$vault_rc" \
   "keychain_read_exit=$keychain_rc"
 
-# This checker reports evidence only; it deliberately does not turn an expected
-# denial into a shell failure that could obscure the two individual exit codes.
+# Evidence only: expected denials remain visible as their individual exit codes.
 exit 0
 """
     path.write_text(script, encoding="utf-8")
@@ -164,7 +196,6 @@ def cleanup_workspace(state_path: Path) -> dict[str, Any]:
     state = json.loads(state_path.read_text(encoding="utf-8"))
     root = state_path.parent
 
-    helper_bin = Path(state["helper_bin"])
     service = str(state["service"])
     account = str(state["account"])
     device = str(state["device"])
@@ -178,12 +209,7 @@ def cleanup_workspace(state_path: Path) -> dict[str, Any]:
     }
 
     try:
-        report["keychain_cleanup"] = helper(
-            helper_bin,
-            "delete",
-            service,
-            account,
-        ) == 0
+        report["keychain_cleanup"] = keychain_delete(service, account)
     except Exception as exc:
         report["keychain_cleanup_error"] = str(exc)
 
@@ -210,9 +236,10 @@ def cleanup_workspace(state_path: Path) -> dict[str, Any]:
     return report
 
 
-def prepare(runtime_user_requested: str | None) -> tuple[dict[str, Any], Path]:
+def prepare(runtime_user_requested: str | None) -> dict[str, Any]:
     if sys.platform != "darwin":
         raise ProbeError("this probe must run on macOS")
+    require_security_tool()
 
     runtime_user = choose_runtime_user(runtime_user_requested)
     root = Path(tempfile.mkdtemp(prefix=WORKSPACE_PREFIX))
@@ -220,13 +247,13 @@ def prepare(runtime_user_requested: str | None) -> tuple[dict[str, Any], Path]:
     # It cannot list the workspace or read the 0600 state file.
     root.chmod(0o711)
 
-    helper_bin = root / "keychain-probe"
     image = root / "identity-vault.sparsebundle"
     mountpoint = root / "mount"
     checker = root / "restricted-check.sh"
     state_path = root / STATE_NAME
 
-    password = secrets.token_hex(32)
+    vault_password = secrets.token_hex(32)
+    keychain_password = secrets.token_hex(32)
     marker = b"synthetic-ada-s2-identity-marker\n"
     service = f"org.ada.mvp30.s2.{secrets.token_hex(8)}"
     account = "synthetic-probe"
@@ -234,10 +261,9 @@ def prepare(runtime_user_requested: str | None) -> tuple[dict[str, Any], Path]:
     device: str | None = None
     keychain_item_added = False
     try:
-        compile_keychain_helper(helper_bin)
-        create_vault(image, password)
+        create_vault(image, vault_password)
         mountpoint.mkdir(mode=0o700, exist_ok=True)
-        device = vault.attach(image, mountpoint, password)
+        device = vault.attach(image, mountpoint, vault_password)
 
         private_file = mountpoint / "synthetic-private.txt"
         private_file.write_bytes(marker)
@@ -246,18 +272,16 @@ def prepare(runtime_user_requested: str | None) -> tuple[dict[str, Any], Path]:
         if private_file.read_bytes() != marker:
             raise ProbeError("current user could not read the synthetic vault marker")
 
-        if helper(helper_bin, "add", service, account) != 0:
-            raise ProbeError("current-user synthetic Keychain add failed")
+        keychain_add(service, account, keychain_password)
         keychain_item_added = True
 
-        if helper(helper_bin, "read", service, account) != 0:
+        if not keychain_read(service, account):
             raise ProbeError("current-user synthetic Keychain read failed")
 
         write_restricted_check(
             checker,
             runtime_user=runtime_user,
             private_file=private_file,
-            helper_bin=helper_bin,
             service=service,
             account=account,
         )
@@ -265,18 +289,18 @@ def prepare(runtime_user_requested: str | None) -> tuple[dict[str, Any], Path]:
         state = {
             "account": account,
             "device": device,
-            "helper_bin": str(helper_bin),
             "runtime_user": runtime_user,
             "service": service,
         }
         write_state(state_path, state)
 
-        report = {
+        return {
             "probe": "mvp-30-s2-restricted-runtime-prepare",
             "status": "ready",
             "runtime_user": runtime_user,
             "broker_user_vault_read": True,
             "broker_user_keychain_read": True,
+            "keychain_transport": "security -i via stdin",
             "workspace": str(root),
             "state_file": str(state_path),
             "manual_identity_switch_command": (
@@ -288,12 +312,11 @@ def prepare(runtime_user_requested: str | None) -> tuple[dict[str, Any], Path]:
                 f"probe_restricted_runtime.py cleanup {shlex.quote(str(state_path))}"
             ),
         }
-        return report, state_path
 
     except Exception:
         if keychain_item_added:
             try:
-                helper(helper_bin, "delete", service, account)
+                keychain_delete(service, account)
             except Exception:
                 pass
         if device is not None:
@@ -322,7 +345,7 @@ def main() -> int:
 
     try:
         if args.command == "prepare":
-            report, _ = prepare(args.runtime_user)
+            report = prepare(args.runtime_user)
         else:
             report = cleanup_workspace(args.state_file)
     except (ProbeError, vault.ProbeError, OSError, ValueError, KeyError) as exc:
