@@ -6,7 +6,13 @@ from enum import Enum
 from typing import Protocol, Sequence
 
 from ada.core.action_outcomes import ProviderCapability
-from ada.core.actions import CreateCalendarEventProposal
+from ada.core.actions import (
+    CancelCalendarEventProposal,
+    CreateCalendarEventProposal,
+    EventRef,
+    EventVersion,
+    UpdateCalendarEventProposal,
+)
 
 
 class CalendarAudience(str, Enum):
@@ -38,24 +44,6 @@ class CalendarRef:
     access_mode: CalendarAccessMode
 
 
-class EventVersion(str):
-    """Opaque provider version for one event resource (a normalized entity tag)."""
-
-    def __new__(cls, value: str) -> "EventVersion":
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("event version must not be empty")
-        return str.__new__(cls, normalized)
-
-
-@dataclass(frozen=True, slots=True)
-class EventRef:
-    """Provider-neutral address for one event resource within a calendar."""
-
-    calendar_id: str
-    resource_name: str
-
-
 @dataclass(frozen=True, slots=True)
 class CalendarEvent:
     event_id: str
@@ -70,6 +58,7 @@ class CalendarEvent:
     all_day: bool = False
     recurring: bool = False
     has_attendees: bool = False
+    sequence: int = 0
 
 
 class CalendarCreateStatus(str, Enum):
@@ -96,12 +85,48 @@ class CalendarCreateResult:
     error_code: str | None = None
 
 
+class CalendarChangeStatus(str, Enum):
+    """Outcome of one update/cancel attempt (ADR-0009 section 6)."""
+
+    COMMITTED = "committed"
+    # The event changed after approval; nothing was written.
+    CONFLICT = "conflict"
+    # The event no longer exists. The goal state may hold, but Ada does not
+    # claim the effect as its own.
+    ABSENT = "absent"
+    # After an ambiguous send the event still equals ``base_version``: the
+    # write provably did not apply and may be retried with the same
+    # precondition.
+    NOT_APPLIED = "not_applied"
+    REJECTED = "rejected"
+    AMBIGUOUS = "ambiguous"
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarChangeResult:
+    """``event`` is the *verified* post-write event; only set for a committed
+    update whose read-back succeeded (as for :class:`CalendarCreateResult`)."""
+
+    status: CalendarChangeStatus
+    event_ref: EventRef | None = None
+    event: CalendarEvent | None = None
+    error_code: str | None = None
+
+
 class CalendarPort(Protocol):
     """Narrow calendar boundary required by the first vertical slice."""
 
     @property
     def create_capability(self) -> ProviderCapability:
         """Declare provider duplicate-safety semantics for create operations."""
+
+    @property
+    def update_capability(self) -> ProviderCapability:
+        """Declare provider duplicate-safety semantics for update operations."""
+
+    @property
+    def cancel_capability(self) -> ProviderCapability:
+        """Declare provider duplicate-safety semantics for cancel operations."""
 
     def list_events(
         self,
@@ -121,3 +146,23 @@ class CalendarPort(Protocol):
 
     def reconcile_create(self, *, operation_id: str) -> CalendarEvent | None:
         """Return an existing committed create when it can be proven."""
+
+    def update_event(
+        self,
+        proposal: UpdateCalendarEventProposal,
+        *,
+        operation_id: str,
+    ) -> CalendarChangeResult:
+        """Attempt one conditional update against ``proposal.base_version``.
+
+        Never overwrites a version newer than ``base_version``; replaying the
+        same operation must not apply twice.
+        """
+
+    def cancel_event(
+        self,
+        proposal: CancelCalendarEventProposal,
+        *,
+        operation_id: str,
+    ) -> CalendarChangeResult:
+        """Attempt one conditional cancel against ``proposal.base_version``."""

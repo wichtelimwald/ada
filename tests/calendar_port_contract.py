@@ -3,8 +3,19 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from ada.core.action_outcomes import ProviderCapability
-from ada.core.actions import CreateCalendarEventProposal
-from ada.ports.calendar import CalendarCreateStatus, CalendarPort
+from ada.core.actions import (
+    CalendarEventChanges,
+    CancelCalendarEventProposal,
+    CreateCalendarEventProposal,
+    EventBaseVersion,
+    UpdateCalendarEventProposal,
+)
+from ada.ports.calendar import (
+    CalendarChangeStatus,
+    CalendarCreateStatus,
+    CalendarEvent,
+    CalendarPort,
+)
 
 
 class CalendarPortContractTests:
@@ -118,3 +129,113 @@ class CalendarPortContractTests:
         self.assertIsNone(  # type: ignore[attr-defined]
             calendar.reconcile_create(operation_id="contract-never-created")
         )
+
+    # -- update / cancel -----------------------------------------------------
+
+    def _created_event(self, calendar: CalendarPort, operation_id: str) -> CalendarEvent:
+        result = calendar.create_event(self.make_proposal(), operation_id=operation_id)
+        assert result.event is not None and result.event.version is not None
+        return result.event
+
+    @staticmethod
+    def _update(event: CalendarEvent, **changes: object) -> UpdateCalendarEventProposal:
+        assert event.event_ref is not None and event.version is not None
+        return UpdateCalendarEventProposal(
+            event_ref=event.event_ref,
+            base_version=EventBaseVersion(event.version, event.sequence),
+            changes=CalendarEventChanges(**changes),  # type: ignore[arg-type]
+        )
+
+    @staticmethod
+    def _cancel(event: CalendarEvent) -> CancelCalendarEventProposal:
+        assert event.event_ref is not None and event.version is not None
+        return CancelCalendarEventProposal(
+            event_ref=event.event_ref,
+            base_version=EventBaseVersion(event.version, event.sequence),
+        )
+
+    def _titles(self, calendar: CalendarPort) -> set[str]:
+        proposal = self.make_proposal()
+        return {
+            event.title
+            for event in calendar.list_events(
+                start=proposal.start - timedelta(hours=1),
+                end=proposal.end + timedelta(hours=1),
+            )
+        }
+
+    def test_declares_update_and_cancel_capabilities(self) -> None:
+        calendar = self.make_calendar()
+        self.assertIsInstance(calendar.update_capability, ProviderCapability)  # type: ignore[attr-defined]
+        self.assertIsInstance(calendar.cancel_capability, ProviderCapability)  # type: ignore[attr-defined]
+
+    def test_update_with_the_approved_version_changes_the_event(self) -> None:
+        calendar = self.make_calendar()
+        event = self._created_event(calendar, "contract-update")
+
+        result = calendar.update_event(
+            self._update(event, title="Renamed"), operation_id="contract-update-1"
+        )
+
+        self.assertEqual(result.status, CalendarChangeStatus.COMMITTED)  # type: ignore[attr-defined]
+        self.assertIn("Renamed", self._titles(calendar))  # type: ignore[attr-defined]
+        self.assertNotIn("Contract test event", self._titles(calendar))  # type: ignore[attr-defined]
+
+    def test_update_with_a_stale_version_is_a_conflict_and_changes_nothing(
+        self,
+    ) -> None:
+        calendar = self.make_calendar()
+        event = self._created_event(calendar, "contract-stale")
+        first = calendar.update_event(
+            self._update(event, title="First"), operation_id="contract-stale-1"
+        )
+        self.assertEqual(first.status, CalendarChangeStatus.COMMITTED)  # type: ignore[attr-defined]
+
+        stale = calendar.update_event(
+            self._update(event, title="Second"), operation_id="contract-stale-2"
+        )
+
+        self.assertEqual(stale.status, CalendarChangeStatus.CONFLICT)  # type: ignore[attr-defined]
+        self.assertIn("First", self._titles(calendar))  # type: ignore[attr-defined]
+        self.assertNotIn("Second", self._titles(calendar))  # type: ignore[attr-defined]
+
+    def test_replaying_an_update_does_not_apply_it_twice(self) -> None:
+        calendar = self.make_calendar()
+        event = self._created_event(calendar, "contract-update-replay")
+        proposal = self._update(event, title="Once")
+
+        first = calendar.update_event(proposal, operation_id="contract-replay-op")
+        second = calendar.update_event(proposal, operation_id="contract-replay-op")
+
+        self.assertEqual(first.status, CalendarChangeStatus.COMMITTED)  # type: ignore[attr-defined]
+        self.assertEqual(second.status, CalendarChangeStatus.COMMITTED)  # type: ignore[attr-defined]
+        assert first.event is not None and second.event is not None
+        self.assertEqual(first.event.sequence, second.event.sequence)  # type: ignore[attr-defined]
+
+    def test_cancel_removes_the_event_and_a_repeat_reports_absent(self) -> None:
+        calendar = self.make_calendar()
+        event = self._created_event(calendar, "contract-cancel")
+        proposal = self._cancel(event)
+
+        first = calendar.cancel_event(proposal, operation_id="contract-cancel-1")
+        second = calendar.cancel_event(proposal, operation_id="contract-cancel-1")
+
+        self.assertEqual(first.status, CalendarChangeStatus.COMMITTED)  # type: ignore[attr-defined]
+        self.assertEqual(second.status, CalendarChangeStatus.ABSENT)  # type: ignore[attr-defined]
+        self.assertNotIn("Contract test event", self._titles(calendar))  # type: ignore[attr-defined]
+
+    def test_cancel_with_a_stale_version_is_a_conflict_and_keeps_the_event(
+        self,
+    ) -> None:
+        calendar = self.make_calendar()
+        event = self._created_event(calendar, "contract-cancel-stale")
+        calendar.update_event(
+            self._update(event, title="Changed"), operation_id="contract-cs-1"
+        )
+
+        result = calendar.cancel_event(
+            self._cancel(event), operation_id="contract-cs-2"
+        )
+
+        self.assertEqual(result.status, CalendarChangeStatus.CONFLICT)  # type: ignore[attr-defined]
+        self.assertIn("Changed", self._titles(calendar))  # type: ignore[attr-defined]

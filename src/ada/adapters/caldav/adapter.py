@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
 import httpx2
 
@@ -18,19 +19,30 @@ from ada.adapters.caldav.dav_client import (
 from ada.adapters.caldav.mapping import (
     CalDAVMappingError,
     CalendarComplexityExceededError,
+    WriteScopeError,
 )
 from ada.adapters.caldav.profile import CalDAVProviderProfile
 from ada.core.action_outcomes import ProviderCapability
-from ada.core.actions import CreateCalendarEventProposal
+from ada.core.actions import (
+    CancelCalendarEventProposal,
+    CreateCalendarEventProposal,
+    EventRef,
+    EventVersion,
+    UpdateCalendarEventProposal,
+)
 from ada.ports.calendar import (
     CalendarAccessMode,
+    CalendarChangeResult,
+    CalendarChangeStatus,
     CalendarCreateResult,
     CalendarCreateStatus,
     CalendarEvent,
     CalendarRef,
-    EventRef,
-    EventVersion,
 )
+
+
+if TYPE_CHECKING:
+    import icalendar
 
 
 def _utc_now() -> datetime:
@@ -96,6 +108,14 @@ class CalDAVCalendarAdapter:
     @property
     def create_capability(self) -> ProviderCapability:
         return self._profile.create_capability
+
+    @property
+    def update_capability(self) -> ProviderCapability:
+        return self._profile.update_capability
+
+    @property
+    def cancel_capability(self) -> ProviderCapability:
+        return self._profile.cancel_capability
 
     def close(self) -> None:
         self._client.close()
@@ -385,3 +405,214 @@ class CalDAVCalendarAdapter:
             resource_name=resource_name,
             version=EventVersion(result.etag) if result.etag else None,
         )
+
+    # -- update / cancel (ADR-0009 section 6) -------------------------------
+
+    def update_event(
+        self,
+        proposal: UpdateCalendarEventProposal,
+        *,
+        operation_id: str,
+    ) -> CalendarChangeResult:
+        return self._change_event(proposal, operation_id=operation_id)
+
+    def cancel_event(
+        self,
+        proposal: CancelCalendarEventProposal,
+        *,
+        operation_id: str,
+    ) -> CalendarChangeResult:
+        return self._change_event(proposal, operation_id=operation_id)
+
+    def _change_event(
+        self,
+        proposal: UpdateCalendarEventProposal | CancelCalendarEventProposal,
+        *,
+        operation_id: str,
+    ) -> CalendarChangeResult:
+        """One conditional update or cancel.
+
+        Fails closed before any provider request for an unconfigured or
+        read-only calendar. Then: read the resource; a replay that finds this
+        operation's marker is already committed; a version other than
+        ``base_version`` is a conflict and nothing is written; otherwise write
+        with ``If-Match: <base_version>`` only, never a later-read tag.
+        """
+
+        is_update = isinstance(proposal, UpdateCalendarEventProposal)
+        event_ref = proposal.event_ref
+        ref = self._calendars.get(event_ref.calendar_id)
+        if ref is None:
+            return _change_result(
+                CalendarChangeStatus.REJECTED, "calendar_not_configured"
+            )
+        if ref.access_mode is not CalendarAccessMode.WRITE:
+            return _change_result(
+                CalendarChangeStatus.REJECTED, "calendar_not_writable"
+            )
+        name = event_ref.resource_name
+        if name.startswith(".") or any(ch in name for ch in "/\\?#%"):
+            return _change_result(
+                CalendarChangeStatus.REJECTED, "invalid_resource_name"
+            )
+
+        marker = mapping.derive_operation_marker(operation_id)
+        base_etag = dav_client.normalize_etag(str(proposal.base_version.version))
+
+        try:
+            collection = self._resolve_collection(ref)
+            href = f"{collection.href.rstrip('/')}/{name}"
+            current = dav_client.get_resource(
+                self._client,
+                href,
+                max_response_bytes=self._profile.max_response_bytes,
+            )
+            if current is None:
+                return _change_result(CalendarChangeStatus.ABSENT, "event_absent")
+            component = mapping.parse_writable_vevent(
+                current.calendar_data, resource_name=name
+            )
+        except WriteScopeError as exc:
+            return _change_result(CalendarChangeStatus.REJECTED, exc.code)
+        except _RECOVERABLE_VERIFICATION_ERRORS:
+            # Nothing has been written yet; only reads failed.
+            return _change_result(CalendarChangeStatus.REJECTED, "pre_read_failed")
+
+        if is_update and self._owns(component, marker):
+            # A replay after a lost checkpoint/response: this operation
+            # already applied. Checked before the version comparison, which
+            # our own write necessarily changed.
+            return CalendarChangeResult(
+                status=CalendarChangeStatus.COMMITTED,
+                event_ref=event_ref,
+                event=self._event_from(ref, name, component, current.etag),
+            )
+
+        if current.etag is None:
+            return _change_result(CalendarChangeStatus.REJECTED, "version_unavailable")
+        if (
+            current.etag != base_etag
+            or mapping.component_sequence(component)
+            != proposal.base_version.sequence
+        ):
+            return _change_result(CalendarChangeStatus.CONFLICT, "version_conflict")
+
+        try:
+            if isinstance(proposal, UpdateCalendarEventProposal):
+                response = dav_client.put_conditional(
+                    self._client,
+                    href,
+                    body=mapping.build_update_ical(
+                        current.calendar_data, proposal, marker=marker
+                    ),
+                    if_match=base_etag,
+                    max_response_bytes=self._profile.max_response_bytes,
+                )
+            else:
+                response = dav_client.delete_conditional(
+                    self._client,
+                    href,
+                    if_match=base_etag,
+                    max_response_bytes=self._profile.max_response_bytes,
+                )
+        except WriteScopeError as exc:
+            return _change_result(CalendarChangeStatus.REJECTED, exc.code)
+        except CalDAVMappingError:
+            return _change_result(CalendarChangeStatus.REJECTED, "unsupported_event")
+        except CalDAVNotAttemptedError:
+            return _change_result(CalendarChangeStatus.REJECTED, "not_attempted")
+        except CalDAVAmbiguousTransportError:
+            return self._reconcile_change(
+                ref, name, href, marker, base_etag, is_update=is_update
+            )
+
+        if response.status_code in (200, 201, 204):
+            event: CalendarEvent | None = None
+            if is_update:
+                try:
+                    event = self._read_back(ref.calendar_id, href, name)
+                except _RECOVERABLE_VERIFICATION_ERRORS:
+                    event = None
+            return CalendarChangeResult(
+                status=CalendarChangeStatus.COMMITTED,
+                event_ref=event_ref,
+                event=event,
+            )
+        if response.status_code == 412:
+            return _change_result(CalendarChangeStatus.CONFLICT, "version_conflict")
+        if response.status_code == 404:
+            return _change_result(CalendarChangeStatus.ABSENT, "event_absent")
+        return self._reconcile_change(
+            ref, name, href, marker, base_etag, is_update=is_update
+        )
+
+    def _owns(self, component: "icalendar.cal.Component", marker: str) -> bool:
+        return (
+            self._profile.preserves_x_properties
+            and mapping.component_operation_marker(component) == marker
+        )
+
+    def _event_from(
+        self,
+        ref: CalendarRef,
+        name: str,
+        component: "icalendar.cal.Component",
+        etag: str | None,
+    ) -> CalendarEvent | None:
+        try:
+            return mapping.build_calendar_event_from_component(
+                component,
+                calendar_id=ref.calendar_id,
+                resource_name=name,
+                version=EventVersion(etag) if etag else None,
+            )
+        except _RECOVERABLE_VERIFICATION_ERRORS:
+            return None
+
+    def _reconcile_change(
+        self,
+        ref: CalendarRef,
+        name: str,
+        href: str,
+        marker: str,
+        base_etag: str,
+        *,
+        is_update: bool,
+    ) -> CalendarChangeResult:
+        """Re-read after an ambiguous send. The re-read is evidence, not a
+        verdict: only this operation's marker proves an update, an unchanged
+        base proves nothing was applied, and anything else stays ambiguous."""
+
+        try:
+            current = dav_client.get_resource(
+                self._client,
+                href,
+                max_response_bytes=self._profile.max_response_bytes,
+            )
+            if current is None:
+                return _change_result(CalendarChangeStatus.ABSENT, "event_absent")
+            component = mapping.parse_single_vevent(
+                current.calendar_data, resource_name=name
+            )
+        except _RECOVERABLE_VERIFICATION_ERRORS:
+            return _change_result(
+                CalendarChangeStatus.AMBIGUOUS, "reconciliation_failed"
+            )
+
+        if is_update and self._owns(component, marker):
+            return CalendarChangeResult(
+                status=CalendarChangeStatus.COMMITTED,
+                event_ref=EventRef(calendar_id=ref.calendar_id, resource_name=name),
+                event=self._event_from(ref, name, component, current.etag),
+            )
+        if current.etag == base_etag:
+            return _change_result(CalendarChangeStatus.NOT_APPLIED, "not_applied")
+        return _change_result(
+            CalendarChangeStatus.AMBIGUOUS, "changed_after_ambiguous_send"
+        )
+
+
+def _change_result(
+    status: CalendarChangeStatus, error_code: str
+) -> CalendarChangeResult:
+    return CalendarChangeResult(status=status, error_code=error_code)

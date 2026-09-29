@@ -8,8 +8,13 @@ import icalendar
 
 import recurring_ical_events
 
-from ada.core.actions import CreateCalendarEventProposal
-from ada.ports.calendar import CalendarEvent, EventRef, EventVersion
+from ada.core.actions import (
+    CreateCalendarEventProposal,
+    EventRef,
+    EventVersion,
+    UpdateCalendarEventProposal,
+)
+from ada.ports.calendar import CalendarEvent
 
 
 OPERATION_MARKER_PROPERTY = "X-ADA-OPERATION-MARKER"
@@ -39,6 +44,18 @@ class FloatingTimeNotSupportedError(CalDAVMappingError):
     calendar/user timezone yet (a later decision); guessing UTC would
     silently shift busy/conflict intervals, so this fails closed instead.
     """
+
+
+class WriteScopeError(CalDAVMappingError):
+    """The resource is outside Ada's MVP write scope (ADR-0009 section 6).
+
+    Recurring series, single occurrences and events with attendees are
+    read-only for Ada and fail closed before any write is sent.
+    """
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class CalendarComplexityExceededError(RuntimeError):
@@ -206,6 +223,18 @@ def _has_attendees(component: "icalendar.cal.Component") -> bool:
     return component.get("attendee") is not None
 
 
+def _sequence(component: "icalendar.cal.Component") -> int:
+    raw = component.get("sequence")
+    try:
+        return int(raw) if raw is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def component_sequence(component: "icalendar.cal.Component") -> int:
+    return _sequence(component)
+
+
 def _text_or_none(component: "icalendar.cal.Component", name: str) -> str | None:
     value = component.get(name)
     return str(value) if value else None
@@ -354,6 +383,7 @@ def map_resource_occurrences(
                 all_day=_is_all_day(dtstart),
                 recurring=is_recurring,
                 has_attendees=_has_attendees(occurrence),
+                sequence=_sequence(occurrence),
             )
         )
 
@@ -415,6 +445,7 @@ def build_calendar_event_from_component(
         recurring=component.get("rrule") is not None
         or component.get("rdate") is not None,
         has_attendees=_has_attendees(component),
+        sequence=_sequence(component),
     )
 
 
@@ -483,4 +514,105 @@ def build_create_ical(
     event.add(OPERATION_MARKER_PROPERTY, marker)
 
     calendar.add_component(event)
+    return calendar.to_ical()
+
+
+def parse_writable_vevent(
+    calendar_data: bytes, *, resource_name: str
+) -> "icalendar.cal.Component":
+    """Parse a resource Ada may update or cancel, or refuse it (fail closed)."""
+
+    calendar = icalendar.Calendar.from_ical(calendar_data)
+    return _writable_vevent(calendar, resource_name)
+
+
+def _writable_vevent(
+    calendar: "icalendar.Calendar", resource_name: str
+) -> "icalendar.cal.Component":
+    vevents = list(calendar.walk("VEVENT"))
+    if len(vevents) != 1:
+        # Several VEVENTs mean a recurrence series with overrides.
+        raise WriteScopeError(
+            "recurring_event_read_only",
+            f"{resource_name!r} holds {len(vevents)} VEVENT components",
+        )
+    component = vevents[0]
+    if any(
+        component.get(name) is not None
+        for name in ("rrule", "rdate", "exdate", "recurrence-id")
+    ):
+        raise WriteScopeError(
+            "recurring_event_read_only", f"{resource_name!r} is recurring"
+        )
+    if _has_attendees(component):
+        raise WriteScopeError(
+            "attendee_event_read_only", f"{resource_name!r} has attendees"
+        )
+    return component
+
+
+def _replace(component: "icalendar.cal.Component", name: str, value: object) -> None:
+    if name in component:
+        del component[name]
+    component.add(name, value)
+
+
+def build_update_ical(
+    calendar_data: bytes,
+    proposal: UpdateCalendarEventProposal,
+    *,
+    marker: str,
+) -> bytes:
+    """Serialize an update as the existing VEVENT plus the requested changes.
+
+    Every other property is carried over unchanged. The base ``SEQUENCE`` is
+    incremented, ``DTSTAMP`` is fresh and the operation marker replaces any
+    earlier one (ADR-0009 section 6). The result is deterministic apart from
+    ``DTSTAMP``, so a replay writes the same ``SEQUENCE`` and marker.
+    """
+
+    resource_name = proposal.event_ref.resource_name
+    calendar = icalendar.Calendar.from_ical(calendar_data)
+    component = _writable_vevent(calendar, resource_name)
+    changes = proposal.changes
+
+    if changes.start is not None or changes.end is not None:
+        dtstart_prop = component.get("dtstart")
+        if dtstart_prop is None:
+            raise CalDAVMappingError(f"{resource_name!r} is missing DTSTART")
+        if _is_all_day(dtstart_prop.dt):
+            raise WriteScopeError(
+                "all_day_time_change_unsupported",
+                f"{resource_name!r} is an all-day event",
+            )
+        old_start = _as_utc_datetime(dtstart_prop.dt)
+        old_end = _as_utc_datetime(
+            _resolve_end(dtstart_prop.dt, component.get("dtend"), component.get("duration"))
+        )
+        new_start = (
+            changes.start.astimezone(timezone.utc)
+            if changes.start is not None
+            else old_start
+        )
+        if changes.end is not None:
+            new_end = changes.end.astimezone(timezone.utc)
+        else:
+            new_end = new_start + (old_end - old_start)
+        if new_end <= new_start:
+            raise WriteScopeError(
+                "invalid_time_range", "the changed end is not after the start"
+            )
+        if "duration" in component:
+            del component["duration"]
+        _replace(component, "dtstart", new_start)
+        _replace(component, "dtend", new_end)
+
+    if changes.title is not None:
+        _replace(component, "summary", changes.title)
+    if changes.location is not None:
+        _replace(component, "location", changes.location)
+
+    _replace(component, "sequence", proposal.base_version.sequence + 1)
+    _replace(component, "dtstamp", datetime.now(timezone.utc))
+    _replace(component, OPERATION_MARKER_PROPERTY, marker)
     return calendar.to_ical()

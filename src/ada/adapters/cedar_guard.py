@@ -35,6 +35,18 @@ action "calendar.create" appliesTo {
     context: RequestContext
 };
 
+action "calendar.update" appliesTo {
+    principal: Actor,
+    resource: AdaResource,
+    context: RequestContext
+};
+
+action "calendar.cancel" appliesTo {
+    principal: Actor,
+    resource: AdaResource,
+    context: RequestContext
+};
+
 action "approval.simple" appliesTo {
     principal: Actor,
     resource: AdaResource,
