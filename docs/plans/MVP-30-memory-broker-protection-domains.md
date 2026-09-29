@@ -223,10 +223,7 @@ S2 Probe A:
 
     python3 research/memory/mvp-30-s2/probe_encrypted_vault.py
 
-An optional distinct-identity sub-probe may be run only with an explicitly chosen
-existing test account; a skipped result is not security evidence. Later S2 probes
-cover Keychain isolation and the selected process identity model. Validation
-evidence is commit-specific and belongs in the PR.
+Probe B — restricted runtime identity:\n\n    sudo -v\n    python3 research/memory/mvp-30-s2/probe_restricted_runtime.py\n\nProbe B uses an existing unprivileged identity as a temporary stand-in and must not\ncreate users or install services. It tests whether the logged-in broker/human\ncontext keeps vault + Keychain access while the restricted runtime identity is\ndenied both. A pass advances the candidate to a later dedicated service-account /\nlaunchd probe; it does not yet accept the final topology. Validation evidence is\ncommit-specific and belongs in the PR.
 
 ## Review focus
 
