@@ -195,3 +195,74 @@ The smallest useful next action is Probe A. It can validate native encrypted-ima
 mechanics and demonstrate the same-user isolation failure with no third-party
 dependency and no real Memory. Its output then determines which identity mechanism
 Probe B needs to test.
+
+
+## Target-Mac Probe A result
+
+Maintainer run on macOS 26.6.2 arm64, Python 3.14.6:
+
+- AES-256/APFS sparse-bundle create/attach/detach/reattach: **PASS**;
+- synthetic current data survives detach/reattach: **PASS**;
+- cleanup: **PASS**;
+- second process under the same macOS user can read the unlocked synthetic file:
+  **YES**;
+- mounted volume root observed as uid 501, gid 20, mode 0755.
+
+This closes one question: a separate Ada process under the same login user is not
+an enforceable Memory-domain boundary once a vault is unlocked.
+
+The observed root mode also confirms that S2 must verify effective mounted
+ownership/modes at runtime instead of assuming image-creation mode flags become the
+mounted volume-root permissions.
+
+## Refined KISS candidate after Probe A
+
+The simplest credible macOS topology is now worth probing in the **opposite**
+direction from a privileged broker daemon:
+
+- keep the broker in the logged-in user's context, where human editing and the
+  user's Keychain are naturally available;
+- run the ordinary Ada runtime/model-facing process under a separate restricted
+  OS identity;
+- let that restricted runtime request scoped operations over a broker IPC boundary;
+- do not give the restricted runtime the vault root, mount point or key.
+
+Why this candidate moved forward:
+
+- Apple documents that the data-protection Keychain is available only in a user
+  context, not to a system launchd daemon;
+- a launchd system-domain job can run under a configured `UserName`/`GroupName`;
+- therefore keeping the broker in the user's context avoids inventing a headless
+  Keychain-unlock scheme, while a restricted runtime identity can still provide the
+  filesystem boundary Probe A proved is missing from same-user process separation.
+
+This is still a probe candidate, not an adopted architecture. It changes the
+question from "how does a broker daemon access a user's Keychain?" to "can a
+restricted runtime identity still perform everything the ordinary runtime needs
+while being denied direct Memory/Keychain access?"
+
+Relevant Apple evidence:
+
+- TN3137: programs outside a user context, such as launchd daemons, cannot use the
+  data-protection Keychain; each logged-in user has their own user-context keychain.
+- launchd supports system-domain services running under an explicit `UserName` /
+  `GroupName`.
+- launchd-managed agents remain in the logged-in user context.
+
+## Probe B — restricted runtime identity
+
+Probe B should use an existing unprivileged system identity only as a **temporary
+stand-in**; it must not create users or install launchd jobs.
+
+It must prove:
+
+1. the current logged-in user can read/edit the mounted synthetic vault;
+2. a distinct unprivileged identity cannot read the synthetic private file;
+3. the logged-in user can create/read a synthetic Keychain item without exposing
+   its value in argv/environment/files/logs;
+4. the distinct runtime identity cannot retrieve that item;
+5. all synthetic Keychain state and mounts are removed after the probe.
+
+A pass would justify a later dedicated Ada runtime service-account/install probe.
+It would **not** yet prove final IPC authentication, packaging, startup, or resource
+access for the real runtime.
