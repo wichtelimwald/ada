@@ -82,3 +82,49 @@ Those belong to later S2 probes after the process identity model has been narrow
 - no secret in argv/environment/log output;
 - cleanup runs in a `finally` block;
 - no third-party dependency or binary is installed/executed.
+
+
+## Probe B — restricted runtime identity
+
+Probe B tests the refined KISS candidate from the research note: keep the broker in
+the logged-in user context and run the ordinary runtime/model-facing process under
+a distinct restricted OS identity.
+
+It uses only synthetic data and an already-existing unprivileged system account as
+a stand-in. It does **not** create users or install launchd jobs.
+
+Preflight:
+
+```bash
+sudo -v
+```
+
+Then:
+
+```bash
+python3 research/memory/mvp-30-s2/probe_restricted_runtime.py
+```
+
+The script prefers the existing `nobody` / `_nobody` account. A specific
+existing test account may be supplied as the only argument.
+
+Expected evidence:
+
+- `broker_user_vault_read: true`
+- `runtime_user_vault_read: false`
+- `broker_user_keychain_read: true`
+- `runtime_user_keychain_read: false`
+- `keychain_cleanup: true`
+- `vault_cleanup: true`
+- `status: "ok"`
+
+For the Keychain part, a small Swift helper uses Security.framework to generate a
+random synthetic value in process memory and put it in the logged-in user's
+**file-based Keychain** using `SecItemAdd`. The value is never printed or passed
+through argv/environment/files. Probe B deliberately tests the OS-user context
+boundary, not the final production Keychain mechanism.
+
+A passing result is evidence that the restricted-runtime identity is viable enough
+to justify a later dedicated Ada service-account / launchd installation probe. It
+is not yet evidence for final IPC permissions, packaging, startup, or resource
+access.
