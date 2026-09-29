@@ -11,6 +11,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PROBE_PATH = (
     REPO_ROOT / "research" / "memory" / "mvp-30-s2" / "probe_encrypted_vault.py"
 )
+PROBE_B_PATH = (
+    REPO_ROOT / "research" / "memory" / "mvp-30-s2" / "probe_restricted_runtime.py"
+)
 
 
 def _load_probe():
@@ -47,6 +50,14 @@ class MVP30S2ProbeTests(unittest.TestCase):
             self.probe.parse_attached_device(payload, mountpoint),
             "/dev/disk99s1",
         )
+
+    def test_probe_b_never_bootstraps_sudo_credentials(self) -> None:
+        source = PROBE_B_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("sudo -v", source)
+        self.assertNotIn('shutil.which("sudo")', source)
+        self.assertNotIn("[sudo,", source)
+        self.assertIn("manual_identity_switch_command", source)
 
     def test_missing_distinct_runtime_user_is_not_treated_as_evidence(self) -> None:
         with mock.patch.object(
