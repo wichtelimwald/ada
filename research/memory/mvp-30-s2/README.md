@@ -86,45 +86,83 @@ Those belong to later S2 probes after the process identity model has been narrow
 
 ## Probe B — restricted runtime identity
 
-Probe B tests the refined KISS candidate from the research note: keep the broker in
-the logged-in user context and run the ordinary runtime/model-facing process under
-a distinct restricted OS identity.
+Probe B tests the refined KISS candidate: keep broker + human editing in the
+logged-in user context and run the ordinary runtime/model-facing process under a
+distinct restricted OS identity.
 
-It uses only synthetic data and an already-existing unprivileged system account as
-a stand-in. It does **not** create users or install launchd jobs.
+**The Python probe never invokes `sudo`.** It only prepares synthetic test state,
+prints one exact identity-switch command, and later cleans up unprivileged.
 
-Preflight:
-
-```bash
-sudo -v
-```
-
-Then:
+### 1. Prepare — no admin rights
 
 ```bash
-python3 research/memory/mvp-30-s2/probe_restricted_runtime.py
+python3 research/memory/mvp-30-s2/probe_restricted_runtime.py prepare
 ```
 
-The script prefers the existing `nobody` / `_nobody` account. A specific
-existing test account may be supplied as the only argument.
+Expected preparation evidence:
 
-Expected evidence:
-
+- `status: "ready"`
 - `broker_user_vault_read: true`
-- `runtime_user_vault_read: false`
 - `broker_user_keychain_read: true`
-- `runtime_user_keychain_read: false`
+- one `manual_identity_switch_command`
+- one `cleanup_command`
+
+Review the printed command before running it.
+
+### 2. Run exactly one explicit identity-switch command
+
+First invalidate any existing sudo credential cache:
+
+```bash
+sudo -k
+```
+
+Then run **only** the exact `manual_identity_switch_command` printed by the
+prepare step. It has this shape:
+
+```bash
+sudo -u nobody -- /bin/sh /tmp/ada-mvp30-s2-identity-.../restricted-check.sh
+```
+
+This use of `sudo` is solely for the OS identity switch. The tested child process
+runs as the restricted account, not as root/admin.
+
+Expected output:
+
+- `vault_read_exit` is non-zero;
+- `keychain_read_exit` is non-zero.
+
+Immediately invalidate the sudo credential cache again:
+
+```bash
+sudo -k
+```
+
+### 3. Cleanup — no admin rights
+
+Run the exact `cleanup_command` printed by the prepare step. It has this shape:
+
+```bash
+python3 research/memory/mvp-30-s2/probe_restricted_runtime.py cleanup \
+  /tmp/ada-mvp30-s2-identity-.../probe-state.json
+```
+
+Expected cleanup evidence:
+
 - `keychain_cleanup: true`
 - `vault_cleanup: true`
+- `workspace_cleanup: true`
 - `status: "ok"`
 
-For the Keychain part, a small Swift helper uses Security.framework to generate a
-random synthetic value in process memory and put it in the logged-in user's
-**file-based Keychain** using `SecItemAdd`. The value is never printed or passed
-through argv/environment/files. Probe B deliberately tests the OS-user context
-boundary, not the final production Keychain mechanism.
+The probe:
 
-A passing result is evidence that the restricted-runtime identity is viable enough
-to justify a later dedicated Ada service-account / launchd installation probe. It
-is not yet evidence for final IPC permissions, packaging, startup, or resource
-access.
+- creates no users;
+- installs no launchd service;
+- never calls `sudo` itself;
+- stores only synthetic data;
+- never exposes the synthetic Keychain value in argv/environment/files/output;
+- uses an existing `nobody` / `_nobody` account by default only as a temporary
+  stand-in for a future restricted Ada runtime identity.
+
+A pass justifies a later dedicated service-account/launchd installation probe. It
+does not yet accept final IPC, packaging, startup, or resource-access topology.
