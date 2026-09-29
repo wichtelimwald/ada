@@ -223,7 +223,21 @@ S2 Probe A:
 
     python3 research/memory/mvp-30-s2/probe_encrypted_vault.py
 
-Probe B — restricted runtime identity:\n\n    sudo -v\n    python3 research/memory/mvp-30-s2/probe_restricted_runtime.py\n\nProbe B uses an existing unprivileged identity as a temporary stand-in and must not\ncreate users or install services. It tests whether the logged-in broker/human\ncontext keeps vault + Keychain access while the restricted runtime identity is\ndenied both. A pass advances the candidate to a later dedicated service-account /\nlaunchd probe; it does not yet accept the final topology. Validation evidence is\ncommit-specific and belongs in the PR.
+Probe B — restricted runtime identity:
+
+    python3 research/memory/mvp-30-s2/probe_restricted_runtime.py prepare
+
+The Python probe never invokes sudo. It prints one exact manual
+`sudo -u <restricted-user> -- ...` identity-switch command for maintainer review.
+Run `sudo -k` immediately before and after that one command, then execute the
+printed unprivileged cleanup command.
+
+Probe B uses an existing unprivileged identity as a temporary stand-in and must not
+create users or install services. It tests whether the logged-in broker/human
+context keeps vault + Keychain access while the restricted runtime identity is
+denied both. A pass advances the candidate to a later dedicated service-account /
+launchd probe; it does not yet accept the final topology. Validation evidence is
+commit-specific and belongs in the PR.
 
 ## Review focus
 
