@@ -59,6 +59,15 @@ class MVP30S2ProbeTests(unittest.TestCase):
         self.assertNotIn("[sudo,", source)
         self.assertIn("manual_identity_switch_command", source)
 
+    def test_probe_b_has_no_compiler_dependency(self) -> None:
+        source = PROBE_B_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("swiftc", source)
+        self.assertNotIn("xcrun", source)
+        self.assertNotIn("clang", source)
+        self.assertIn('SECURITY = Path("/usr/bin/security")', source)
+        self.assertIn('"security -i via stdin"', source)
+
     def test_missing_distinct_runtime_user_is_not_treated_as_evidence(self) -> None:
         with mock.patch.object(
             self.probe.pwd,
