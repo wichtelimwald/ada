@@ -23,8 +23,9 @@ def _load_probe():
 
 
 class MVP30S2ProbeTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.probe = _load_probe()
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.probe = _load_probe()
 
     def test_hdi_password_keeps_secret_out_of_argv_shape(self) -> None:
         self.assertEqual(self.probe.hdi_password("synthetic"), b"synthetic")
