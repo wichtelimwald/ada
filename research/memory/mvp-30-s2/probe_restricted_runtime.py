@@ -95,7 +95,7 @@ def helper(
     argv = [str(executable), operation, service, account]
     if sudo and runtime_user:
         argv = [sudo, "-n", "-u", runtime_user, *argv]
-    return vault.run(argv, check=False)
+    return vault.run(argv, check=False, timeout=20)
 
 
 def create_vault(image: Path, password: str) -> None:
@@ -216,8 +216,22 @@ def main() -> int:
             report["error"] = str(exc)
         finally:
             if keychain_item_added:
-                delete_result = helper(helper_bin, "delete", service, account)
-                report["keychain_cleanup"] = delete_result.returncode == 0
+                try:
+                    delete_result = helper(helper_bin, "delete", service, account)
+                    report["keychain_cleanup"] = delete_result.returncode == 0
+                    if not report["keychain_cleanup"]:
+                        report.setdefault(
+                            "error",
+                            "synthetic Keychain item cleanup failed",
+                        )
+                        report["status"] = "error"
+                except Exception as exc:
+                    report["keychain_cleanup"] = False
+                    report.setdefault(
+                        "error",
+                        f"synthetic Keychain cleanup failed: {exc}",
+                    )
+                    report["status"] = "error"
             else:
                 report["keychain_cleanup"] = True
 
