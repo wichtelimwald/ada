@@ -159,8 +159,10 @@ The probe:
 - creates no users;
 - installs no launchd service;
 - never calls `sudo` itself;
+- requires no Xcode/Swift compiler;
 - stores only synthetic data;
-- never exposes the synthetic Keychain value in argv/environment/files/output;
+- sends the synthetic Keychain value to macOS `security -i` only over stdin,
+  never argv/environment/files/output;
 - uses an existing `nobody` / `_nobody` account by default only as a temporary
   stand-in for a future restricted Ada runtime identity.
 
