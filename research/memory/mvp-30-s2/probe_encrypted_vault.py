@@ -34,15 +34,21 @@ def run(
     *,
     input_bytes: bytes | None = None,
     check: bool = True,
+    timeout: int = 120,
 ) -> subprocess.CompletedProcess[bytes]:
-    result = subprocess.run(
-        argv,
-        input=input_bytes,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-        timeout=120,
-    )
+    try:
+        result = subprocess.run(
+            argv,
+            input=input_bytes,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ProbeError(
+            f"{argv[0]} timed out after {timeout}s"
+        ) from exc
     if check and result.returncode != 0:
         stderr = result.stderr.decode("utf-8", errors="replace").strip()
         raise ProbeError(f"{argv[0]} failed with exit {result.returncode}: {stderr}")
