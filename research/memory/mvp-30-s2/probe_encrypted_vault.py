@@ -61,15 +61,43 @@ def hdi_password(password: str) -> bytes:
     return password.encode("utf-8")
 
 
-def parse_attached_device(plist_bytes: bytes, mountpoint: Path) -> str:
+def parse_attached_device(plist_bytes: bytes, mountpoint: Path) -> tuple[str, str]:
     data = plistlib.loads(plist_bytes)
     expected = str(mountpoint.resolve())
+    mounted_device: str | None = None
+    whole_device: str | None = None
+
     for entity in data.get("system-entities", []):
         candidate_mount = entity.get("mount-point")
         dev_entry = entity.get("dev-entry")
-        if candidate_mount and dev_entry and str(Path(candidate_mount).resolve()) == expected:
-            return str(dev_entry)
-    raise ProbeError("hdiutil attach output did not contain the expected mounted device")
+        if not dev_entry:
+            continue
+        dev_entry = str(dev_entry)
+
+        # The whole image device is the /dev/diskN entry; mounted filesystems are
+        # typically slices such as /dev/diskNs1.
+        if dev_entry.startswith("/dev/disk") and "s" not in Path(dev_entry).name:
+            whole_device = dev_entry
+
+        if (
+            candidate_mount
+            and str(Path(candidate_mount).resolve()) == expected
+        ):
+            mounted_device = dev_entry
+
+    if mounted_device is None:
+        raise ProbeError(
+            "hdiutil attach output did not contain the expected mounted device"
+        )
+    if whole_device is None:
+        # Conservative fallback from /dev/diskNsM -> /dev/diskN.
+        name = Path(mounted_device).name
+        if "s" in name:
+            whole_device = "/dev/" + name.split("s", 1)[0]
+        else:
+            whole_device = mounted_device
+
+    return mounted_device, whole_device
 
 
 def python_can_read(path: Path) -> bool:
@@ -114,7 +142,7 @@ def distinct_user_can_read(path: Path, runtime_user: str) -> tuple[str, bool | N
     return ("executed", result.returncode == 0)
 
 
-def attach(image: Path, mountpoint: Path, password: str) -> str:
+def attach(image: Path, mountpoint: Path, password: str) -> tuple[str, str]:
     mountpoint.mkdir(mode=0o700, exist_ok=True)
     result = run(
         [
@@ -135,7 +163,7 @@ def attach(image: Path, mountpoint: Path, password: str) -> str:
 
 
 def detach(device: str) -> None:
-    run(["/usr/bin/hdiutil", "detach", device])
+    run(["/usr/bin/hdiutil", "detach", device], timeout=20)
 
 
 def probe(runtime_user: str | None) -> dict[str, Any]:
@@ -198,7 +226,7 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
 
         device: str | None = None
         try:
-            device = attach(image, mountpoint, password)
+            mounted_device, device = attach(image, mountpoint, password)
             secret_file = mountpoint / "synthetic-private.txt"
             secret_file.write_bytes(marker)
             secret_file.chmod(0o600)
@@ -219,7 +247,7 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
             detach(device)
             device = None
 
-            device = attach(image, mountpoint, password)
+            mounted_device, device = attach(image, mountpoint, password)
             persisted = (mountpoint / "synthetic-private.txt").read_bytes()
             report["detach_reattach_persistence"] = persisted == marker
         finally:
