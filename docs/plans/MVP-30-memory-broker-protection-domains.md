@@ -24,8 +24,9 @@ when intentionally unlocked.
   <root>/.git; no protection-domain broker or encryption exists yet.
 - docs/research/memory-protection-evaluation.md evaluates maintained/platform
   protection mechanisms. ADR-0011 records the proposed topology.
-- docs/research/macos-broker-isolation-evaluation.md narrows the S2 macOS
-  enforcement candidates and defines the target-Mac decision probes.
+- docs/research/macos-broker-isolation-evaluation.md records completed target-Mac
+  Probe A/B evidence: same-user process separation fails, while a distinct
+  restricted OS identity is denied both unlocked-vault and Keychain access.
 
 ## Scope
 
@@ -54,13 +55,12 @@ when intentionally unlocked.
 These remain blockers for ADR-0011 acceptance, not invitations to guess:
 
 1. target-Mac Keychain access-control shape for a broker process;
-2. the concrete OS-level enforcement mechanism (for example a distinct service
-   identity/POSIX user, filesystem ACLs, a code-signing-scoped Keychain
-   access-control list, or an app-sandbox/entitlement boundary) that prevents a
-   same-user ordinary Ada runtime process from directly reading an unrelated
-   domain's unlocked plaintext mount or retrieving its Keychain secret; no
-   mechanism is assumed until proven by the S2 target-Mac negative probes
-   (see ADR-0011 point 2 and "Review focus" below);
+2. final production shape of the now target-Mac-proven distinct-OS-identity
+   direction: dedicated Ada runtime account/service lifecycle, launchd/startup
+   ownership, IPC authentication, and required non-Memory resource access. Probe B
+   proves the isolation property with an existing restricted identity but does not
+   yet prove the packaged service topology (see ADR-0011 point 2 and "Review focus"
+   below);
 3. exact platform encrypted-image command/format after the macOS probe;
 4. whether ADR-0010's final late non-cooperating-save race is accepted as an MVP
    residual or closed through a separately designed synchronization slice;
@@ -139,8 +139,10 @@ provider credentials entirely behind the host-side broker/provider adapters.
 
 ### S2 — Host process + encrypted-vault provider probe
 
-S2 starts with a probe/decision slice; production broker/vault code must not be
-written until the two isolation negatives have a credible mechanism.
+S2 started with a probe/decision slice. Probe A/B now provide a credible
+target-Mac mechanism: keep broker/human context under the logged-in user and run
+the ordinary runtime under a distinct restricted OS identity. Production work must
+still preserve that boundary and validate dedicated-account/IPC/startup details.
 
 - run `research/memory/mvp-30-s2/probe_encrypted_vault.py` on the target Mac to
   validate AES-256/APFS create/attach/detach/reattach mechanics and record the
@@ -153,10 +155,9 @@ written until the two isolation negatives have a credible mechanism.
   implementing the encrypted-vault provider; do not assume Unix-socket IPC
   permissions alone isolate a mounted vault or a Keychain item from the
   ordinary Ada runtime process;
-- add the two required negative target-Mac probes run from the ordinary
-  runtime process: it must fail to read an unrelated domain's unlocked
-  plaintext mount, and it must fail to retrieve an unrelated domain's
-  Keychain secret;
+- **completed:** target-Mac negative probes prove a distinct restricted OS identity
+  cannot read the unlocked synthetic private file and cannot retrieve the
+  synthetic Keychain item, while the broker/current-user context can access both;
 - implement local-only broker IPC with restrictive permissions;
 - define EncryptedVaultProvider behind the adapter boundary;
 - target-Mac synthetic probe for encrypted create/unlock/lock/restart;
