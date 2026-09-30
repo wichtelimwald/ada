@@ -13,6 +13,9 @@ PROBE_PATH = (
 PROBE_B_PATH = (
     REPO_ROOT / "research" / "memory" / "mvp-30-s2" / "probe_restricted_runtime.py"
 )
+IPC_PROBE_PATH = (
+    REPO_ROOT / "research" / "memory" / "mvp-30-s2" / "probe_ipc_peer_identity.py"
+)
 
 
 def _load_probe():
@@ -74,6 +77,23 @@ class MVP30S2ProbeTests(unittest.TestCase):
 
         self.assertNotIn("sudo", source)
         self.assertNotIn("runtime-user", source)
+
+    def test_ipc_probe_authenticates_before_payload_read(self) -> None:
+        source = IPC_PROBE_PATH.read_text(encoding="utf-8")
+
+        peer_check = source.index("get_peer_credentials(conn.fileno())")
+        payload_read = source.index("payload = conn.recv(64)")
+        self.assertLess(peer_check, payload_read)
+        self.assertIn('peer_uid != expected_uid', source)
+        self.assertIn('"rejected_before_payload_read": True', source)
+
+    def test_ipc_probe_never_bootstraps_sudo_credentials(self) -> None:
+        source = IPC_PROBE_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("sudo -v", source)
+        self.assertNotIn('shutil.which("sudo")', source)
+        self.assertIn("manual_identity_switch_command", source)
+        self.assertIn("getpeereid", source)
 
     def test_probe_b_never_bootstraps_sudo_credentials(self) -> None:
         source = PROBE_B_PATH.read_text(encoding="utf-8")
