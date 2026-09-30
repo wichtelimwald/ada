@@ -189,12 +189,21 @@ ADR-0011 rather than weakening the requirement.
 
 ## Current conclusion
 
-Desk research narrows S2 but does **not** select the production mechanism.
+Target-Mac evidence now supports the smallest credible S2 enforcement candidate:
 
-The smallest useful next action is Probe A. It can validate native encrypted-image
-mechanics and demonstrate the same-user isolation failure with no third-party
-dependency and no real Memory. Its output then determines which identity mechanism
-Probe B needs to test.
+- keep broker + human-editing context under the logged-in user;
+- run the ordinary/model-facing runtime under a distinct restricted OS identity;
+- expose only broker-mediated scoped operations to that runtime.
+
+Probe A proved that same-user process separation is insufficient. Probe B then
+proved that a distinct OS identity can be denied both direct access to the unlocked
+synthetic vault and retrieval of the synthetic Keychain item while the logged-in
+broker/user context retains both.
+
+This selects the **candidate isolation direction**, not the final packaged topology.
+A dedicated Ada runtime identity, startup/launchd ownership, IPC authentication,
+restart behavior, and ordinary-runtime resource needs still require explicit design
+and validation before production broker code is accepted.
 
 
 ## Target-Mac Probe A result
@@ -266,3 +275,48 @@ It must prove:
 A pass would justify a later dedicated Ada runtime service-account/install probe.
 It would **not** yet prove final IPC authentication, packaging, startup, or resource
 access for the real runtime.
+
+
+## Target-Mac Probe B result
+
+Maintainer run on macOS 26.6.2 arm64 against PR #47 head `1027234`:
+
+Prepare:
+
+- broker/current-user synthetic vault read: **PASS**;
+- broker/current-user synthetic Keychain read: **PASS**;
+- workspace created under cross-identity-traversable `/tmp`;
+- no compiler/Xcode dependency;
+- no automatic sudo use.
+
+Restricted identity check, executed explicitly as existing account `nobody`:
+
+```text
+probe=mvp-30-s2-restricted-runtime-manual
+runtime_user=nobody
+vault_read_exit=1
+keychain_read_exit=44
+```
+
+Interpretation:
+
+- direct read of the unlocked synthetic private file: **DENIED**;
+- retrieval of the synthetic Keychain item: **DENIED**.
+
+Cleanup:
+
+- Keychain cleanup: **PASS**;
+- vault detach cleanup: **PASS**;
+- workspace cleanup: **PASS**.
+
+The probe also exposed and fixed two research-harness defects before accepting the
+result:
+
+1. macOS per-user `/var/folders/.../T` caused a false denial before the restricted
+   identity reached the intended targets, so Probe B now uses explicit `/tmp`;
+2. the cleanup state initially tracked the mounted slice instead of the whole disk
+   image device, so detach now records/selects the whole `/dev/diskN` device and
+   is regression-tested.
+
+These fixes are part of the evidence quality: only the final rerun above is treated
+as isolation evidence.
