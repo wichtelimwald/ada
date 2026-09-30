@@ -154,9 +154,7 @@ def probe() -> dict[str, Any]:
 
     with tempfile.TemporaryDirectory(prefix="ada-mvp30-s2-") as temp_dir:
         root = Path(temp_dir)
-        # TemporaryDirectory is normally 0700. Make only the parent traversable so
-        # an optional distinct-user read reaches the mounted volume and tests the
-        # volume's ownership/mode rather than failing early on the temp parent.
+        # Keep the synthetic workspace explicit and inspectable during the probe.
         root.chmod(0o711)
         image = root / "synthetic-vault.sparsebundle"
         mountpoint = root / "mount"
