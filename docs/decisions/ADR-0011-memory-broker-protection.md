@@ -51,37 +51,50 @@ permissions. Do not open a TCP/network listener merely for convenience.
 The exact message serialization is an implementation detail and must remain behind
 the Ada-owned port.
 
-#### Unresolved: same-user OS enforcement for mounted vaults and Keychain secrets
+#### Selected S2 direction: restricted runtime OS identity
 
-A separate broker process is necessary but not sufficient. If the broker and the
-ordinary Ada runtime run under the same macOS user/security context, Unix-domain
-socket permissions restrict who can talk to the broker over IPC, but they do
-**not** by themselves prevent the ordinary runtime from directly reading an
-unrelated domain's already-unlocked plaintext mount on disk, nor from directly
-querying the platform credential store for that domain's Keychain item. Both are
-same-user, same-machine resources unless a distinct OS-level enforcement
-mechanism scopes them to the broker specifically.
+Target-Mac Probe A/B evidence selects the smallest credible enforcement direction:
 
-This is an explicitly **unresolved** problem, not a solved one. No enforcement
-mechanism is adopted by this ADR. Before S2 implements the encrypted-vault
-provider, S2 must run a target-Mac decision gate that selects and validates a
-concrete OS-level enforcement mechanism — for example a distinct service
-identity/POSIX user for the broker, filesystem ACLs on the mount point, a
-code-signing-scoped Keychain access-control list restricted to the broker
-binary, an app-sandbox/entitlement boundary, or another equivalent, tested
-mechanism. Do not invent or assume a solution ahead of that probe.
+- keep the Memory Broker in the logged-in user's context, where the authorized
+  human editing surface and user Keychain are naturally available;
+- run the ordinary/model-facing Ada runtime under a distinct, dedicated,
+  non-login OS identity;
+- communicate only over a local Unix-domain stream socket;
+- authenticate the client from kernel-supplied Unix peer credentials, not from a
+  caller-supplied token, domain ID, path or model-visible value;
+- reject a connection before request parsing unless its peer effective UID matches
+  the configured Ada runtime identity.
 
-S2 must add, at minimum, these negative target-Mac probes, run from the
-ordinary (non-broker) Ada runtime process:
+On macOS the peer-credential primitive is `getpeereid(3)`. Apple documents that
+its UID/GID result is bound to the Unix-domain peer and cannot be chosen by the
+peer except by actually connecting under different effective credentials.
 
-- the ordinary runtime process cannot read an unrelated domain's unlocked
-  plaintext mount;
-- the ordinary runtime process cannot retrieve an unrelated domain's Keychain
-  secret.
+Probe B used the existing `nobody` identity only as a disposable stand-in and
+proved that such a distinct identity could read neither the unlocked synthetic
+vault file nor the logged-in user's synthetic Keychain item, while the current
+user could access both. Production must **not** reuse `nobody`; it requires a
+dedicated Ada runtime identity.
 
-Until both probes pass on the target Mac, this ADR remains Proposed and the
-topology provides encryption at rest without the claimed runtime domain
-isolation.
+The broker remains a per-user process/LaunchAgent candidate because Apple documents
+that the data-protection Keychain is available only in a user login context. The
+restricted runtime is a system LaunchDaemon candidate configured by launchd to run
+under the dedicated runtime identity. The runtime must tolerate the broker being
+unavailable before user login and reconnect without widening authority.
+
+The Unix-socket pathname and filesystem mode are defense in depth, not the
+authentication decision. The broker must verify peer UID on every accepted
+connection. No TCP listener and no reusable bearer secret shared with the runtime
+are introduced.
+
+This direction is **selected**, but ADR-0011 remains Proposed until a target-Mac
+service-boundary probe validates:
+
+- kernel peer-UID rejection for the wrong local user before request parsing;
+- the dedicated runtime lifecycle/launchd shape and clean uninstall;
+- broker restart/login/logout behavior;
+- the runtime's explicitly required non-Memory resources without granting access
+  to user Memory roots or Keychain;
+- no hidden or cached broad administrator authorization in probe/install tooling.
 
 ### 3. Use one encrypted current-Memory vault per protection domain
 
