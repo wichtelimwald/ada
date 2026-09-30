@@ -168,3 +168,66 @@ The probe:
 
 A pass justifies a later dedicated service-account/launchd installation probe. It
 does not yet accept final IPC, packaging, startup, or resource-access topology.
+
+
+## Probe C / S2C1 — Unix peer identity
+
+This probe validates the local IPC authentication boundary before any permanent
+runtime account or launchd service is installed.
+
+It uses macOS `getpeereid(3)` on an AF_UNIX/SOCK_STREAM connection. The broker
+checks the kernel-supplied peer UID before reading request payload.
+
+### 1. Prepare — no admin rights
+
+```bash
+python3 research/memory/mvp-30-s2/probe_ipc_peer_identity.py prepare
+```
+
+Prepare automatically starts a short-lived broker probe and connects once as the
+current user. Because the configured stand-in runtime identity is different, that
+connection must be rejected **without sending or parsing request payload**.
+
+Expected preparation evidence includes:
+
+- `status: "ready"`
+- `wrong_user_rejected: true`
+- `wrong_user_sent_payload: false`
+- one `manual_identity_switch_command`
+- one `collect_command`
+
+The server self-times out after 90 seconds if the restricted client is never run.
+
+### 2. Run exactly one explicit identity switch
+
+As with Probe B, clear any existing sudo timestamp first, run only the printed
+command, then invalidate the timestamp immediately:
+
+```bash
+sudo -k
+# run the exact manual_identity_switch_command printed by prepare
+sudo -k
+```
+
+Expected restricted-client result:
+
+```json
+{"auth":"accepted","response":"OK","status":"ok"}
+```
+
+The Python probe itself never invokes sudo.
+
+### 3. Collect and clean up — no admin rights
+
+Run the exact `collect_command` printed by prepare.
+
+A pass requires:
+
+- at least one wrong peer UID rejected;
+- rejection occurred before request payload read;
+- accepted peer UID exactly equals the configured restricted runtime UID;
+- accepted payload is the synthetic `PING`;
+- workspace cleanup succeeds.
+
+This proves IPC peer-identity enforcement only. It does not create or validate the
+final dedicated Ada runtime user or launchd lifecycle.
