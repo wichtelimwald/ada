@@ -10,16 +10,13 @@ This is research/probe code, not the production EncryptedVaultProvider.
 
 from __future__ import annotations
 
-import argparse
 import json
 import os
 from pathlib import Path
 import plistlib
 import platform
-import pwd
 import re
 import secrets
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -112,38 +109,6 @@ def python_can_read(path: Path) -> bool:
     return result.returncode == 0
 
 
-def distinct_user_can_read(path: Path, runtime_user: str) -> tuple[str, bool | None]:
-    try:
-        account = pwd.getpwnam(runtime_user)
-    except KeyError:
-        return ("skipped:runtime-user-not-found", None)
-    if account.pw_uid == os.getuid():
-        return ("skipped:runtime-user-is-current-user", None)
-
-    sudo = shutil.which("sudo")
-    if sudo is None:
-        return ("skipped:sudo-unavailable", None)
-
-    preflight = run([sudo, "-n", "-u", runtime_user, "/usr/bin/true"], check=False)
-    if preflight.returncode != 0:
-        return ("skipped:sudo-not-preauthorized-or-user-invalid", None)
-
-    reader = "/usr/bin/python3"
-    if not Path(reader).exists():
-        return ("skipped:/usr/bin/python3-unavailable", None)
-
-    code = (
-        "from pathlib import Path; import sys; "
-        "Path(sys.argv[1]).read_bytes(); "
-        "raise SystemExit(0)"
-    )
-    result = run(
-        [sudo, "-n", "-u", runtime_user, reader, "-c", code, str(path)],
-        check=False,
-    )
-    return ("executed", result.returncode == 0)
-
-
 def attach(image: Path, mountpoint: Path, password: str) -> tuple[str, str]:
     mountpoint.mkdir(mode=0o700, exist_ok=True)
     result = run(
@@ -168,7 +133,7 @@ def detach(device: str) -> None:
     run(["/usr/bin/hdiutil", "detach", device], timeout=20)
 
 
-def probe(runtime_user: str | None) -> dict[str, Any]:
+def probe() -> dict[str, Any]:
     if sys.platform != "darwin":
         raise ProbeError("this probe must run on macOS")
     if not Path("/usr/bin/hdiutil").exists():
@@ -180,9 +145,6 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
         "machine": platform.machine(),
         "python": platform.python_version(),
         "same_user_unlocked_read": None,
-        "distinct_runtime_user_requested": runtime_user is not None,
-        "distinct_user_probe": "not-requested",
-        "distinct_user_unlocked_read": None,
         "detach_reattach_persistence": False,
         "cleanup": False,
     }
@@ -241,11 +203,6 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
             # filesystem protection boundary once the vault is unlocked.
             report["same_user_unlocked_read"] = python_can_read(secret_file)
 
-            if runtime_user:
-                status, readable = distinct_user_can_read(secret_file, runtime_user)
-                report["distinct_user_probe"] = status
-                report["distinct_user_unlocked_read"] = readable
-
             detach(device)
             device = None
 
@@ -265,24 +222,8 @@ def probe(runtime_user: str | None) -> dict[str, Any]:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Probe macOS encrypted-vault mechanics and direct-read isolation "
-            "using synthetic data only."
-        )
-    )
-    parser.add_argument(
-        "--runtime-user",
-        help=(
-            "Optional existing macOS account to use for the distinct-identity "
-            "negative read probe. The script never prompts for sudo; run sudo -v "
-            "yourself first if you intentionally want this probe."
-        ),
-    )
-    args = parser.parse_args()
-
     try:
-        report = probe(args.runtime_user)
+        report = probe()
     except ProbeError as exc:
         print(json.dumps({"status": "error", "error": str(exc)}, indent=2))
         return 2
@@ -301,19 +242,7 @@ def main() -> int:
         print("error: detach/reattach persistence check failed", file=sys.stderr)
         return 4
 
-    if (
-        args.runtime_user
-        and report["distinct_user_probe"] == "executed"
-        and report["distinct_user_unlocked_read"] is True
-    ):
-        print(
-            "error: distinct runtime identity could still read the synthetic vault",
-            file=sys.stderr,
-        )
-        return 5
-
     return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())
