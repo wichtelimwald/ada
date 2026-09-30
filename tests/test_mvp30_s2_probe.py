@@ -68,6 +68,12 @@ class MVP30S2ProbeTests(unittest.TestCase):
         self.assertIn('SECURITY = Path("/usr/bin/security")', source)
         self.assertIn('"security -i via stdin"', source)
 
+    def test_probe_b_uses_cross_identity_traversable_tmp_root(self) -> None:
+        source = PROBE_B_PATH.read_text(encoding="utf-8")
+
+        self.assertIn('tempfile.mkdtemp(prefix=WORKSPACE_PREFIX, dir="/tmp")', source)
+        self.assertNotIn("tempfile.mkdtemp(prefix=WORKSPACE_PREFIX))", source)
+
     def test_missing_distinct_runtime_user_is_not_treated_as_evidence(self) -> None:
         with mock.patch.object(
             self.probe.pwd,
