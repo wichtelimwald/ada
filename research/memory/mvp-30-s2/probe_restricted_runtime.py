@@ -267,7 +267,7 @@ def prepare(runtime_user_requested: str | None) -> dict[str, Any]:
     try:
         create_vault(image, vault_password)
         mountpoint.mkdir(mode=0o700, exist_ok=True)
-        device = vault.attach(image, mountpoint, vault_password)
+        mounted_device, device = vault.attach(image, mountpoint, vault_password)
 
         private_file = mountpoint / "synthetic-private.txt"
         private_file.write_bytes(marker)
@@ -293,6 +293,7 @@ def prepare(runtime_user_requested: str | None) -> dict[str, Any]:
         state = {
             "account": account,
             "device": device,
+            "mounted_device": mounted_device,
             "runtime_user": runtime_user,
             "service": service,
         }
