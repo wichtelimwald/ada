@@ -17,6 +17,7 @@ from pathlib import Path
 import plistlib
 import platform
 import pwd
+import re
 import secrets
 import shutil
 import subprocess
@@ -76,7 +77,8 @@ def parse_attached_device(plist_bytes: bytes, mountpoint: Path) -> tuple[str, st
 
         # The whole image device is the /dev/diskN entry; mounted filesystems are
         # typically slices such as /dev/diskNs1.
-        if dev_entry.startswith("/dev/disk") and "s" not in Path(dev_entry).name:
+        name = Path(dev_entry).name
+        if re.fullmatch(r"disk\d+", name):
             whole_device = dev_entry
 
         if (
@@ -92,10 +94,10 @@ def parse_attached_device(plist_bytes: bytes, mountpoint: Path) -> tuple[str, st
     if whole_device is None:
         # Conservative fallback from /dev/diskNsM -> /dev/diskN.
         name = Path(mounted_device).name
-        if "s" in name:
-            whole_device = "/dev/" + name.split("s", 1)[0]
-        else:
-            whole_device = mounted_device
+        match = re.fullmatch(r"(disk\d+)(?:s\d+)+", name)
+        whole_device = (
+            f"/dev/{match.group(1)}" if match else mounted_device
+        )
 
     return mounted_device, whole_device
 
