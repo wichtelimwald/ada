@@ -242,7 +242,11 @@ def prepare(runtime_user_requested: str | None) -> dict[str, Any]:
     require_security_tool()
 
     runtime_user = choose_runtime_user(runtime_user_requested)
-    root = Path(tempfile.mkdtemp(prefix=WORKSPACE_PREFIX))
+    # Use /tmp explicitly instead of macOS's per-user TMPDIR under /var/folders.
+    # The latter is intentionally not traversable by unrelated OS identities and
+    # would make the manual restricted-user check fail before it reaches the
+    # synthetic vault/Keychain targets.
+    root = Path(tempfile.mkdtemp(prefix=WORKSPACE_PREFIX, dir="/tmp"))
     # The stand-in runtime must reach the mounted file/checker by exact path.
     # It cannot list the workspace or read the 0600 state file.
     root.chmod(0o711)
