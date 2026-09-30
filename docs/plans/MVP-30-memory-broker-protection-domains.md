@@ -164,6 +164,35 @@ still preserve that boundary and validate dedicated-account/IPC/startup details.
 - validate Keychain item access restrictions and secret handling;
 - keep platform command details out of core/ports.
 
+#### S2C — production service-boundary proof
+
+Do this in two explicit stages; do not install a permanent service account in the
+first stage.
+
+1. **IPC identity probe, no persistent admin changes**
+   - broker test server runs as the current user;
+   - client runs explicitly as the existing restricted probe identity;
+   - Unix-domain stream socket only;
+   - broker obtains peer UID/GID from `getpeereid(3)` and rejects a wrong UID
+     before parsing the request body;
+   - prove current-user and other-UID clients are rejected when the configured
+     runtime UID is the restricted probe identity;
+   - no bearer token, TCP listener, `sudo -v`, user creation or launchd install.
+
+2. **Dedicated runtime/launchd installation probe**
+   - only after stage 1 passes and the install manifest is reviewed;
+   - create a dedicated non-login, non-admin Ada runtime identity; never use
+     `nobody` in production;
+   - broker remains in logged-in user context; runtime is launchd-managed under the
+     restricted identity;
+   - explicitly test login/logout, restart/reconnect, local model access and clean
+     uninstall;
+   - installation uses only visible, exact privileged operations and leaves no
+     cached sudo authorization by design.
+
+Only after both stages pass should S2 implement the production IPC adapter and
+EncryptedVaultProvider.
+
 ### S3 — Protected current Memory + separated history
 
 - make GitMemoryHistory support a broker-controlled Git directory separate from
