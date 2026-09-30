@@ -4,7 +4,6 @@ import importlib.util
 from pathlib import Path
 import plistlib
 import unittest
-from unittest import mock
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -70,6 +69,12 @@ class MVP30S2ProbeTests(unittest.TestCase):
             ("/dev/disk48s1", "/dev/disk48"),
         )
 
+    def test_probe_a_contains_no_sudo_path(self) -> None:
+        source = PROBE_PATH.read_text(encoding="utf-8")
+
+        self.assertNotIn("sudo", source)
+        self.assertNotIn("runtime-user", source)
+
     def test_probe_b_never_bootstraps_sudo_credentials(self) -> None:
         source = PROBE_B_PATH.read_text(encoding="utf-8")
 
@@ -92,20 +97,6 @@ class MVP30S2ProbeTests(unittest.TestCase):
 
         self.assertIn('tempfile.mkdtemp(prefix=WORKSPACE_PREFIX, dir="/tmp")', source)
         self.assertNotIn("tempfile.mkdtemp(prefix=WORKSPACE_PREFIX))", source)
-
-    def test_missing_distinct_runtime_user_is_not_treated_as_evidence(self) -> None:
-        with mock.patch.object(
-            self.probe.pwd,
-            "getpwnam",
-            side_effect=KeyError("synthetic missing user"),
-        ):
-            status, readable = self.probe.distinct_user_can_read(
-                Path("/tmp/does-not-matter"),
-                "synthetic-missing-user",
-            )
-
-        self.assertEqual(status, "skipped:runtime-user-not-found")
-        self.assertIsNone(readable)
 
 
 if __name__ == "__main__":
