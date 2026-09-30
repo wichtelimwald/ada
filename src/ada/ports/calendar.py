@@ -91,8 +91,11 @@ class CalendarChangeStatus(str, Enum):
     COMMITTED = "committed"
     # The event changed after approval; nothing was written.
     CONFLICT = "conflict"
-    # The event no longer exists. The goal state may hold, but Ada does not
-    # claim the effect as its own.
+    # The event was already absent when it was observed *before any send*
+    # (or the provider answered 404 to the first send): nothing of this
+    # operation applied. Absence observed after a possibly-sent write proves
+    # no such thing and is reported as ``AMBIGUOUS`` with
+    # ``event_absent_cause_unknown`` instead.
     ABSENT = "absent"
     # After an ambiguous send the event still equals ``base_version``: the
     # write provably did not apply and may be retried with the same

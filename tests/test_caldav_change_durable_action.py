@@ -305,6 +305,113 @@ class CalDAVChangeDurableTests(_Base):
         self.assertEqual(fresh.provider.error_code, "event_absent")
         self.assertEqual(self.requests.count("DELETE"), 1)
 
+    def _after_first_write_attempt(self, action, *, on_get: int) -> None:  # type: ignore[no-untyped-def]
+        """Run ``action`` just before the ``on_get``-th read that follows the
+        first conditional write attempt (1 = the reconciliation read,
+        2 = the retry's pre-read)."""
+
+        real_get = self.server._get
+        state = {"seen": 0}
+
+        def get(path: str) -> httpx2.Response:
+            if self.server.conditional_writes:
+                state["seen"] += 1
+                if state["seen"] == on_get:
+                    action()
+            return real_get(path)
+
+        self.server._get = get  # type: ignore[method-assign]
+
+    def test_update_absent_after_ambiguous_send_is_ambiguous_end_to_end(self) -> None:
+        calendar = self.adapter()
+        event = self.seed(calendar)
+        durable = self.launch(calendar)
+        self.server.lose_write_response_after_commit = 1
+        self._after_first_write_attempt(
+            lambda: self.server._collections[FAMILY_PATH].resources.clear(),
+            on_get=1,
+        )
+
+        result = durable.update_calendar_event(self.update_request(event, "op-gone"))
+
+        self.assertEqual(result.provider.status, ProviderOutcomeStatus.AMBIGUOUS)
+        self.assertEqual(result.provider.error_code, "event_absent_cause_unknown")
+        self.assertEqual(result.business.status, BusinessOutcomeStatus.AMBIGUOUS)
+
+    def test_cancel_lost_response_knows_absence_but_reports_no_non_commit(self) -> None:
+        calendar = self.adapter()
+        event = self.seed(calendar)
+        durable = self.launch(calendar)
+        self.server.lose_write_response_after_commit = 1
+
+        result = durable.cancel_calendar_event(self.cancel_request(event, "op-cancel-lost"))
+
+        self.assertEqual(result.provider.status, ProviderOutcomeStatus.AMBIGUOUS)
+        self.assertEqual(result.provider.error_code, "event_absent_cause_unknown")
+        self.assertNotEqual(result.business.summary_code, "provider_non_commit_confirmed")
+        self.assertEqual(self.requests.count("DELETE"), 1)
+
+    def test_change_found_while_retrying_after_a_send_is_not_a_fresh_conflict(
+        self,
+    ) -> None:
+        # The first write attempt may still apply, so what the retry then
+        # observes cannot prove non-application.
+        calendar = self.adapter()
+        event = self.seed(calendar)
+        assert event.event_ref is not None
+        durable = self.launch(calendar)
+        self.server.lose_write_before_commit = 1
+
+        def human_edit() -> None:
+            body = self.server.resource_body(FAMILY_PATH, event.event_ref.resource_name)  # type: ignore[union-attr]
+            assert body is not None
+            self.server.human_edit(
+                FAMILY_PATH, event.event_ref.resource_name, body.replace(b"dentist", b"HUMAN")  # type: ignore[union-attr]
+            )
+
+        self._after_first_write_attempt(human_edit, on_get=2)
+
+        result = durable.update_calendar_event(self.update_request(event, "op-retry-conflict"))
+
+        self.assertEqual(result.provider.status, ProviderOutcomeStatus.AMBIGUOUS)
+        self.assertEqual(result.provider.error_code, "version_conflict_after_possible_send")
+
+    def test_absence_found_while_retrying_a_cancel_is_unproven(self) -> None:
+        calendar = self.adapter()
+        event = self.seed(calendar)
+        durable = self.launch(calendar)
+        self.server.lose_write_before_commit = 1
+        self._after_first_write_attempt(
+            lambda: self.server._collections[FAMILY_PATH].resources.clear(),
+            on_get=2,
+        )
+
+        result = durable.cancel_calendar_event(self.cancel_request(event, "op-retry-gone"))
+
+        self.assertEqual(result.provider.status, ProviderOutcomeStatus.AMBIGUOUS)
+        self.assertEqual(result.provider.error_code, "event_absent_cause_unknown")
+
+    def test_fresh_outcomes_stay_definite(self) -> None:
+        # Positive controls: before any send, absence and a stale version are
+        # proven non-effects and keep their definite reports.
+        calendar = self.adapter()
+        stale = self.seed(calendar)
+        assert stale.event_ref is not None
+        body = self.server.resource_body(FAMILY_PATH, stale.event_ref.resource_name)
+        assert body is not None
+        self.server.human_edit(FAMILY_PATH, stale.event_ref.resource_name, body.replace(b"dentist", b"HUMAN"))
+        durable = self.launch(calendar)
+
+        conflict = durable.cancel_calendar_event(self.cancel_request(stale, "op-fresh-stale"))
+        self.server._collections[FAMILY_PATH].resources.clear()
+        absent = durable.update_calendar_event(self.update_request(stale, "op-fresh-absent"))
+
+        self.assertEqual(conflict.provider.status, ProviderOutcomeStatus.FAILED)
+        self.assertEqual(conflict.provider.error_code, "version_conflict")
+        self.assertEqual(absent.provider.status, ProviderOutcomeStatus.FAILED)
+        self.assertEqual(absent.provider.error_code, "event_absent")
+        self.assertEqual(self.server.conditional_writes, [])
+
     def test_operation_id_reuse_with_different_base_version_is_rejected(self) -> None:
         calendar = self.adapter()
         event = self.seed(calendar)
@@ -487,6 +594,24 @@ class RenderTests(unittest.TestCase):
             "update", self._response(ProviderOutcomeStatus.AMBIGUOUS, "x")
         )
         self.assertIn("cannot confirm", ambiguous)
+
+        unproven_absence = render_calendar_change_response(
+            "cancel",
+            self._response(ProviderOutcomeStatus.AMBIGUOUS, "event_absent_cause_unknown"),
+        )
+        self.assertIn("no longer exists", unproven_absence)
+        self.assertIn("cannot confirm whether my cancel caused", unproven_absence)
+        self.assertNotIn("no change", unproven_absence)
+
+        after_send = render_calendar_change_response(
+            "update",
+            self._response(
+                ProviderOutcomeStatus.AMBIGUOUS, "version_conflict_after_possible_send"
+            ),
+        )
+        self.assertIn("earlier attempt may already have reached", after_send)
+        self.assertNotIn("Nothing was overwritten", after_send)
+        self.assertNotIn("no change", after_send)
 
         scope = render_calendar_change_response(
             "update",

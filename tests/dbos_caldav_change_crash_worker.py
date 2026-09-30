@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 import sqlite3
@@ -14,7 +15,11 @@ from dbos import DBOS, DBOSConfig
 from ada.adapters.caldav.adapter import CalDAVCalendarAdapter
 from ada.adapters.caldav.profile import IONOS_PROFILE
 from ada.adapters.dbos_durable_actions import DBOSDurableCalendarActions
-from ada.core.action_outcomes import AuthorizationEvidence, OperationId
+from ada.core.action_outcomes import (
+    AuthorizationEvidence,
+    OperationId,
+    ProviderCapability,
+)
 from ada.core.actions import (
     CalendarEventChanges,
     CancelCalendarEventProposal,
@@ -63,9 +68,16 @@ class _PersistentFakeCalDAVServer:
     and DELETE. It hard-kills the process right after a write committed.
     """
 
-    def __init__(self, provider_db: Path, *, crash_after_commit: bool) -> None:
+    def __init__(
+        self,
+        provider_db: Path,
+        *,
+        crash_after_commit: bool,
+        fail_gets: bool = False,
+    ) -> None:
         self._provider_db = provider_db
         self._crash_after_commit = crash_after_commit
+        self._fail_gets = fail_gets
         with closing(_connect(provider_db)):
             pass
 
@@ -98,6 +110,9 @@ class _PersistentFakeCalDAVServer:
 
         with closing(_connect(self._provider_db)) as con:
             if method == "GET":
+                if self._fail_gets:
+                    # The provider is unreachable for reads (after the PROPFIND).
+                    raise httpx2.ConnectError("simulated unreachable provider")
                 self._record(con, "get")
                 row = con.execute(
                     "SELECT body, etag FROM resources WHERE path = ?", (path,)
@@ -164,17 +179,33 @@ def _configure(system_db: Path) -> None:
     DBOS(config=config)
 
 
+def _print_result(result: object, *, workflow_status: str = "SUCCESS") -> None:
+    print(
+        json.dumps(
+            {
+                "workflow_status": workflow_status,
+                "provider_status": result.provider.status.value,  # type: ignore[attr-defined]
+                "business_status": result.business.status.value,  # type: ignore[attr-defined]
+                "error_code": result.provider.error_code,  # type: ignore[attr-defined]
+            }
+        )
+    )
+
+
 def main() -> None:
-    if len(sys.argv) != 6:
+    if len(sys.argv) not in (6, 7):
         raise SystemExit(
             "usage: dbos_caldav_change_crash_worker.py "
-            "<update|cancel> <seed|start|recover> "
-            "<system-db> <provider-db> <operation-id>"
+            "<update|cancel> <seed|start|recover|run> "
+            "<system-db> <provider-db> <operation-id> [variant]"
         )
 
     kind, phase = sys.argv[1], sys.argv[2]
     system_db, provider_db = Path(sys.argv[3]), Path(sys.argv[4])
     operation_id = sys.argv[5]
+    # recover-phase variants: "get-fails" (reads fail), "no-capability" (the
+    # restarted process declares the operation kind not recoverable).
+    variant = sys.argv[6] if len(sys.argv) == 7 else ""
 
     if phase == "seed":
         with closing(_connect(provider_db)) as con:
@@ -187,8 +218,17 @@ def main() -> None:
 
     _configure(system_db)
     server = _PersistentFakeCalDAVServer(
-        provider_db, crash_after_commit=phase == "start"
+        provider_db,
+        crash_after_commit=phase == "start",
+        fail_gets=variant == "get-fails",
     )
+    profile = IONOS_PROFILE
+    if variant == "no-capability":
+        profile = dataclasses.replace(
+            IONOS_PROFILE,
+            update_capability=ProviderCapability.NONE,
+            cancel_capability=ProviderCapability.NONE,
+        )
     calendar = CalDAVCalendarAdapter(
         base_url=BASE_URL,
         auth=("ada-fake@example.test", "fake-app-password"),
@@ -200,7 +240,7 @@ def main() -> None:
                 access_mode=CalendarAccessMode.WRITE,
             ),
         ),
-        profile=IONOS_PROFILE,
+        profile=profile,
         transport=httpx2.MockTransport(server),
         clock=lambda: datetime.fromisoformat("2026-10-01T00:00:00+00:00"),
     )
@@ -212,9 +252,9 @@ def main() -> None:
 
     event_ref = EventRef(calendar_id="family", resource_name=RESOURCE_NAME)
 
-    if phase == "start":
+    if phase in ("start", "run"):
         if kind == "update":
-            durable.update_calendar_event(
+            result = durable.update_calendar_event(
                 DurableCalendarUpdate(
                     operation_id=OperationId(operation_id),
                     proposal=UpdateCalendarEventProposal(
@@ -226,7 +266,7 @@ def main() -> None:
                 )
             )
         else:
-            durable.cancel_calendar_event(
+            result = durable.cancel_calendar_event(
                 DurableCalendarCancel(
                     operation_id=OperationId(operation_id),
                     proposal=CancelCalendarEventProposal(
@@ -235,22 +275,16 @@ def main() -> None:
                     authorization=_authorization(),
                 )
             )
-        raise AssertionError("the provider commit should hard-crash the process")
+        if phase == "start":
+            raise AssertionError("the provider commit should hard-crash the process")
+        _print_result(result)
+        DBOS.destroy()
+        return
 
     if phase == "recover":
         handle = DBOS.retrieve_workflow(operation_id)
         result = handle.get_result(polling_interval_sec=0.05)
-        status = handle.get_status()
-        print(
-            json.dumps(
-                {
-                    "workflow_status": status.status,
-                    "provider_status": result.provider.status.value,
-                    "business_status": result.business.status.value,
-                    "error_code": result.provider.error_code,
-                }
-            )
-        )
+        _print_result(result, workflow_status=handle.get_status().status)
         DBOS.destroy()
         return
 

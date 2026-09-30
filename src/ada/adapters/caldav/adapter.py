@@ -581,7 +581,16 @@ class CalDAVCalendarAdapter:
     ) -> CalendarChangeResult:
         """Re-read after an ambiguous send. The re-read is evidence, not a
         verdict: only this operation's marker proves an update, an unchanged
-        base proves nothing was applied, and anything else stays ambiguous."""
+        base proves nothing was applied *yet*, and anything else stays
+        ambiguous.
+
+        Absence is not evidence of non-application for either kind: the
+        write may have committed and the event then been deleted. For a
+        cancel the goal state "absent" holds, but whether Ada's own DELETE
+        caused it is unproven, so it is reported as ambiguous with
+        ``event_absent_cause_unknown`` rather than as ``ABSENT``, which only
+        ever means "observed before any send".
+        """
 
         try:
             current = dav_client.get_resource(
@@ -590,7 +599,9 @@ class CalDAVCalendarAdapter:
                 max_response_bytes=self._profile.max_response_bytes,
             )
             if current is None:
-                return _change_result(CalendarChangeStatus.ABSENT, "event_absent")
+                return _change_result(
+                    CalendarChangeStatus.AMBIGUOUS, "event_absent_cause_unknown"
+                )
             component = mapping.parse_single_vevent(
                 current.calendar_data, resource_name=name
             )

@@ -383,6 +383,47 @@ class CalDAVUpdateTests(unittest.TestCase):
         self.assertEqual(result.status, CalendarChangeStatus.AMBIGUOUS)
         self.assertEqual(result.error_code, "reconciliation_failed")
 
+    def _delete_after_write(self, event: CalendarEvent) -> None:
+        """Someone else deletes the event after Ada's write was sent but
+        before Ada re-reads it for reconciliation."""
+
+        assert event.event_ref is not None
+        real_get = self.fx.server._get
+        state = {"done": False}
+
+        def get_after_delete(path: str) -> httpx2.Response:
+            if not state["done"] and self.fx.server.conditional_writes:
+                state["done"] = True
+                self.fx.server._collections[FAMILY_PATH].resources.clear()
+            return real_get(path)
+
+        self.fx.server._get = get_after_delete  # type: ignore[method-assign]
+
+    def test_update_absent_after_ambiguous_send_is_ambiguous_not_a_non_commit(
+        self,
+    ) -> None:
+        # Absence does not prove the update did not commit: it may have
+        # committed and the event been deleted afterwards. Both histories
+        # must stay indistinguishable, hence ambiguous.
+        for label, fault in (
+            ("lost response after commit", "lose_write_response_after_commit"),
+            ("lost request before commit", "lose_write_before_commit"),
+        ):
+            with self.subTest(label):
+                self.tearDown()
+                self.setUp()
+                event = self.fx.create()
+                setattr(self.fx.server, fault, 1)
+                self._delete_after_write(event)
+
+                result = self.fx.adapter.update_event(
+                    update_of(event, title="x"), operation_id="upd-gone"
+                )
+
+                self.assertEqual(result.status, CalendarChangeStatus.AMBIGUOUS)
+                self.assertEqual(result.error_code, "event_absent_cause_unknown")
+                self.assertEqual(len(self.fx.server.conditional_writes), 1)
+
     def test_update_of_an_absent_event_reports_absent_without_writing(self) -> None:
         event = self.fx.create()
         assert event.event_ref is not None
@@ -466,14 +507,47 @@ class CalDAVCancelTests(unittest.TestCase):
         self.assertEqual(result.status, CalendarChangeStatus.CONFLICT)
         self.assertEqual(str(self.fx.stored(event).get("summary")), "Edited by a human")
 
-    def test_lost_response_after_delete_reports_absent_not_own_effect(self) -> None:
+    def test_lost_response_after_delete_knows_absence_but_not_its_cause(self) -> None:
         event = self.fx.create()
         self.fx.server.lose_write_response_after_commit = 1
 
         result = self.fx.adapter.cancel_event(cancel_of(event), operation_id="cancel-l")
 
-        # The goal state holds but Ada cannot prove it was Ada's delete.
+        # The goal state (absent) is known, but Ada cannot prove its own
+        # DELETE caused it: not ABSENT (which means "nothing applied").
+        self.assertEqual(result.status, CalendarChangeStatus.AMBIGUOUS)
+        self.assertEqual(result.error_code, "event_absent_cause_unknown")
+
+    def test_lost_request_then_deletion_by_someone_else_is_the_same_unproven_state(
+        self,
+    ) -> None:
+        event = self.fx.create()
+        assert event.event_ref is not None
+        self.fx.server.lose_write_before_commit = 1
+        real_get = self.fx.server._get
+        state = {"done": False}
+
+        def get_after_delete(path: str) -> httpx2.Response:
+            if not state["done"] and self.fx.server.conditional_writes:
+                state["done"] = True
+                self.fx.server._collections[FAMILY_PATH].resources.clear()
+            return real_get(path)
+
+        self.fx.server._get = get_after_delete  # type: ignore[method-assign]
+
+        result = self.fx.adapter.cancel_event(cancel_of(event), operation_id="cancel-x")
+
+        self.assertEqual(result.status, CalendarChangeStatus.AMBIGUOUS)
+        self.assertEqual(result.error_code, "event_absent_cause_unknown")
+
+    def test_absence_before_any_send_is_a_proven_non_effect(self) -> None:
+        event = self.fx.create()
+        self.fx.server._collections[FAMILY_PATH].resources.clear()
+
+        result = self.fx.adapter.cancel_event(cancel_of(event), operation_id="cancel-p")
+
         self.assertEqual(result.status, CalendarChangeStatus.ABSENT)
+        self.assertEqual(self.fx.server.conditional_writes, [])
 
     def test_lost_request_before_delete_is_not_applied_and_replay_deletes_once(
         self,

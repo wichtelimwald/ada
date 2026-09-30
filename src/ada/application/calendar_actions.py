@@ -272,6 +272,18 @@ def render_calendar_change_response(
     if status is BusinessOutcomeStatus.COMMITTED:
         return f"I did {verb} the calendar event."
     if status is BusinessOutcomeStatus.AMBIGUOUS:
+        if error_code == "event_absent_cause_unknown":
+            # The goal state is known; Ada's own effect is not.
+            return (
+                f"The calendar event no longer exists, but I cannot confirm "
+                f"whether my {verb} caused that. I will not retry it blindly."
+            )
+        if error_code is not None and error_code.endswith("_after_possible_send"):
+            return (
+                f"I cannot confirm whether my {verb} was applied: an earlier "
+                "attempt may already have reached the calendar. I will not "
+                "retry it blindly."
+            )
         return (
             f"I cannot confirm whether the calendar event was changed by this "
             f"{verb}. I will not retry it blindly."
@@ -282,6 +294,7 @@ def render_calendar_change_response(
             "approved. Nothing was overwritten."
         )
     if error_code == "event_absent":
+        # Only reported when the absence was observed before any send.
         return "The calendar event no longer exists; I made no change."
     if error_code in (
         "recurring_event_read_only",
