@@ -120,7 +120,7 @@ does not directly solve the future Linux/server deployment path.
 | --- | --- | --- | --- | --- | --- |
 | Same user + Unix socket only | No | No proven isolation | Yes | Low | Rejected as enforcement boundary |
 | Same user + legacy Keychain trusted-app ACL | No for mounted vault | Prompt-based, not fail-closed; shared-interpreter problem | Yes | Low/medium | Insufficient alone |
-| Distinct runtime/service POSIX identity + filesystem ownership/ACL | Credible; must be target-Mac-proven with owners enabled | Separate-account Keychain/service bootstrap unresolved | Yes, if human/broker permissions are explicit | Medium; system service/admin install | Probe first for filesystem boundary |
+| Distinct runtime/service POSIX identity + filesystem ownership/ACL | Target-Mac Probe B passed | Target-Mac Probe B denied runtime access to user Keychain | Yes | Medium; dedicated service install still pending | Selected direction; S2C lifecycle/IPC proof pending |
 | Sandboxed ordinary runtime + privileged/signed broker helper | Credible | Credible with signed keychain identity/access group | Yes | High; packaging/signing/entitlements | Keep as strong fallback |
 | Signed broker helper + data-protection Keychain access group, runtime otherwise same user | Does not by itself isolate mounted vault | Credible | Yes | Medium/high | Secret-only candidate; needs another vault boundary |
 
@@ -139,12 +139,10 @@ The probe:
 - proves that another process under the **same** user can read the unlocked
   plaintext file;
 - detaches and reattaches the image and verifies persistence;
-- optionally, when an explicit existing runtime account is supplied and
-  non-interactive sudo is already authorized, proves whether that distinct identity
-  is denied direct read access.
-
 A same-user read succeeding is an **expected negative result**: it is evidence that
-"separate process" is not a storage isolation boundary.
+"separate process" is not a storage isolation boundary. Distinct-user testing is
+deliberately not part of Probe A; Probe B owns that evidence without a hidden or
+pre-authorized sudo path.
 
 ### Probe B — choose the identity model
 
@@ -164,20 +162,44 @@ Decision criteria:
 - installation/maintenance burden must be acceptable for the MVP;
 - the design should not make a future Linux service impossible.
 
-### Probe C — Keychain secret isolation
+### Probe C / S2C — production service boundary
 
-Only after the process identity model is narrowed, test secret storage using the
-matching mechanism:
+Probe B already proved the required Keychain and unlocked-vault denials for a
+distinct OS identity. The next probe therefore focuses on turning that property
+into a production-capable local boundary without installing anything permanently
+at first.
 
-- distinct service identity: prove the runtime account cannot access the broker
-  account's chosen keychain item and prove broker restart/unlock behavior;
-- signed broker identity: prove a data-protection Keychain item/private access group
-  is retrievable by the broker helper but denied to the ordinary runtime without a
-  user authorization escape hatch.
+Stage 1, no persistent admin changes:
 
-Legacy `security -T`/trusted-application ACLs may be useful characterization
-evidence, but do not satisfy the hard gate by themselves because an untrusted app
-can trigger user confirmation.
+- broker test server runs in the logged-in user context;
+- restricted client is launched explicitly under the existing probe identity;
+- Unix-domain stream socket only;
+- broker obtains effective peer UID/GID via macOS `getpeereid(3)`;
+- broker rejects a wrong UID **before** parsing request payload;
+- no bearer token, TCP listener, user creation, launchd installation or
+  `sudo -v`.
+
+Apple's `getpeereid(3)` documentation states that the returned Unix-domain peer
+credentials are kernel-derived and cannot be influenced by the peer except by
+connecting under different effective credentials:
+
+- https://developer.apple.com/library/archive/documentation/System/Conceptual/ManPages_iPhoneOS/man3/getpeereid.3.html
+
+Stage 2 only after Stage 1 passes and the installation manifest is reviewed:
+
+- create a dedicated non-login, non-admin Ada runtime identity; `nobody` remains
+  probe-only;
+- run the ordinary runtime as a system launchd job under that identity;
+- keep the broker in the logged-in user context because the data-protection
+  Keychain is user-context-only;
+- test login/logout, restart/reconnect, required local-model/resource access and
+  complete uninstall.
+
+Apple recommends configuring daemon identity through launchd rather than changing
+UID/GID inside the daemon:
+
+- https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/CreatingLaunchdJobs.html
+- https://developer.apple.com/documentation/Technotes/tn3137-on-mac-keychains
 
 ## Decision rule
 
