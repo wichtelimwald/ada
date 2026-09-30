@@ -38,8 +38,27 @@ class MVP30S2ProbeTests(unittest.TestCase):
         payload = plistlib.dumps(
             {
                 "system-entities": [
+                    {"dev-entry": "/dev/disk99"},
                     {
                         "dev-entry": "/dev/disk99s1",
+                        "mount-point": str(mountpoint),
+                    },
+                ]
+            }
+        )
+
+        self.assertEqual(
+            self.probe.parse_attached_device(payload, mountpoint),
+            ("/dev/disk99s1", "/dev/disk99"),
+        )
+
+    def test_parse_attached_device_derives_whole_disk_when_plist_omits_it(self) -> None:
+        mountpoint = Path("/tmp/ada-mvp30-s2-test-mount")
+        payload = plistlib.dumps(
+            {
+                "system-entities": [
+                    {
+                        "dev-entry": "/dev/disk48s1",
                         "mount-point": str(mountpoint),
                     }
                 ]
@@ -48,7 +67,7 @@ class MVP30S2ProbeTests(unittest.TestCase):
 
         self.assertEqual(
             self.probe.parse_attached_device(payload, mountpoint),
-            "/dev/disk99s1",
+            ("/dev/disk48s1", "/dev/disk48"),
         )
 
     def test_probe_b_never_bootstraps_sudo_credentials(self) -> None:
