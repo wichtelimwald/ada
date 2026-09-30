@@ -19,11 +19,16 @@ def call_counts(provider_db: Path) -> dict[str, int]:
     return {kind: int(count) for kind, count in rows}
 
 
-def provider_human_edit(provider_db: Path, *, keep_marker: bool) -> None:
+def provider_human_edit(
+    provider_db: Path, *, keep_marker: bool, add_property: bytes | None = None
+) -> None:
     """A person edits the event in webmail: a new ETag and a changed title.
 
     ``keep_marker=False`` also drops Ada's operation marker, as a client that
     rewrites the resource without unknown ``X-`` properties would.
+    ``add_property`` inserts one more iCalendar line into the VEVENT (for
+    example an ``ATTENDEE`` or an ``RRULE``), moving the event outside the
+    shapes Ada is allowed to write.
     """
 
     with closing(sqlite3.connect(provider_db)) as con:
@@ -33,6 +38,8 @@ def provider_human_edit(provider_db: Path, *, keep_marker: bool) -> None:
         body = bytes(body).replace(b"SUMMARY:", b"SUMMARY:Edited by a human - ")
         if not keep_marker:
             body = body.replace(b"X-ADA-OPERATION-MARKER", b"X-OTHER-PROPERTY")
+        if add_property is not None:
+            body = body.replace(b"END:VEVENT", add_property + b"\r\nEND:VEVENT")
         con.execute(
             "UPDATE resources SET body = ?, etag = ? WHERE path = ?",
             (body, f"e{int(etag[1:]) + 1}", RESOURCE_PATH),
@@ -162,6 +169,53 @@ class CalDAVChangeCrashRecoveryTests(unittest.TestCase):
         payload = self.payload_of(self.run_worker("update", "recover", operation_id))
 
         self.assertEqual(payload["provider_status"], "committed")
+        self.assertEqual(call_counts(self.provider_db).get("put"), 1)
+
+    def test_update_crash_then_marker_preserving_shape_change_is_still_committed(
+        self,
+    ) -> None:
+        # The preserved marker proves Ada's update committed. A later edit
+        # that moves the event outside the MVP write scope (attendee,
+        # recurrence) only forbids a *new* write; it must not erase that
+        # evidence, and no second PUT may be sent.
+        shapes = {
+            "attendee": b"ATTENDEE:mailto:someone@example.test",
+            "recurrence": b"RRULE:FREQ=WEEKLY;COUNT=4",
+        }
+        for label, line in shapes.items():
+            with self.subTest(label):
+                self.tearDown()
+                self.setUp()
+                operation_id = f"op-caldav-update-shape-{label}"
+                self.seed_and_crash("update", operation_id)
+                provider_human_edit(self.provider_db, keep_marker=True, add_property=line)
+
+                payload = self.payload_of(
+                    self.run_worker("update", "recover", operation_id)
+                )
+
+                self.assertEqual(payload["workflow_status"], "SUCCESS")
+                self.assertEqual(payload["provider_status"], "committed")
+                self.assertEqual(payload["business_status"], "committed")
+                self.assertEqual(call_counts(self.provider_db).get("put"), 1)
+
+    def test_update_crash_then_shape_change_without_marker_stays_conservative(
+        self,
+    ) -> None:
+        # Without a usable marker nothing proves the earlier commit, so the
+        # write-scope refusal is reported as unproven, never as a confirmed
+        # non-commit.
+        operation_id = "op-caldav-update-shape-no-marker"
+        self.seed_and_crash("update", operation_id)
+        provider_human_edit(
+            self.provider_db,
+            keep_marker=False,
+            add_property=b"ATTENDEE:mailto:someone@example.test",
+        )
+
+        payload = self.payload_of(self.run_worker("update", "recover", operation_id))
+
+        self.assert_unproven(payload, "attendee_event_read_only_after_possible_send")
         self.assertEqual(call_counts(self.provider_db).get("put"), 1)
 
     def test_update_crash_then_deletion_is_not_a_confirmed_non_commit(self) -> None:

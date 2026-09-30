@@ -454,6 +454,129 @@ class CalDAVUpdateTests(unittest.TestCase):
         self.assertEqual(self.fx.server.conditional_writes, [])
 
 
+class CalDAVMarkerBeforeWriteScopeTests(unittest.TestCase):
+    """A preserved operation marker proves Ada's earlier update committed even
+    if the event was later changed into a shape Ada may no longer write.
+
+    Write-scope refusals only forbid a *new* write; they must not erase
+    reconciliation evidence (ADR-0009 section 6).
+    """
+
+    SHAPES = {
+        "attendee": "ATTENDEE:mailto:someone@example.test",
+        "recurrence": "RRULE:FREQ=WEEKLY;COUNT=4",
+        "series-with-override": None,  # a second VEVENT, see _reshape
+    }
+
+    def setUp(self) -> None:
+        self.fx = _Fixture()
+        self.addCleanup(self.fx.adapter.close)
+
+    def _reshape(self, event: CalendarEvent, shape: str) -> None:
+        """A provider/user edit that keeps Ada's marker but changes the shape."""
+
+        assert event.event_ref is not None
+        body = self.fx.server.resource_body(FAMILY_PATH, event.event_ref.resource_name)
+        assert body is not None
+        calendar = icalendar.Calendar.from_ical(body)
+        vevent = next(iter(calendar.walk("VEVENT")))
+        if shape == "attendee":
+            vevent.add("attendee", "mailto:someone@example.test")
+        elif shape == "recurrence":
+            vevent.add("rrule", {"FREQ": "WEEKLY", "COUNT": 4})
+        else:
+            override = icalendar.Event()
+            override.add("uid", str(vevent.get("uid")))
+            override.add("dtstamp", datetime(2026, 9, 1, tzinfo=timezone.utc))
+            override.add("dtstart", START + timedelta(days=7))
+            override.add("dtend", END + timedelta(days=7))
+            override.add("recurrence-id", START + timedelta(days=7))
+            calendar.add_component(override)
+            vevent.add("rrule", {"FREQ": "WEEKLY", "COUNT": 4})
+        self.fx.server.human_edit(
+            FAMILY_PATH, event.event_ref.resource_name, calendar.to_ical()
+        )
+
+    def test_replay_after_commit_is_committed_even_if_the_event_left_the_write_scope(
+        self,
+    ) -> None:
+        for shape in self.SHAPES:
+            with self.subTest(shape):
+                self.tearDown()
+                self.setUp()
+                event = self.fx.create()
+                proposal = update_of(event, title="Applied once")
+                first = self.fx.adapter.update_event(proposal, operation_id="upd-scope")
+                self.assertEqual(first.status, CalendarChangeStatus.COMMITTED)
+                self._reshape(event, shape)
+
+                replay = self.fx.adapter.update_event(proposal, operation_id="upd-scope")
+
+                self.assertEqual(replay.status, CalendarChangeStatus.COMMITTED)
+                self.assertEqual(len(self.fx.server.conditional_writes), 1)
+
+    def test_reconciliation_after_a_lost_response_survives_a_shape_change(self) -> None:
+        for shape in self.SHAPES:
+            with self.subTest(shape):
+                self.tearDown()
+                self.setUp()
+                event = self.fx.create()
+                self.fx.server.lose_write_response_after_commit = 1
+                real_get = self.fx.server._get
+                state = {"done": False}
+
+                def get_after_reshape(path: str, _real=real_get, _state=state, _event=event, _shape=shape) -> httpx2.Response:  # noqa: E501
+                    if not _state["done"] and self.fx.server.conditional_writes:
+                        _state["done"] = True
+                        self._reshape(_event, _shape)
+                    return _real(path)
+
+                self.fx.server._get = get_after_reshape  # type: ignore[method-assign]
+
+                result = self.fx.adapter.update_event(
+                    update_of(event, title="Applied"), operation_id="upd-recon-scope"
+                )
+
+                self.assertEqual(result.status, CalendarChangeStatus.COMMITTED)
+                self.assertEqual(len(self.fx.server.conditional_writes), 1)
+
+    def test_without_a_marker_the_scope_refusal_still_applies(self) -> None:
+        event = self.fx.create()
+        assert event.event_ref is not None
+        body = self.fx.server.resource_body(FAMILY_PATH, event.event_ref.resource_name)
+        assert body is not None
+        self.fx.server.human_edit(
+            FAMILY_PATH,
+            event.event_ref.resource_name,
+            body.replace(b"END:VEVENT", b"ATTENDEE:mailto:someone@example.test\r\nEND:VEVENT"),
+        )
+        current = self.fx.adapter.list_events(
+            start=START - timedelta(hours=1), end=END + timedelta(hours=1)
+        )[0]
+
+        result = self.fx.adapter.update_event(
+            update_of(current, title="x"), operation_id="upd-no-marker"
+        )
+
+        self.assertEqual(result.status, CalendarChangeStatus.REJECTED)
+        self.assertEqual(result.error_code, "attendee_event_read_only")
+        self.assertEqual(self.fx.server.conditional_writes, [])
+
+    def test_unparsable_provider_data_is_a_typed_pre_read_failure(self) -> None:
+        event = self.fx.create()
+        assert event.event_ref is not None
+        self.fx.server.human_edit(
+            FAMILY_PATH, event.event_ref.resource_name, b"this is not iCalendar"
+        )
+
+        result = self.fx.adapter.update_event(
+            update_of(event, title="x"), operation_id="upd-garbage"
+        )
+
+        self.assertEqual(result.status, CalendarChangeStatus.REJECTED)
+        self.assertEqual(result.error_code, "pre_read_failed")
+
+
 class CalDAVCancelTests(unittest.TestCase):
     def setUp(self) -> None:
         self.fx = _Fixture()

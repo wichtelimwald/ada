@@ -284,8 +284,11 @@ S6-S7 (roadmap `done` only in the last PR).
   `sequence`. `CalDAVCalendarAdapter._change_event` follows ADR-0009
   section 6: fail closed before any request for an unconfigured or read-only
   calendar or an unsafe resource name; read the resource; a replayed update
-  that carries this operation's marker is `committed` (checked before the
-  version comparison, which the operation's own write changed); a version or
+  that carries this operation's marker is `committed`, checked before both
+  the version comparison (which the operation's own write changed) and the
+  write-scope check (which only forbids a *new* write: an event later edited
+  into a recurring or attendee shape keeps its proof of the earlier commit,
+  also for a multi-`VEVENT` series); a version or
   `SEQUENCE` other than `base_version` is a `conflict` without a write;
   otherwise `PUT`/`DELETE` with `If-Match: <base_version>` only, base
   `SEQUENCE` + 1, fresh `DTSTAMP` and the marker (update carries all other
@@ -332,7 +335,8 @@ S6-S7 (roadmap `done` only in the last PR).
   `tests/dbos_caldav_change_crash_worker.py` (hard kill after the provider
   commit: update recovers `committed` with one write; replay with a failed
   read, a stripped-marker edit, a deletion or a non-recoverable provider is
-  `ambiguous`; cancel recovers with one `DELETE` and known absence but an
+  `ambiguous`, while a marker-preserving edit (also one that adds an attendee
+  or recurrence) stays `committed` with one write; cancel recovers with one `DELETE` and known absence but an
   unproven cause; fresh stale and fresh absent requests keep their definite
   `version_conflict`/`event_absent` reports). Not part of S4: the operation record and
   payload purge (S6/D5), the Ada-created-events distinction of D3 (needs the

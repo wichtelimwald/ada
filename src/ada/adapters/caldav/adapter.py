@@ -469,24 +469,31 @@ class CalDAVCalendarAdapter:
             )
             if current is None:
                 return _change_result(CalendarChangeStatus.ABSENT, "event_absent")
-            component = mapping.parse_writable_vevent(
-                current.calendar_data, resource_name=name
+            calendar = mapping.parse_calendar(current.calendar_data)
+            # Reconciliation evidence first: a preserved operation marker
+            # proves this update already committed, however the event was
+            # changed afterwards. The write-scope check below only decides
+            # whether a *new* write may be sent.
+            owner = (
+                mapping.operation_marker_component(calendar, marker)
+                if is_update and self._profile.preserves_x_properties
+                else None
             )
+            if owner is not None:
+                # A replay after a lost checkpoint/response: this operation
+                # already applied. Checked before the version comparison,
+                # which our own write necessarily changed.
+                return CalendarChangeResult(
+                    status=CalendarChangeStatus.COMMITTED,
+                    event_ref=event_ref,
+                    event=self._event_from(ref, name, owner, current.etag),
+                )
+            component = mapping.writable_vevent(calendar, name)
         except WriteScopeError as exc:
             return _change_result(CalendarChangeStatus.REJECTED, exc.code)
         except _RECOVERABLE_VERIFICATION_ERRORS:
             # Nothing has been written yet; only reads failed.
             return _change_result(CalendarChangeStatus.REJECTED, "pre_read_failed")
-
-        if is_update and self._owns(component, marker):
-            # A replay after a lost checkpoint/response: this operation
-            # already applied. Checked before the version comparison, which
-            # our own write necessarily changed.
-            return CalendarChangeResult(
-                status=CalendarChangeStatus.COMMITTED,
-                event_ref=event_ref,
-                event=self._event_from(ref, name, component, current.etag),
-            )
 
         if current.etag is None:
             return _change_result(CalendarChangeStatus.REJECTED, "version_unavailable")
@@ -546,12 +553,6 @@ class CalDAVCalendarAdapter:
             ref, name, href, marker, base_etag, is_update=is_update
         )
 
-    def _owns(self, component: "icalendar.cal.Component", marker: str) -> bool:
-        return (
-            self._profile.preserves_x_properties
-            and mapping.component_operation_marker(component) == marker
-        )
-
     def _event_from(
         self,
         ref: CalendarRef,
@@ -602,19 +603,23 @@ class CalDAVCalendarAdapter:
                 return _change_result(
                     CalendarChangeStatus.AMBIGUOUS, "event_absent_cause_unknown"
                 )
-            component = mapping.parse_single_vevent(
-                current.calendar_data, resource_name=name
+            owner = (
+                mapping.operation_marker_component(
+                    mapping.parse_calendar(current.calendar_data), marker
+                )
+                if is_update and self._profile.preserves_x_properties
+                else None
             )
         except _RECOVERABLE_VERIFICATION_ERRORS:
             return _change_result(
                 CalendarChangeStatus.AMBIGUOUS, "reconciliation_failed"
             )
 
-        if is_update and self._owns(component, marker):
+        if owner is not None:
             return CalendarChangeResult(
                 status=CalendarChangeStatus.COMMITTED,
                 event_ref=EventRef(calendar_id=ref.calendar_id, resource_name=name),
-                event=self._event_from(ref, name, component, current.etag),
+                event=self._event_from(ref, name, owner, current.etag),
             )
         if current.etag == base_etag:
             return _change_result(CalendarChangeStatus.NOT_APPLIED, "not_applied")

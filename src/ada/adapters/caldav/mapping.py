@@ -517,18 +517,41 @@ def build_create_ical(
     return calendar.to_ical()
 
 
-def parse_writable_vevent(
-    calendar_data: bytes, *, resource_name: str
-) -> "icalendar.cal.Component":
-    """Parse a resource Ada may update or cancel, or refuse it (fail closed)."""
+def parse_calendar(calendar_data: bytes) -> "icalendar.Calendar":
+    """Parse provider iCalendar data; malformed input is a typed mapping error
+    rather than a raw parser exception."""
 
-    calendar = icalendar.Calendar.from_ical(calendar_data)
-    return _writable_vevent(calendar, resource_name)
+    try:
+        return icalendar.Calendar.from_ical(calendar_data)
+    except ValueError as exc:
+        raise CalDAVMappingError(f"malformed iCalendar data: {exc}") from exc
 
 
-def _writable_vevent(
+def operation_marker_component(
+    calendar: "icalendar.Calendar", marker: str
+) -> "icalendar.cal.Component | None":
+    """The VEVENT carrying ``marker``, whatever shape the resource has now.
+
+    The marker is reconciliation evidence of an earlier write. Whether Ada may
+    *write* the resource today (``writable_vevent``) is a separate question
+    that only matters before a new write; a later edit that moved the event
+    out of the write scope does not undo the earlier write.
+    """
+
+    for component in calendar.walk("VEVENT"):
+        if component_operation_marker(component) == marker:
+            return component
+    return None
+
+
+def writable_vevent(
     calendar: "icalendar.Calendar", resource_name: str
 ) -> "icalendar.cal.Component":
+    """The single VEVENT Ada may update or cancel, or a refusal (fail closed).
+
+    Only consulted when a new write may still be attempted.
+    """
+
     vevents = list(calendar.walk("VEVENT"))
     if len(vevents) != 1:
         # Several VEVENTs mean a recurrence series with overrides.
@@ -572,8 +595,8 @@ def build_update_ical(
     """
 
     resource_name = proposal.event_ref.resource_name
-    calendar = icalendar.Calendar.from_ical(calendar_data)
-    component = _writable_vevent(calendar, resource_name)
+    calendar = parse_calendar(calendar_data)
+    component = writable_vevent(calendar, resource_name)
     changes = proposal.changes
 
     if changes.start is not None or changes.end is not None:
