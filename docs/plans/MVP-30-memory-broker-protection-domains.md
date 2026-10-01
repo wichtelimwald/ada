@@ -3,7 +3,7 @@
 Status: implementation  
 Roadmap: docs/product/mvp-roadmap.md  
 Depends on: MVP-20  
-Owner PR: #46
+Owner PR: S1 #46 (merged); S2 #47
 
 ## Goal
 
@@ -15,6 +15,7 @@ when intentionally unlocked.
 ## Current state / evidence
 
 - MVP-20 is done on main via PR #41.
+- S1 is complete on main via PR #46 (squash `3c5c6d4`): broker/domain contract, fail-closed scope binding, non-authoritative MemoryScope boundary, and worktree-safe validation.
 - ADR-0008 already selects a host-side Memory Broker and private-by-default,
   independently protected Memory domains.
 - ADR-0010 provides safe current-file semantics and Git recovery history, but leaves
@@ -23,6 +24,9 @@ when intentionally unlocked.
   <root>/.git; no protection-domain broker or encryption exists yet.
 - docs/research/memory-protection-evaluation.md evaluates maintained/platform
   protection mechanisms. ADR-0011 records the proposed topology.
+- docs/research/macos-broker-isolation-evaluation.md records completed target-Mac
+  Probe A/B evidence: same-user process separation fails, while a distinct
+  restricted OS identity is denied both unlocked-vault and Keychain access.
 
 ## Scope
 
@@ -51,13 +55,12 @@ when intentionally unlocked.
 These remain blockers for ADR-0011 acceptance, not invitations to guess:
 
 1. target-Mac Keychain access-control shape for a broker process;
-2. the concrete OS-level enforcement mechanism (for example a distinct service
-   identity/POSIX user, filesystem ACLs, a code-signing-scoped Keychain
-   access-control list, or an app-sandbox/entitlement boundary) that prevents a
-   same-user ordinary Ada runtime process from directly reading an unrelated
-   domain's unlocked plaintext mount or retrieving its Keychain secret; no
-   mechanism is assumed until proven by the S2 target-Mac negative probes
-   (see ADR-0011 point 2 and "Review focus" below);
+2. final production shape of the now target-Mac-proven distinct-OS-identity
+   direction: dedicated Ada runtime account/service lifecycle, launchd/startup
+   ownership, IPC authentication, and required non-Memory resource access. Probe B
+   proves the isolation property with an existing restricted identity but does not
+   yet prove the packaged service topology (see ADR-0011 point 2 and "Review focus"
+   below);
 3. exact platform encrypted-image command/format after the macOS probe;
 4. whether ADR-0010's final late non-cooperating-save race is accepted as an MVP
    residual or closed through a separately designed synchronization slice;
@@ -136,20 +139,59 @@ provider credentials entirely behind the host-side broker/provider adapters.
 
 ### S2 — Host process + encrypted-vault provider probe
 
+S2 started with a probe/decision slice. Probe A/B now provide a credible
+target-Mac mechanism: keep broker/human context under the logged-in user and run
+the ordinary runtime under a distinct restricted OS identity. Production work must
+still preserve that boundary and validate dedicated-account/IPC/startup details.
+
+- run `research/memory/mvp-30-s2/probe_encrypted_vault.py` on the target Mac to
+  validate AES-256/APFS create/attach/detach/reattach mechanics and record the
+  expected same-user direct-read result (same-user read succeeds, proving that
+  process separation alone is insufficient);
+- compare the smallest credible enforcement candidates documented in
+  `docs/research/macos-broker-isolation-evaluation.md`;
 - decide and target-Mac-validate the concrete OS-level enforcement mechanism
   for same-user process isolation (open decision 2 above) **before**
   implementing the encrypted-vault provider; do not assume Unix-socket IPC
   permissions alone isolate a mounted vault or a Keychain item from the
   ordinary Ada runtime process;
-- add the two required negative target-Mac probes run from the ordinary
-  runtime process: it must fail to read an unrelated domain's unlocked
-  plaintext mount, and it must fail to retrieve an unrelated domain's
-  Keychain secret;
+- **completed:** target-Mac negative probes prove a distinct restricted OS identity
+  cannot read the unlocked synthetic private file and cannot retrieve the
+  synthetic Keychain item, while the broker/current-user context can access both;
 - implement local-only broker IPC with restrictive permissions;
 - define EncryptedVaultProvider behind the adapter boundary;
 - target-Mac synthetic probe for encrypted create/unlock/lock/restart;
 - validate Keychain item access restrictions and secret handling;
 - keep platform command details out of core/ports.
+
+#### S2C — production service-boundary proof
+
+Do this in two explicit stages; do not install a permanent service account in the
+first stage.
+
+1. **IPC identity probe, no persistent admin changes**
+   - broker test server runs as the current user;
+   - client runs explicitly as the existing restricted probe identity;
+   - Unix-domain stream socket only;
+   - broker obtains peer UID/GID from `getpeereid(3)` and rejects a wrong UID
+     before parsing the request body;
+   - prove current-user and other-UID clients are rejected when the configured
+     runtime UID is the restricted probe identity;
+   - no bearer token, TCP listener, `sudo -v`, user creation or launchd install.
+
+2. **Dedicated runtime/launchd installation probe**
+   - only after stage 1 passes and the install manifest is reviewed;
+   - create a dedicated non-login, non-admin Ada runtime identity; never use
+     `nobody` in production;
+   - broker remains in logged-in user context; runtime is launchd-managed under the
+     restricted identity;
+   - explicitly test login/logout, restart/reconnect, local model access and clean
+     uninstall;
+   - installation uses only visible, exact privileged operations and leaves no
+     cached sudo authorization by design.
+
+Only after both stages pass should S2 implement the production IPC adapter and
+EncryptedVaultProvider.
 
 ### S3 — Protected current Memory + separated history
 
@@ -207,8 +249,25 @@ puts that worktree's `src/` ahead of `PYTHONPATH`, then asserts the `ada`
 import actually resolves there, so validation cannot silently pass/fail
 against a different, stale Ada checkout (PR #46 M3).
 
-Later slices add target-Mac platform probes and restart/restore tests. Validation
-evidence is commit-specific and belongs in the PR.
+S2 Probe A:
+
+    python3 research/memory/mvp-30-s2/probe_encrypted_vault.py
+
+Probe B — restricted runtime identity:
+
+    python3 research/memory/mvp-30-s2/probe_restricted_runtime.py prepare
+
+The Python probe never invokes sudo. It prints one exact manual
+`sudo -u <restricted-user> -- ...` identity-switch command for maintainer review.
+Run `sudo -k` immediately before and after that one command, then execute the
+printed unprivileged cleanup command.
+
+Probe B uses an existing unprivileged identity as a temporary stand-in and must not
+create users or install services. It tests whether the logged-in broker/human
+context keeps vault + Keychain access while the restricted runtime identity is
+denied both. A pass advances the candidate to a later dedicated service-account /
+launchd probe; it does not yet accept the final topology. Validation evidence is
+commit-specific and belongs in the PR.
 
 ## Review focus
 
