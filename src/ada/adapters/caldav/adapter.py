@@ -238,7 +238,17 @@ class CalDAVCalendarAdapter:
                 error_code="calendar_not_writable",
             )
 
-        collection = self._resolve_collection(ref)
+        try:
+            collection = self._resolve_collection(ref)
+        except _RECOVERABLE_VERIFICATION_ERRORS:
+            # Only a read (PROPFIND) failed; no create was sent by this call.
+            # Typed like every other pre-send refusal instead of escaping as a
+            # raw exception that would end the durable workflow without any
+            # outcome.
+            return CalendarCreateResult(
+                status=CalendarCreateStatus.REJECTED,
+                error_code="collection_unavailable",
+            )
         marker = mapping.derive_operation_marker(operation_id)
         resource_name = mapping.derive_resource_name(operation_id)
         resource_href = f"{collection.href.rstrip('/')}/{resource_name}"

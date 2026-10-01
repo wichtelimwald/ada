@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 from contextlib import closing
 import os
 import sqlite3
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import httpx2
@@ -13,7 +15,11 @@ from dbos import DBOS, DBOSConfig
 from ada.adapters.caldav.adapter import CalDAVCalendarAdapter
 from ada.adapters.caldav.profile import IONOS_PROFILE
 from ada.adapters.dbos_durable_actions import DBOSDurableCalendarActions
-from ada.core.action_outcomes import AuthorizationEvidence, OperationId
+from ada.core.action_outcomes import (
+    AuthorizationEvidence,
+    OperationId,
+    ProviderCapability,
+)
 from ada.core.actions import CreateCalendarEventProposal
 from ada.ports.calendar import CalendarAccessMode, CalendarAudience, CalendarRef
 from ada.ports.durable_action import DurableCalendarCreate
@@ -44,15 +50,27 @@ class _PersistentFakeCalDAVServer:
     ``CalDAVCalendarAdapter`` rather than a hand-rolled ``CalendarPort``.
     """
 
-    def __init__(self, provider_db: Path, *, crash_after_commit: bool) -> None:
+    def __init__(
+        self,
+        provider_db: Path,
+        *,
+        crash_after_commit: bool,
+        fail_method: str | None = None,
+    ) -> None:
         self._provider_db = provider_db
         self._crash_after_commit = crash_after_commit
+        # An HTTP method whose connection attempt is refused before anything
+        # is sent (a provider that is unreachable *now*).
+        self._fail_method = fail_method
         with closing(_connect(provider_db)):
             pass
 
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
         method = request.method
         path = request.url.path
+
+        if method == self._fail_method:
+            raise httpx2.ConnectError("simulated unreachable provider")
 
         if method == "PROPFIND":
             body = (
@@ -118,8 +136,6 @@ class _PersistentFakeCalDAVServer:
 
 
 def _request(operation_id: str) -> DurableCalendarCreate:
-    from datetime import datetime
-
     return DurableCalendarCreate(
         operation_id=OperationId(operation_id),
         proposal=CreateCalendarEventProposal(
@@ -148,34 +164,72 @@ def _configure(system_db: Path) -> None:
     DBOS(config=config)
 
 
+def _print_result(
+    result: object | None,
+    *,
+    workflow_status: str,
+    raised: BaseException | None = None,
+) -> None:
+    payload: dict[str, object] = {"workflow_status": workflow_status}
+    if raised is not None:
+        payload["raised"] = type(raised).__name__
+    else:
+        payload["provider_status"] = result.provider.status.value  # type: ignore[attr-defined]
+        payload["business_status"] = result.business.status.value  # type: ignore[attr-defined]
+        payload["error_code"] = result.provider.error_code  # type: ignore[attr-defined]
+    print(json.dumps(payload))
+
+
 def main() -> None:
-    if len(sys.argv) != 5:
+    if len(sys.argv) not in (5, 6):
         raise SystemExit(
-            "usage: dbos_caldav_crash_worker.py <start|recover> "
-            "<system-db> <provider-db> <operation-id>"
+            "usage: dbos_caldav_crash_worker.py <start|recover|run> "
+            "<system-db> <provider-db> <operation-id> [variant]"
         )
 
     phase = sys.argv[1]
     system_db = Path(sys.argv[2])
     provider_db = Path(sys.argv[3])
     operation_id = sys.argv[4]
+    # Variants describe what the process sees *now* (the restarted process for
+    # ``recover``, the only process for ``run``):
+    #   read-only / unconfigured -- the calendar is no longer writable / known;
+    #   put-unreachable          -- a create PUT cannot be sent;
+    #   propfind-fails / get-fails -- the collection lookup / reads fail;
+    #   no-capability            -- the provider declares create not recoverable.
+    variant = sys.argv[5] if len(sys.argv) == 6 else ""
 
     _configure(system_db)
     server = _PersistentFakeCalDAVServer(
-        provider_db, crash_after_commit=phase == "start"
+        provider_db,
+        crash_after_commit=phase == "start",
+        fail_method={
+            "put-unreachable": "PUT",
+            "propfind-fails": "PROPFIND",
+            "get-fails": "GET",
+        }.get(variant),
     )
+    profile = IONOS_PROFILE
+    if variant == "no-capability":
+        profile = dataclasses.replace(
+            IONOS_PROFILE, create_capability=ProviderCapability.NONE
+        )
     calendar = CalDAVCalendarAdapter(
         base_url=BASE_URL,
         auth=("ada-fake@example.test", "fake-app-password"),
         calendars=(
             CalendarRef(
-                calendar_id="family",
+                calendar_id="elsewhere" if variant == "unconfigured" else "family",
                 provider_collection=COLLECTION_PATH,
                 audience=CalendarAudience.FAMILY,
-                access_mode=CalendarAccessMode.WRITE,
+                access_mode=(
+                    CalendarAccessMode.READ
+                    if variant == "read-only"
+                    else CalendarAccessMode.WRITE
+                ),
             ),
         ),
-        profile=IONOS_PROFILE,
+        profile=profile,
         transport=httpx2.MockTransport(server),
     )
     durable = DBOSDurableCalendarActions(
@@ -188,19 +242,30 @@ def main() -> None:
         durable.create_calendar_event(_request(operation_id))
         raise AssertionError("first provider commit should hard-crash the process")
 
+    if phase == "run":
+        try:
+            result = durable.create_calendar_event(_request(operation_id))
+        except Exception as exc:  # noqa: BLE001 - the test inspects what escapes
+            _print_result(
+                None,
+                workflow_status=DBOS.retrieve_workflow(operation_id).get_status().status,
+                raised=exc,
+            )
+        else:
+            _print_result(result, workflow_status="SUCCESS")
+        DBOS.destroy()
+        return
+
     if phase == "recover":
         handle = DBOS.retrieve_workflow(operation_id)
-        result = handle.get_result(polling_interval_sec=0.05)
-        status = handle.get_status()
-        print(
-            json.dumps(
-                {
-                    "workflow_status": status.status,
-                    "provider_status": result.provider.status.value,
-                    "business_status": result.business.status.value,
-                }
+        try:
+            result = handle.get_result(polling_interval_sec=0.05)
+        except Exception as exc:  # noqa: BLE001 - the test inspects what escapes
+            _print_result(
+                None, workflow_status=handle.get_status().status, raised=exc
             )
-        )
+        else:
+            _print_result(result, workflow_status=handle.get_status().status)
         DBOS.destroy()
         return
 

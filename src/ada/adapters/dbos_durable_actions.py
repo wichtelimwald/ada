@@ -150,24 +150,22 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
         action_binding: str,
     ) -> ActionExecutionResult:
         del action_binding  # persisted DBOS identity evidence; semantics are in Ada
-        capability = self._calendar.create_capability
+        attempt_run_id = self._begin_attempt()
 
         # A provider with neither idempotency nor reconciliation is not safe
         # for automatic durable execution. Until Ada has an explicit at-most-
         # once bridge for such providers, fail closed rather than risk a
-        # duplicate real-world effect during workflow recovery.
-        if capability is ProviderCapability.NONE:
-            provider = ProviderOutcome(
-                status=ProviderOutcomeStatus.FAILED,
-                error_code="provider_not_recoverable",
-            )
-            return ActionExecutionResult(
-                operation_id=request.operation_id,
-                provider=provider,
-                business=business_outcome_from_provider(provider),
+        # duplicate real-world effect during workflow recovery. A restarted
+        # process may declare this only *after* an earlier execution already
+        # sent the create, which is why the refusal is replay-aware.
+        if self._calendar.create_capability is ProviderCapability.NONE:
+            return self._non_commit(
+                request,
+                "provider_not_recoverable",
+                replayed=attempt_run_id != self._run_id,
             )
 
-        return self._create_calendar_step(request)
+        return self._create_calendar_step(request, attempt_run_id)
 
     @DBOS.workflow()
     def _update_calendar_workflow(
@@ -211,7 +209,7 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
 
     @DBOS.step()
     def _begin_attempt(self) -> str:
-        """Checkpoint which process lifetime began this update/cancel attempt.
+        """Checkpoint which process lifetime began this create/update/cancel attempt.
 
         A step that crashes after the provider applied a write is executed
         again on recovery, and from inside that step a first execution and a
@@ -294,13 +292,33 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
             )
         if status is CalendarChangeStatus.NOT_APPLIED:
             return self._ambiguous(request, "retry_exhausted")
-        code = result.error_code or f"provider_{status.value}"
+        if replayed and status is CalendarChangeStatus.ABSENT:
+            # The goal state (absent) may be known; Ada's effect is not.
+            return self._ambiguous(request, "event_absent_cause_unknown")
+        return self._non_commit(
+            request, result.error_code or f"provider_{status.value}", replayed=replayed
+        )
+
+    def _non_commit(
+        self,
+        request: DurableCalendarCreate | DurableCalendarUpdate | DurableCalendarCancel,
+        error_code: str,
+        *,
+        replayed: bool,
+    ) -> ActionExecutionResult:
+        """A refusal or rejection: a confirmed non-commit only while nothing
+        of this operation can have been sent.
+
+        What a refusal observes about *this* execution (the request was not
+        sent, the calendar is no longer writable, the provider no longer
+        declares recovery) says nothing about an earlier execution of the same
+        operation. When ``replayed`` such an execution may already have
+        committed, so the weakest truthful outcome is ``AMBIGUOUS``.
+        """
+
         if replayed:
-            if status is CalendarChangeStatus.ABSENT:
-                # The goal state (absent) may be known; Ada's effect is not.
-                return self._ambiguous(request, "event_absent_cause_unknown")
-            return self._ambiguous(request, f"{code}_after_possible_send")
-        return self._failed(request, code)
+            return self._ambiguous(request, f"{error_code}_after_possible_send")
+        return self._failed(request, error_code)
 
     @staticmethod
     def _failed(
@@ -321,9 +339,13 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
     def _create_calendar_step(
         self,
         request: DurableCalendarCreate,
+        attempt_run_id: str,
     ) -> ActionExecutionResult:
         capability = self._calendar.create_capability
         operation_id = str(request.operation_id)
+        # See ``_begin_attempt``: a step that crashed after the provider
+        # committed runs again and looks like a first execution from here.
+        replayed = attempt_run_id != self._run_id
 
         # Reconcile before a write. On DBOS recovery this is what closes the
         # provider-commit / local-checkpoint crash window.
@@ -344,14 +366,10 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
             return self._committed(request, reference)
 
         if result.status is CalendarCreateStatus.REJECTED:
-            provider = ProviderOutcome(
-                status=ProviderOutcomeStatus.FAILED,
-                error_code=result.error_code or "provider_rejected",
-            )
-            return ActionExecutionResult(
-                operation_id=request.operation_id,
-                provider=provider,
-                business=business_outcome_from_provider(provider),
+            return self._non_commit(
+                request,
+                result.error_code or "provider_rejected",
+                replayed=replayed,
             )
 
         if capability is ProviderCapability.RECONCILABLE:
@@ -360,6 +378,8 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
                 return self._committed(request, existing.event_id)
 
         if capability is ProviderCapability.IDEMPOTENT:
+            # The first send was ambiguous and may still apply, so what the
+            # retry observes cannot prove a non-commit either.
             retry = self._calendar.create_event(
                 request.proposal,
                 operation_id=operation_id,
@@ -369,14 +389,10 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
                 if reference is not None:
                     return self._committed(request, reference)
             if retry.status is CalendarCreateStatus.REJECTED:
-                provider = ProviderOutcome(
-                    status=ProviderOutcomeStatus.FAILED,
-                    error_code=retry.error_code or "provider_rejected",
-                )
-                return ActionExecutionResult(
-                    operation_id=request.operation_id,
-                    provider=provider,
-                    business=business_outcome_from_provider(provider),
+                return self._non_commit(
+                    request,
+                    retry.error_code or "provider_rejected",
+                    replayed=True,
                 )
 
         return self._ambiguous(

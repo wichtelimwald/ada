@@ -63,6 +63,9 @@ class CalendarEvent:
 
 class CalendarCreateStatus(str, Enum):
     COMMITTED = "committed"
+    # No create was sent by *this call*. That says nothing about an earlier
+    # call for the same operation: a caller that may have sent one before (a
+    # replay, or an ambiguous first send) must not read it as a non-commit.
     REJECTED = "rejected"
     AMBIGUOUS = "ambiguous"
 
