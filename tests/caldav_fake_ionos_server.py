@@ -84,6 +84,7 @@ class _UnboundedByteStream(httpx2.SyncByteStream):
 class _StoredResource:
     body: bytes
     uid: str
+    etag: str = ""
 
 
 @dataclass
@@ -131,10 +132,23 @@ class FakeIonosCalDAVServer:
         self.put_response_body_read_failure: Exception | None = None
         self.report_malformed_content_encoding = False
         self.get_malformed_content_encoding = False
+        # Lose the response of the next N conditional writes (PUT with
+        # If-Match, DELETE) *after* the provider committed them.
+        self.lose_write_response_after_commit = 0
+        # Lose the next N conditional writes *before* they are applied.
+        self.lose_write_before_commit = 0
+        # Answer the next conditional write with this status without applying
+        # it (for example 503).
+        self.conditional_write_status: int | None = None
+        # Called once at the start of the next conditional write, before it is
+        # evaluated: lets a test make a human edit between Ada's pre-read and
+        # its write.
+        self.before_next_conditional_write = None
 
         # Observability for assertions.
         self.received_time_ranges: list[tuple[datetime, datetime]] = []
         self.put_attempts = 0
+        self.conditional_writes: list[tuple[str, str | None]] = []
 
     def add_collection(
         self,
@@ -157,7 +171,33 @@ class FakeIonosCalDAVServer:
         calendar = icalendar.Calendar.from_ical(ical_body)
         uid = str(next(iter(calendar.walk("VEVENT"))).get("uid"))
         resource_path = f"{collection.canonical_href.rstrip('/')}/{resource_name}"
-        collection.resources[resource_path] = _StoredResource(body=ical_body, uid=uid)
+        collection.resources[resource_path] = _StoredResource(
+            body=ical_body, uid=uid, etag=self._new_etag()
+        )
+
+    def human_edit(
+        self, configured_path: str, resource_name: str, ical_body: bytes
+    ) -> str:
+        """Simulate a webmail edit: replaces the body and changes the ETag."""
+
+        collection = self._collections[configured_path]
+        resource_path = f"{collection.canonical_href.rstrip('/')}/{resource_name}"
+        stored = collection.resources[resource_path]
+        stored.body = ical_body
+        stored.etag = self._new_etag()
+        return stored.etag
+
+    def resource_body(self, configured_path: str, resource_name: str) -> bytes | None:
+        collection = self._collections[configured_path]
+        resource_path = f"{collection.canonical_href.rstrip('/')}/{resource_name}"
+        stored = collection.resources.get(resource_path)
+        return stored.body if stored else None
+
+    def resource_etag(self, configured_path: str, resource_name: str) -> str | None:
+        collection = self._collections[configured_path]
+        resource_path = f"{collection.canonical_href.rstrip('/')}/{resource_name}"
+        stored = collection.resources.get(resource_path)
+        return stored.etag if stored else None
 
     def _new_etag(self) -> str:
         value = f"e{self._next_etag_id}"
@@ -220,6 +260,8 @@ class FakeIonosCalDAVServer:
             return self._get(path)
         if method == "PUT":
             return self._put(path, request)
+        if method == "DELETE":
+            return self._delete(path, request)
         return httpx2.Response(501, content=b"unsupported method in fake server")
 
     def _propfind(self, path: str) -> httpx2.Response:
@@ -296,7 +338,7 @@ class FakeIonosCalDAVServer:
         # not enforced server-side, so every stored resource is returned and
         # Ada's own client-side filtering must do the real work.
         for resource_path, resource in collection.resources.items():
-            etag = self._new_etag()  # unquoted on purpose (probe P4j)
+            etag = resource.etag  # unquoted on purpose (probe P4j)
             entries.append(
                 "<D:response>"
                 f"<D:href>{_xml_escape(resource_path)}</D:href>"
@@ -338,7 +380,7 @@ class FakeIonosCalDAVServer:
                     content=resource.body,
                     headers={
                         "Content-Type": "text/calendar",
-                        "ETag": f'"{self._new_etag()}"',
+                        "ETag": f'"{resource.etag}"',
                     },
                 )
         return httpx2.Response(404, content=b"not found")
@@ -355,12 +397,37 @@ class FakeIonosCalDAVServer:
             return httpx2.Response(412, content=b"precondition failed")
 
         calendar = icalendar.Calendar.from_ical(request.content)
-        uid = str(next(iter(calendar.walk("VEVENT"))).get("uid"))
+        vevent = next(iter(calendar.walk("VEVENT")))
+        uid = str(vevent.get("uid"))
         for other_path, other in collection.resources.items():
             if other_path != path and other.uid == uid:
                 return httpx2.Response(403, content=b"duplicate UID")
 
-        collection.resources[path] = _StoredResource(body=request.content, uid=uid)
+        if_match = request.headers.get("if-match")
+        if if_match is not None:
+            self.conditional_writes.append(("PUT", if_match))
+            early = self._conditional_write_faults()
+            if early is not None:
+                return early
+            existing = collection.resources.get(path)
+            if existing is None:
+                return httpx2.Response(404, content=b"not found")
+            if if_match.strip() != f'"{existing.etag}"':
+                return httpx2.Response(412, content=b"precondition failed")
+            # Observed IONOS/OX rule: a lower SEQUENCE than the stored one is
+            # refused.
+            stored_vevent = next(
+                iter(icalendar.Calendar.from_ical(existing.body).walk("VEVENT"))
+            )
+            if int(vevent.get("sequence", 0)) < int(stored_vevent.get("sequence", 0)):
+                return httpx2.Response(412, content=b"sequence too low")
+        # No If-Match: a blind overwrite is accepted (probe: not refused).
+
+        stored = _StoredResource(body=request.content, uid=uid, etag=self._new_etag())
+        collection.resources[path] = stored
+        if if_match is not None and self.lose_write_response_after_commit > 0:
+            self.lose_write_response_after_commit -= 1
+            raise httpx2.ReadTimeout("simulated lost response after commit")
         if self.put_response_body_read_failure is not None:
             # The write already committed (the resource is stored above);
             # only the unused response body fails while being streamed, to
@@ -374,3 +441,39 @@ class FakeIonosCalDAVServer:
         # IONOS reports no ETag in the create response (probe P2); the
         # adapter must GET afterward to learn the version.
         return httpx2.Response(201, content=b"")
+
+    def _conditional_write_faults(self) -> httpx2.Response | None:
+        hook = self.before_next_conditional_write
+        if hook is not None:
+            self.before_next_conditional_write = None
+            hook()
+        if self.lose_write_before_commit > 0:
+            self.lose_write_before_commit -= 1
+            raise httpx2.ReadTimeout("simulated lost request before commit")
+        if self.conditional_write_status is not None:
+            status = self.conditional_write_status
+            self.conditional_write_status = None
+            return httpx2.Response(status, content=b"injected")
+        return None
+
+    def _delete(self, path: str, request: httpx2.Request) -> httpx2.Response:
+        collection = self._collection_for_href(path.rsplit("/", 1)[0] + "/")
+        if collection is None:
+            return httpx2.Response(404, content=b"no such collection")
+
+        if_match = request.headers.get("if-match")
+        self.conditional_writes.append(("DELETE", if_match))
+        early = self._conditional_write_faults()
+        if early is not None:
+            return early
+        existing = collection.resources.get(path)
+        if existing is None:
+            return httpx2.Response(404, content=b"not found")
+        if if_match is not None and if_match.strip() != f'"{existing.etag}"':
+            return httpx2.Response(412, content=b"precondition failed")
+
+        del collection.resources[path]
+        if self.lose_write_response_after_commit > 0:
+            self.lose_write_response_after_commit -= 1
+            raise httpx2.ReadTimeout("simulated lost response after commit")
+        return httpx2.Response(204, content=b"")

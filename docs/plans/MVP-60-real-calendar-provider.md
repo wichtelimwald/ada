@@ -4,8 +4,9 @@ Status: implementation
 Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-00 (done)
 Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR, merged);
-S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (draft).
-Further implementation PRs follow for S4-S5 and S6-S7 (roadmap stays `ready`
+S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (merged);
+S4 implementation PR: see the open PR from branch `feat/mvp-60-s4-update-cancel`.
+Further implementation PRs follow for S5 and S6-S7 (roadmap stays `ready`
 until S7).
 
 ## Goal
@@ -194,7 +195,7 @@ calendar mapping and travel durations. Nothing is written to Memory.
 
 ## Implementation slices
 
-Each slice is independently testable. Suggested PR grouping: S1-S3, S4-S5,
+Each slice is independently testable. PR grouping used: S1-S3, S4, then S5 and
 S6-S7 (roadmap `done` only in the last PR).
 
 - **S0 Evidence:** maintainer creates the Ada calendars' probe counterpart and an
@@ -270,13 +271,76 @@ S6-S7 (roadmap `done` only in the last PR).
   process kill after the provider commit recovers to exactly one event via
   `tests/dbos_caldav_crash_worker.py`, extending the pattern in
   `tests/dbos_crash_worker.py`).
-- **S4 Update/cancel:** durable workflows following ADR-0009 section 6:
-  pre-write check against `base_version`, `If-Match: <base_version>` only,
-  base `SEQUENCE` + 1, fresh `DTSTAMP`, operation marker, 2xx as success,
-  definite 412 as conflict, reconciliation after an ambiguous send
-  (marker → committed; unchanged base → retry; otherwise ambiguous). Cedar
-  actions/policies (D3). The fake server can simulate a lost response after
-  commit and a human edit between approval and execution.
+- **S4 Update/cancel: done.** Ada-owned types in `core/actions.py`:
+  `UpdateCalendarEventProposal(event_ref, base_version, changes)`,
+  `CancelCalendarEventProposal(event_ref, base_version)`, `EventBaseVersion`
+  (entity tag + `SEQUENCE`) and keyed action bindings that include
+  `base_version` (`EventRef`/`EventVersion` moved there from the port to avoid
+  a core→port import cycle; the port re-exports them). `CalendarPort` gains
+  `update_event`/`cancel_event`, `CalendarChangeStatus`
+  (`committed`/`conflict`/`absent`/`not_applied`/`rejected`/`ambiguous`) and
+  per-operation `update_capability`/`cancel_capability` (profile data; IONOS:
+  update `RECONCILABLE`, cancel `IDEMPOTENT`). `CalendarEvent` gains
+  `sequence`. `CalDAVCalendarAdapter._change_event` follows ADR-0009
+  section 6: fail closed before any request for an unconfigured or read-only
+  calendar or an unsafe resource name; read the resource; a replayed update
+  that carries this operation's marker is `committed`, checked before both
+  the version comparison (which the operation's own write changed) and the
+  write-scope check (which only forbids a *new* write: an event later edited
+  into a recurring or attendee shape keeps its proof of the earlier commit,
+  also for a multi-`VEVENT` series); a version or
+  `SEQUENCE` other than `base_version` is a `conflict` without a write;
+  otherwise `PUT`/`DELETE` with `If-Match: <base_version>` only, base
+  `SEQUENCE` + 1, fresh `DTSTAMP` and the marker (update carries all other
+  properties over unchanged); a definite 412 is a `conflict`; any 2xx is
+  `committed`, with a best-effort verified read-back for updates; after an
+  ambiguous send or an unexpected status the re-read decides (marker →
+  `committed`; unchanged base → `not_applied`; anything else, **including
+  absence**, → `ambiguous`: absence does not prove an update did not commit,
+  and for a cancel it proves the goal state but not that Ada's own `DELETE`
+  caused it, so it is reported as `ambiguous` with
+  `event_absent_cause_unknown`). `absent` only ever means "observed before
+  any send" (or a 404 answer to the first send) and is a confirmed
+  non-effect. Recurring series, single occurrences, events with
+  attendees and time changes on all-day events are refused before any write.
+  `DBOSDurableCalendarActions.update_calendar_event`/`cancel_calendar_event`
+  reuse the create workflow's operation-ID binding check, fail closed for a
+  `NONE` capability, retry a provably unapplied write once with the same
+  precondition and otherwise report `ambiguous`. A conflict, an absent
+  event or a refusal is reported as a confirmed non-commit
+  (`version_conflict`/`event_absent`/...) **only when it was observed before
+  any send**. A step that crashes after the provider applied a write is
+  executed again on recovery and looks identical to a first execution from
+  the inside, so a checkpointed `_begin_attempt` step records the process
+  lifetime that began the attempt; a send step running in a different process
+  (or after its own first send, in the retry) is a *replay*. On a replay only
+  `committed` (this operation's own 2xx or marker) and `not_applied`
+  (unchanged base) stay conclusive; every other observation (failed read,
+  changed or vanished event, refusal, non-recoverable provider) is reported
+  as `ambiguous` with a `..._after_possible_send` code, because it may be a
+  later change by someone else rather than proof that the earlier attempt
+  did not apply. A crash between `_begin_attempt` and the send also reads as
+  a replay, which only ever weakens a conclusion. Not a substitute for the
+  S6/D5 operation record.
+  `CalendarActionService.update_event`/`cancel_event` derive the Cedar action
+  (`calendar.update`/`calendar.cancel`) and resource from the typed proposal.
+  Tests: `tests/test_calendar_change_actions.py` (validation, bindings),
+  `tests/test_caldav_update_cancel.py` (fake IONOS server: stale/mismatched
+  `If-Match`, `SEQUENCE` rule, human edit before and between read and write,
+  lost response after commit, lost request before commit, unresolvable
+  reconciliation, write-scope refusals, no request for read-only calendars),
+  the shared contract suite (`tests/calendar_port_contract.py`, both
+  adapters), `tests/test_caldav_change_durable_action.py` (DBOS layer and
+  service/Cedar wiring) and `tests/test_caldav_change_crash_recovery.py` via
+  `tests/dbos_caldav_change_crash_worker.py` (hard kill after the provider
+  commit: update recovers `committed` with one write; replay with a failed
+  read, a stripped-marker edit, a deletion or a non-recoverable provider is
+  `ambiguous`, while a marker-preserving edit (also one that adds an attendee
+  or recurrence) stays `committed` with one write; cancel recovers with one `DELETE` and known absence but an
+  unproven cause; fresh stale and fresh absent requests keep their definite
+  `version_conflict`/`event_absent` reports). Not part of S4: the operation record and
+  payload purge (S6/D5), the Ada-created-events distinction of D3 (needs the
+  S6 operation record), conflict detection (S5).
 - **S5 Conflict detection:** busy semantics, occurrences, travel table (D4),
   explicit unknown travel, availability-only inputs.
 - **S6 Operations:** credential source (D2), durable payload retention (D5),

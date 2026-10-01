@@ -26,6 +26,12 @@ class CalDAVProviderProfile:
     # Duplicate-safety semantics this provider gives Ada for create.
     create_capability: ProviderCapability
 
+    # Same for update and cancel (ADR-0009 section 2: declared per operation
+    # kind). Both are ``If-Match``-conditional; update also relies on the
+    # operation marker for reconciliation.
+    update_capability: ProviderCapability
+    cancel_capability: ProviderCapability
+
     # Deterministic complexity limits for untrusted calendar data
     # (ADR-0009 section 5). Exceeding any of these fails closed for the
     # affected calendar.
@@ -51,6 +57,8 @@ IONOS_PROFILE = CalDAVProviderProfile(
     query_window_before=timedelta(days=30),
     query_window_after=timedelta(days=365),
     create_capability=ProviderCapability.IDEMPOTENT,
+    update_capability=ProviderCapability.RECONCILABLE,
+    cancel_capability=ProviderCapability.IDEMPOTENT,
     max_components_per_response=500,
     max_properties_per_component=200,
     max_occurrences_per_series=1000,

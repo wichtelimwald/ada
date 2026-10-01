@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from dbos import DBOS, DBOSConfiguredInstance, SetWorkflowID
 
 from ada.core.action_outcomes import (
@@ -10,9 +12,23 @@ from ada.core.action_outcomes import (
     ProviderOutcomeStatus,
     business_outcome_from_provider,
 )
-from ada.core.actions import calendar_create_action_binding
-from ada.ports.calendar import CalendarCreateResult, CalendarCreateStatus, CalendarPort
-from ada.ports.durable_action import DurableCalendarCreate
+from ada.core.actions import (
+    calendar_cancel_action_binding,
+    calendar_create_action_binding,
+    calendar_update_action_binding,
+)
+from ada.ports.calendar import (
+    CalendarChangeResult,
+    CalendarChangeStatus,
+    CalendarCreateResult,
+    CalendarCreateStatus,
+    CalendarPort,
+)
+from ada.ports.durable_action import (
+    DurableCalendarCancel,
+    DurableCalendarCreate,
+    DurableCalendarUpdate,
+)
 
 
 def _provider_reference(result: CalendarCreateResult) -> str | None:
@@ -46,6 +62,8 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
         instance_name: str = "calendar-actions",
     ) -> None:
         self._calendar = calendar
+        # Identifies this process lifetime; see ``_begin_attempt``.
+        self._run_id = uuid.uuid4().hex
         super().__init__(instance_name)
 
     def create_calendar_event(
@@ -70,6 +88,36 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
         # callers first see no workflow and race with different payloads,
         # DBOS stores one durable input. Only the caller whose binding matches
         # that stored input may receive the durable result.
+        self._assert_workflow_binding(operation_id, action_binding)
+        return result
+
+    def update_calendar_event(
+        self,
+        request: DurableCalendarUpdate,
+    ) -> ActionExecutionResult:
+        operation_id = str(request.operation_id)
+        action_binding = calendar_update_action_binding(request.proposal)
+        self._assert_workflow_binding(operation_id, action_binding)
+        with SetWorkflowID(operation_id):
+            result = self._update_calendar_workflow(
+                request,
+                action_binding=action_binding,
+            )
+        self._assert_workflow_binding(operation_id, action_binding)
+        return result
+
+    def cancel_calendar_event(
+        self,
+        request: DurableCalendarCancel,
+    ) -> ActionExecutionResult:
+        operation_id = str(request.operation_id)
+        action_binding = calendar_cancel_action_binding(request.proposal)
+        self._assert_workflow_binding(operation_id, action_binding)
+        with SetWorkflowID(operation_id):
+            result = self._cancel_calendar_workflow(
+                request,
+                action_binding=action_binding,
+            )
         self._assert_workflow_binding(operation_id, action_binding)
         return result
 
@@ -120,6 +168,154 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
             )
 
         return self._create_calendar_step(request)
+
+    @DBOS.workflow()
+    def _update_calendar_workflow(
+        self,
+        request: DurableCalendarUpdate,
+        *,
+        action_binding: str,
+    ) -> ActionExecutionResult:
+        del action_binding  # persisted DBOS identity evidence
+        attempt_run_id = self._begin_attempt()
+        if self._calendar.update_capability is ProviderCapability.NONE:
+            return self._change_result(
+                request,
+                CalendarChangeResult(
+                    status=CalendarChangeStatus.REJECTED,
+                    error_code="provider_not_recoverable",
+                ),
+                replayed=attempt_run_id != self._run_id,
+            )
+        return self._update_calendar_step(request, attempt_run_id)
+
+    @DBOS.workflow()
+    def _cancel_calendar_workflow(
+        self,
+        request: DurableCalendarCancel,
+        *,
+        action_binding: str,
+    ) -> ActionExecutionResult:
+        del action_binding  # persisted DBOS identity evidence
+        attempt_run_id = self._begin_attempt()
+        if self._calendar.cancel_capability is ProviderCapability.NONE:
+            return self._change_result(
+                request,
+                CalendarChangeResult(
+                    status=CalendarChangeStatus.REJECTED,
+                    error_code="provider_not_recoverable",
+                ),
+                replayed=attempt_run_id != self._run_id,
+            )
+        return self._cancel_calendar_step(request, attempt_run_id)
+
+    @DBOS.step()
+    def _begin_attempt(self) -> str:
+        """Checkpoint which process lifetime began this update/cancel attempt.
+
+        A step that crashes after the provider applied a write is executed
+        again on recovery, and from inside that step a first execution and a
+        replay look identical. This step runs *before* any write and its
+        result is checkpointed, so the send step can compare it with its own
+        process: a different process means the workflow is being recovered
+        and an earlier execution may already have sent the write. (A crash
+        between this step and the send also reads as a replay; that only ever
+        weakens a conclusion, never strengthens one.)
+        """
+
+        return self._run_id
+
+    @DBOS.step()
+    def _update_calendar_step(
+        self,
+        request: DurableCalendarUpdate,
+        attempt_run_id: str,
+    ) -> ActionExecutionResult:
+        operation_id = str(request.operation_id)
+        replayed = attempt_run_id != self._run_id
+        # The adapter reconciles by re-reading before it writes, so a replay
+        # after a provider commit finds the operation marker instead of
+        # reporting a conflict against its own write.
+        result = self._calendar.update_event(
+            request.proposal, operation_id=operation_id
+        )
+        if result.status is CalendarChangeStatus.NOT_APPLIED:
+            # Provably unchanged base: retry once with the same precondition.
+            result = self._calendar.update_event(
+                request.proposal, operation_id=operation_id
+            )
+            replayed = True  # the first send of this step may still apply
+        return self._change_result(request, result, replayed=replayed)
+
+    @DBOS.step()
+    def _cancel_calendar_step(
+        self,
+        request: DurableCalendarCancel,
+        attempt_run_id: str,
+    ) -> ActionExecutionResult:
+        operation_id = str(request.operation_id)
+        replayed = attempt_run_id != self._run_id
+        result = self._calendar.cancel_event(
+            request.proposal, operation_id=operation_id
+        )
+        if result.status is CalendarChangeStatus.NOT_APPLIED:
+            result = self._calendar.cancel_event(
+                request.proposal, operation_id=operation_id
+            )
+            replayed = True
+        return self._change_result(request, result, replayed=replayed)
+
+    def _change_result(
+        self,
+        request: DurableCalendarUpdate | DurableCalendarCancel,
+        result: CalendarChangeResult,
+        *,
+        replayed: bool,
+    ) -> ActionExecutionResult:
+        """Map an update/cancel result without a stronger claim than its
+        evidence about *Ada's own* effect.
+
+        ``CONFLICT``, ``ABSENT`` and ``REJECTED`` each say "nothing of this
+        operation applied". That is proven when the observation preceded any
+        send, but not when ``replayed``: an earlier execution may already have
+        written, and what is observed now may be a later change by someone
+        else. A replay therefore keeps only ``COMMITTED`` (this operation's own
+        2xx or marker) and ``NOT_APPLIED`` (base provably unchanged); every
+        other conclusion becomes ``AMBIGUOUS``.
+        """
+
+        status = result.status
+        if status is CalendarChangeStatus.COMMITTED:
+            event_ref = result.event_ref or request.proposal.event_ref
+            return self._committed(request, event_ref.resource_name)
+        if status is CalendarChangeStatus.AMBIGUOUS:
+            return self._ambiguous(
+                request, result.error_code or "provider_outcome_ambiguous"
+            )
+        if status is CalendarChangeStatus.NOT_APPLIED:
+            return self._ambiguous(request, "retry_exhausted")
+        code = result.error_code or f"provider_{status.value}"
+        if replayed:
+            if status is CalendarChangeStatus.ABSENT:
+                # The goal state (absent) may be known; Ada's effect is not.
+                return self._ambiguous(request, "event_absent_cause_unknown")
+            return self._ambiguous(request, f"{code}_after_possible_send")
+        return self._failed(request, code)
+
+    @staticmethod
+    def _failed(
+        request: DurableCalendarCreate | DurableCalendarUpdate | DurableCalendarCancel,
+        error_code: str,
+    ) -> ActionExecutionResult:
+        provider = ProviderOutcome(
+            status=ProviderOutcomeStatus.FAILED,
+            error_code=error_code,
+        )
+        return ActionExecutionResult(
+            operation_id=request.operation_id,
+            provider=provider,
+            business=business_outcome_from_provider(provider),
+        )
 
     @DBOS.step()
     def _create_calendar_step(
@@ -190,7 +386,7 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
 
     @staticmethod
     def _committed(
-        request: DurableCalendarCreate,
+        request: DurableCalendarCreate | DurableCalendarUpdate | DurableCalendarCancel,
         provider_reference: str,
     ) -> ActionExecutionResult:
         provider = ProviderOutcome(
@@ -205,7 +401,7 @@ class DBOSDurableCalendarActions(DBOSConfiguredInstance):
 
     @staticmethod
     def _ambiguous(
-        request: DurableCalendarCreate,
+        request: DurableCalendarCreate | DurableCalendarUpdate | DurableCalendarCancel,
         error_code: str,
     ) -> ActionExecutionResult:
         provider = ProviderOutcome(

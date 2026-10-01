@@ -518,3 +518,44 @@ def put_create_only(
         max_response_bytes=max_response_bytes,
         content=body,
     )
+
+
+def put_conditional(
+    client: httpx2.Client,
+    resource_href: str,
+    *,
+    body: bytes,
+    if_match: str,
+    max_response_bytes: int,
+) -> DavResponse:
+    """Overwriting ``PUT`` that only succeeds against ``if_match`` (RFC 9110)."""
+
+    return send_request(
+        client,
+        "PUT",
+        resource_href,
+        headers={
+            "If-Match": if_match,
+            "Content-Type": "text/calendar; charset=utf-8",
+        },
+        max_response_bytes=max_response_bytes,
+        content=body,
+    )
+
+
+def delete_conditional(
+    client: httpx2.Client,
+    resource_href: str,
+    *,
+    if_match: str,
+    max_response_bytes: int,
+) -> DavResponse:
+    """``DELETE`` that only succeeds against ``if_match`` (RFC 9110)."""
+
+    return send_request(
+        client,
+        "DELETE",
+        resource_href,
+        headers={"If-Match": if_match},
+        max_response_bytes=max_response_bytes,
+    )

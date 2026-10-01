@@ -12,12 +12,21 @@ from ada.core.action_outcomes import (
     OperationId,
 )
 from ada.core.actions import (
+    CancelCalendarEventProposal,
     CreateCalendarEventProposal,
+    UpdateCalendarEventProposal,
+    validate_calendar_cancel_proposal,
     validate_calendar_create_proposal,
+    validate_calendar_update_proposal,
 )
 from ada.core.authorization import AuthorizationRequest, GuardDecision
 from ada.ports.calendar import CalendarEvent
-from ada.ports.durable_action import DurableActionPort, DurableCalendarCreate
+from ada.ports.durable_action import (
+    DurableActionPort,
+    DurableCalendarCancel,
+    DurableCalendarCreate,
+    DurableCalendarUpdate,
+)
 from ada.ports.guard import AdaGuard
 from ada.ports.travel_time import TravelTimePort
 
@@ -71,6 +80,78 @@ class CalendarActionService:
             guard=decision,
             execution=self._durable_actions.create_calendar_event(durable),
         )
+
+
+    def update_event(
+        self,
+        proposal: UpdateCalendarEventProposal,
+        *,
+        operation_id: OperationId,
+        authorization: AuthorizationRequest,
+    ) -> CalendarActionResponse:
+        validate_calendar_update_proposal(proposal)
+        decision = self._authorize(
+            proposal.kind, proposal.event_ref.calendar_id, authorization
+        )
+        if not decision.allowed:
+            return CalendarActionResponse(guard=decision, execution=None)
+
+        durable = DurableCalendarUpdate(
+            operation_id=operation_id,
+            proposal=proposal,
+            authorization=_evidence(decision),
+        )
+        return CalendarActionResponse(
+            guard=decision,
+            execution=self._durable_actions.update_calendar_event(durable),
+        )
+
+    def cancel_event(
+        self,
+        proposal: CancelCalendarEventProposal,
+        *,
+        operation_id: OperationId,
+        authorization: AuthorizationRequest,
+    ) -> CalendarActionResponse:
+        validate_calendar_cancel_proposal(proposal)
+        decision = self._authorize(
+            proposal.kind, proposal.event_ref.calendar_id, authorization
+        )
+        if not decision.allowed:
+            return CalendarActionResponse(guard=decision, execution=None)
+
+        durable = DurableCalendarCancel(
+            operation_id=operation_id,
+            proposal=proposal,
+            authorization=_evidence(decision),
+        )
+        return CalendarActionResponse(
+            guard=decision,
+            execution=self._durable_actions.cancel_calendar_event(durable),
+        )
+
+    def _authorize(
+        self,
+        action: str,
+        calendar_id: str,
+        authorization: AuthorizationRequest,
+    ) -> GuardDecision:
+        # Privileged action/resource come from the typed proposal, never from
+        # model/tool-supplied authorization fields.
+        return self._guard.authorize(
+            replace(
+                authorization,
+                action=action,
+                resource=f"calendar:{calendar_id}",
+            )
+        )
+
+
+def _evidence(decision: GuardDecision) -> AuthorizationEvidence:
+    return AuthorizationEvidence(
+        policy_version=decision.policy_version,
+        matched_rule_ids=decision.matched_rule_ids,
+    )
 
 
 class ConflictKind(str, Enum):
@@ -168,3 +249,65 @@ def render_calendar_action_response(
         f"I cannot confirm whether the calendar event was created: {proposal.title}. "
         "I will not retry it blindly."
     )
+
+
+def render_calendar_change_response(
+    verb: str,
+    response: CalendarActionResponse,
+) -> str:
+    """Deterministic text for an update/cancel outcome.
+
+    ``verb`` is ``"update"`` or ``"cancel"``. A conflict or an absent event is
+    reported as such, never as Ada's own effect.
+    """
+
+    if not response.guard.allowed:
+        return f"I did not {verb} the calendar event because it is not authorized."
+
+    assert response.execution is not None
+    execution = response.execution
+    status = execution.business.status
+    error_code = execution.provider.error_code
+
+    if status is BusinessOutcomeStatus.COMMITTED:
+        return f"I did {verb} the calendar event."
+    if status is BusinessOutcomeStatus.AMBIGUOUS:
+        if error_code == "event_absent_cause_unknown":
+            # The goal state is known; Ada's own effect is not.
+            return (
+                f"The calendar event no longer exists, but I cannot confirm "
+                f"whether my {verb} caused that. I will not retry it blindly."
+            )
+        if error_code is not None and error_code.endswith("_after_possible_send"):
+            return (
+                f"I cannot confirm whether my {verb} was applied: an earlier "
+                "attempt may already have reached the calendar. I will not "
+                "retry it blindly."
+            )
+        return (
+            f"I cannot confirm whether the calendar event was changed by this "
+            f"{verb}. I will not retry it blindly."
+        )
+    if error_code == "version_conflict":
+        return (
+            f"I did not {verb} the calendar event: it changed after it was "
+            "approved. Nothing was overwritten."
+        )
+    if error_code == "event_absent":
+        # Only reported when the absence was observed before any send.
+        return "The calendar event no longer exists; I made no change."
+    if error_code in (
+        "recurring_event_read_only",
+        "attendee_event_read_only",
+        "all_day_time_change_unsupported",
+    ):
+        return (
+            f"I did not {verb} the calendar event: recurring events, events "
+            "with attendees and all-day time changes are read-only for me."
+        )
+    if error_code == "provider_not_recoverable":
+        return (
+            f"I did not attempt to {verb} the calendar event. This calendar "
+            "provider cannot safely recover from a retry."
+        )
+    return f"I could not {verb} the calendar event."
