@@ -5,9 +5,9 @@ Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-00 (done)
 Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR, merged);
 S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (merged);
-S4 implementation PR: see the open PR from branch `feat/mvp-60-s4-update-cancel`.
+S4 implementation PR: https://github.com/wichtelimwald/ada/pull/48 (merged).
 Further implementation PRs follow for S5 and S6-S7 (roadmap stays `ready`
-until S7).
+until S7); S5 is the next implementation slice.
 
 ## Goal
 
@@ -271,6 +271,32 @@ S6-S7 (roadmap `done` only in the last PR).
   process kill after the provider commit recovers to exactly one event via
   `tests/dbos_caldav_crash_worker.py`, extending the pattern in
   `tests/dbos_crash_worker.py`).
+  **Replay-aware outcomes (corrected after the S4 review).** The create path
+  predates S4's replay awareness. A create step that crashed after the
+  provider committed runs again on recovery and looks like a first execution
+  from the inside, so a refusal the *replay* observed before sending (calendar
+  no longer writable or configured, collection lookup failing, the PUT refused
+  before it left, provider no longer declared recoverable) was reported as a
+  confirmed non-commit (`failed`) although the earlier execution had
+  committed; the same held for the IDEMPOTENT retry after an ambiguous first
+  send (no crash needed). The create workflow now takes S4's checkpointed
+  `_begin_attempt` marker before the capability check, and every such refusal
+  on a replay, or on that retry, is `ambiguous` with a `..._after_possible_send`
+  code (`_non_commit`, shared with update/cancel). A failing collection
+  lookup before the `PUT` is a typed `REJECTED` (`collection_unavailable`)
+  instead of a raw exception that ended the workflow in `ERROR` without any
+  outcome. Unchanged: a 2xx is `COMMITTED`, 412 reconciles by `GET` + marker,
+  the operation-ID binding, and a fresh request refused before anything could
+  have been sent stays a definite `failed`. Residual until the S6/D5 operation
+  record: a crash between `_begin_attempt` and the send also reads as a replay
+  (this only weakens a conclusion), and a replay after a person deleted the
+  committed event re-creates it and reports `committed` on that `PUT`'s own
+  2xx. Tests: `tests/test_caldav_create_crash_recovery.py` (replay after a
+  hard kill refused before sending in five ways stays `ambiguous` with no
+  second event; unreadable 412 reconciliation stays `ambiguous`; fresh
+  refusals stay `failed`), `tests/test_caldav_create_durable_action.py`
+  (refused retry after an ambiguous first send), `tests/test_caldav_create.py`
+  (collection lookup failure is a typed refusal).
 - **S4 Update/cancel: done.** Ada-owned types in `core/actions.py`:
   `UpdateCalendarEventProposal(event_ref, base_version, changes)`,
   `CancelCalendarEventProposal(event_ref, base_version)`, `EventBaseVersion`

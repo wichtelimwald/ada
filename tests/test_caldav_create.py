@@ -98,6 +98,22 @@ class CalDAVCreateTests(unittest.TestCase):
         self.assertEqual(result.error_code, "calendar_not_configured")
         self.assertEqual(server.put_attempts, 0)
 
+    def test_unresolvable_collection_rejects_create_without_sending_it(self) -> None:
+        # The collection lookup (PROPFIND) fails before any create PUT: a
+        # typed pre-send refusal, not a raw exception out of the adapter.
+        adapter, server = _adapter_with_method_override(
+            "PROPFIND", httpx2.ConnectError("simulated unreachable provider")
+        )
+        self.addCleanup(adapter.close)
+
+        result = adapter.create_event(
+            _proposal(), operation_id="op-collection-unavailable"
+        )
+
+        self.assertEqual(result.status, CalendarCreateStatus.REJECTED)
+        self.assertEqual(result.error_code, "collection_unavailable")
+        self.assertEqual(server.put_attempts, 0)
+
     def test_duplicate_uid_under_a_different_resource_is_ambiguous(self) -> None:
         server = build_fake_server()
         operation_id = "op-duplicate-uid"

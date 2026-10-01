@@ -20,7 +20,13 @@ from ada.core.action_outcomes import (
 )
 from ada.core.actions import CreateCalendarEventProposal
 from ada.ports.durable_action import DurableCalendarCreate
-from caldav_test_support import BASE_URL, FAKE_AUTH, build_fake_server, default_family_ref
+from caldav_test_support import (
+    BASE_URL,
+    FAKE_AUTH,
+    FAMILY_PATH,
+    build_fake_server,
+    default_family_ref,
+)
 
 
 def _proposal() -> CreateCalendarEventProposal:
@@ -37,7 +43,8 @@ class CalDAVCreateDurableActionTests(unittest.TestCase):
     """Proves the DBOS durable-action layer does not reinterpret an
     already-known provider commit as ambiguous merely because CalDAV
     read-back metadata is unavailable (ADR-0009 section 6: any 2xx status is
-    success).
+    success), and that it never reports a confirmed non-commit while an
+    earlier send of the same operation may have applied.
     """
 
     _counter = 0
@@ -108,6 +115,61 @@ class CalDAVCreateDurableActionTests(unittest.TestCase):
         # The deterministic reference, not a fabricated verified event.
         self.assertEqual(
             result.provider.provider_reference, derive_resource_name(operation_id)
+        )
+
+    def test_refused_retry_after_an_ambiguous_send_is_not_a_confirmed_failure(
+        self,
+    ) -> None:
+        # The first create PUT commits at the provider but its response is
+        # lost (ambiguous). The step's one retry is then refused before it is
+        # sent. That refusal says nothing about the first send, which did
+        # commit: the outcome must not be reported as a confirmed non-commit.
+        operation_id = "op-caldav-ambiguous-then-refused"
+        server = build_fake_server()
+        puts: list[httpx2.Request] = []
+
+        def dispatch(request: httpx2.Request) -> httpx2.Response:
+            if request.method == "PUT":
+                puts.append(request)
+                if len(puts) == 1:
+                    server(request)  # the provider commits ...
+                    raise httpx2.ReadTimeout("simulated lost response after commit")
+                raise httpx2.ConnectError("simulated connection refused")
+            return server(request)
+
+        calendar = CalDAVCalendarAdapter(
+            base_url=BASE_URL,
+            auth=FAKE_AUTH,
+            calendars=(default_family_ref(),),
+            profile=IONOS_PROFILE,
+            transport=httpx2.MockTransport(dispatch),
+        )
+        self.addCleanup(calendar.close)
+        durable = DBOSDurableCalendarActions(
+            calendar,
+            instance_name=f"calendar-actions-caldav-durable-{self._counter}",
+        )
+        DBOS.launch()
+
+        result = durable.create_calendar_event(
+            DurableCalendarCreate(
+                operation_id=OperationId(operation_id),
+                proposal=_proposal(),
+                authorization=AuthorizationEvidence(
+                    policy_version="test-policy-v1",
+                    matched_rule_ids=("grant-family-calendar",),
+                ),
+            )
+        )
+
+        self.assertEqual(result.provider.status, ProviderOutcomeStatus.AMBIGUOUS)
+        self.assertEqual(result.business.status, BusinessOutcomeStatus.AMBIGUOUS)
+        self.assertEqual(
+            result.provider.error_code, "not_attempted_after_possible_send"
+        )
+        self.assertEqual(len(puts), 2)
+        self.assertIsNotNone(
+            server.resource_body(FAMILY_PATH, derive_resource_name(operation_id))
         )
 
 
