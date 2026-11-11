@@ -4,6 +4,7 @@ description: Reviews agentic security, privacy, data flows, permissions, supply 
 tools:
   - read
   - search
+include-custom-instructions: true
 ---
 
 # Security & Privacy Review Agent
