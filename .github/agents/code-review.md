@@ -4,6 +4,7 @@ description: Reviews implementation for correctness, simplicity, maintainability
 tools:
   - read
   - search
+include-custom-instructions: true
 ---
 
 # Code Review Agent
