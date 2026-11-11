@@ -52,4 +52,4 @@ Security, privacy, accessibility, and usability are requirements, not optional p
 - At the start of a new session and before handover, use `docs/handover.md` and `.github/skills/project-continuity.md`. Verify actual Git/PR state.
 - For "implement the next step" requests, use `docs/product/mvp-roadmap.md` and `docs/plans/README.md`; do not infer step order from chat history.
 - Keep decisions, implementation evidence, and changing state in their canonical sources; the source-of-truth map is in `docs/handover.md`.
-- The files in `.github/skills/` are task-specific repository guidance, **not automatically executed skills**. Read relevant ones explicitly. Review-role definitions in `.github/agents/` are optional; their existence is not permission to delegate or run tools.
+- The flat `.github/skills/*.md` files are **task-specific guidance, not automatically discoverable Agent Skills** (which require a `SKILL.md` in a skill directory). Read relevant guides explicitly. Review-role definitions in `.github/agents/` are optional; their existence is not permission to delegate or run tools.
