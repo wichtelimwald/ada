@@ -6,15 +6,9 @@ Code, comments, documentation, issues, commits, pull requests, and GitHub review
 
 ## Working model
 
-- Work on a branch and submit a pull request.
-- Do not commit directly to `main`.
-- Keep changes small, focused, and reviewable.
-- Prefer root-cause fixes over workarounds.
-- Follow `.github/skills/development-process.md` for KISS/YAGNI.
-- Prefer reuse and standard/platform capabilities over new dependencies.
-- Do not introduce technology choices that have not been researched and documented where required.
-- Do not add GitHub Actions unless explicitly approved by the maintainer.
-- Record PR review findings and their resolution in the PR itself.
+Follow `AGENTS.md` for branch/PR, review, security and approval gates.
+Follow `.github/skills/development-process.md` for implementation workflow and KISS/YAGNI.
+Keep changes focused and document verified checks in the PR.
 
 ## Product and architecture decisions
 
