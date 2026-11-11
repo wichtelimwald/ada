@@ -18,25 +18,11 @@ Code, comments, documentation, issues, commits, pull requests, and GitHub review
 
 ## Product and architecture decisions
 
-Accepted technology choices live in `docs/decisions/`; open capability work
-lives in `docs/todo.md`. Do not duplicate a changing technology-status list
-here, and do not treat a researched candidate as adopted unless an accepted ADR
-or other canonical decision says so.
-
-For significant choices:
-
-1. Define requirements and hard gates.
-2. Search the problem domain for credible maintained existing systems before proposing custom infrastructure.
-3. Review licenses/distribution constraints for every serious candidate.
-4. Research the candidates using current primary sources where possible.
-5. State cross-capability integration assumptions.
-6. Use a documented decision matrix and decision-changing prototypes where useful.
-7. Reopen the comparison if new evidence or a newly discovered credible system could change the outcome.
-8. Record the decision, consequences, fallback/re-open triggers, and license status in an ADR.
-9. Summarize user-relevant decisions in plain language in the top-level README.
-10. Only then implement.
-
-Custom infrastructure requires an explicit explanation of why an existing library/framework/service cannot satisfy the requirement behind an Ada-owned boundary.
+Accepted decisions live under `docs/decisions/`; open work lives in `docs/todo.md`.
+For significant choices, follow the canonical evaluation and license gates in
+`.github/skills/technology-evaluation.md` and `.github/skills/development-process.md`.
+Document new decisions and re-open triggers in an ADR; summarize user-facing changes
+in `README.md`. Do not duplicate changing technology status here.
 
 ## Security and privacy
 
