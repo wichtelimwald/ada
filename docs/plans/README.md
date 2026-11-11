@@ -91,7 +91,7 @@ also be copied to docs/todo.md.
 
 ## Parallel work
 
-Parallel work is encouraged only through stable boundaries.
+Parallel work is encouraged only through stable boundaries. This is **not** permission for an agent to delegate or spawn subagents; that requires the maintainer's explicit prior agreement under `AGENTS.md`.
 
 - Two steps may proceed in parallel when both are `ready` in the roadmap and
   they do not modify the same unresolved authority/data-ownership decision.
