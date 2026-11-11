@@ -1,31 +1,26 @@
-# Maintainer collaboration (development agents)
+# Maintainer collaboration — situational details
 
-These rules govern **our work on Ada**: discussion, research, coding, reviews, and handovers. They do **not** define Ada's end-user personality, runtime skills, or authorization policy.
+The **always-on** collaboration rules are in `AGENTS.md`. This file adds task-level practices for development agents; it does not define Ada's persona, runtime skills, or security policy.
 
-## Conversation
+## Decisions
 
-- Use German in direct chats; write GitHub and repository artifacts in English.
-- **Caveman:** answer the actual question first, in as few clear sentences as needed. One topic and at most one decision question at a time. Keep essential commands, paths, risks, and evidence precise; expand when requested or necessary for safety.
-- Be a **critical partner**, not an approval machine: test proposals against requirements, contrary evidence, risks, and simpler options before endorsing them. State a meaningful objection when one exists; do not manufacture objections.
-- Separate verified facts, inferences, unknowns, proposals, implementation, validation, and user acceptance. Do not praise, recap, or offer new workstreams by default.
-- Research facts independently. For a material unresolved choice, ask **one decision question** with your recommended default and its main trade-off. Do not interview for trivial or reversible details.
-- A question or evaluation is **not** implementation authorization. Do not jump to plans, code, or structural decisions before agreeing the substance. Within an explicitly approved scope, execute without repeatedly requesting the same approval.
+- For a material choice, identify the next question whose prerequisites are known. Present the recommended default and its decisive trade-off; ask one question, then reconsider based on the answer.
+- Do not turn a discussion into a project plan unless the maintainer requests one. Avoid interviewing for trivial, obvious, or reversible details.
+- For detailed technology evaluation and weighted decisions, follow `.github/skills/technology-evaluation.md`; do not invent weights or scores.
 
-## Change discipline
+## Execution and correction
 
-- For a targeted correction, start from the **last user-accepted baseline**; change only the requested delta. Propose unrelated improvements separately.
-- Verify review findings before fixing them; inspect related cases and complete one coherent correction/validation cycle where practical.
-- Preserve existing work; never reset, overwrite, or force-push it for convenience.
-- If local commands must run on the maintainer's computer, provide one complete copy-and-paste block and request the results together.
-- Explain simply with concrete examples when the maintainer requests `/eli5`.
+- Once a task is authorized, complete the reasonable implementation, validation, and PR follow-up without asking for the same permission again. **Merge authorization remains separate.**
+- Substantiate review findings before fixing them; inspect the affected class of cases, and prefer a coherent correction/validation pass over repeated micro-runs.
+- When the maintainer must run commands locally, give one complete copy-and-paste block and request one batch of results.
+- For `/eli5`, use a concrete example and simpler language without changing the technical meaning.
 
-## Delegation
+## Delegation, if approved
 
-- Do **not** spawn subagents or delegate work to another agent without explicit prior agreement.
-- If delegation is requested, provide a complete ready-to-use prompt and a recommended target model. The responsible agent must inspect the worker's actual output and verify decisive checks; worker reports are not acceptance.
+- Give a worker a bounded scope, relevant interfaces and constraints, a complete ready-to-use prompt, and a recommended target model.
+- Inspect the worker's actual changes and rerun decisive checks. A worker's completion claim is not independent verification or maintainer acceptance.
 
-## Decisions and completion
+## Reporting
 
-- Follow `.github/skills/technology-evaluation.md` for substantive trade-offs and weighting; do not invent scores.
-- Report only what was actually verified and what remains unknown. Review, test success, merge authorization, and explicit user acceptance are separate.
-- Branch/PR workflow and merge permission remain governed by `AGENTS.md` and `.github/skills/project-continuity.md`.
+- Name the exact verified revision, checks and remaining uncertainty. Do not equate a proposal, passing CI, a review, a merge, and explicit user acceptance.
+- Preserve uncommitted work. Keep PR findings and their resolutions on the PR; use `.github/skills/project-continuity.md` for durable state.
