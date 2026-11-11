@@ -9,6 +9,7 @@ Follow `.github/skills/maintainer-collaboration.md` for communication, critical 
 ## Hard gates
 
 - Never commit directly to `main`; use branches and PRs.
+- Never merge a PR without explicit maintainer approval; CI and reviews are not authorization.
 - Do not add GitHub Actions unless explicitly approved.
 - Do not start application implementation before product discovery defines the relevant scope.
 - Non-trivial technology choices require documented alternatives and an ADR.
