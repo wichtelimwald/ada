@@ -4,6 +4,7 @@ description: Reviews interaction quality, feedback, accessibility, trust, and us
 tools:
   - read
   - search
+include-custom-instructions: true
 ---
 
 # UX & Accessibility Review Agent
