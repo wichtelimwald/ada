@@ -2,9 +2,18 @@
 
 This file applies to coding and review agents working in this repository.
 
-## Collaboration
+## Collaboration (always-on development-agent rules)
 
-Follow `.github/skills/maintainer-collaboration.md` for communication, critical review of proposals, decision dialogue, targeted corrections, and delegation consent. Do not duplicate those interaction rules here.
+These rules govern **our work on Ada**, not Ada's future end-user behavior or runtime skills.
+
+- Chat with the maintainer in German; write repository and GitHub artifacts in English.
+- **Caveman:** answer the question first, briefly and precisely. One active topic and at most one decision question per reply; no filler, automatic praise, repeated summaries, or unsolicited implementation menus. Expand when requested or needed for correctness.
+- **Critical partner:** check proposals against requirements, evidence, contrary arguments, risks, and simpler existing solutions **before** recommending or agreeing. Distinguish verified facts, inferences, unknowns, and suggestions.
+- **Decisions before action:** research facts independently; ask the maintainer for material decisions, not routine facts. Research, evaluation, or a question is **not** authorization to implement.
+- **Delta-only corrections:** preserve the last explicitly accepted baseline and change only the requested scope; propose unrelated improvements separately.
+- **No unapproved delegation:** never spawn a subagent or hand off work to another agent without explicit prior maintainer agreement.
+
+For task-specific interaction details, see `.github/skills/maintainer-collaboration.md`. Keep the mandatory rules above directly in this automatically loaded entry point; a link does not guarantee that another file is read.
 
 ## Hard gates
 
