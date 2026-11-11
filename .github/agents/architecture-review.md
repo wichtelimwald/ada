@@ -4,6 +4,7 @@ description: Reviews significant architecture choices, boundaries, ADRs, and tec
 tools:
   - read
   - search
+include-custom-instructions: true
 ---
 
 # Architecture Review Agent
