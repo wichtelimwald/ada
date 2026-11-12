@@ -1,5 +1,7 @@
 # MVP-30 Memory protection mechanism evaluation
 
+> **Historical research (scope superseded on 2026-11-12).** [ADR-0012](../decisions/ADR-0012-memory-access-mvp-boundary.md) removes Ada-managed encrypted vaults, per-person host isolation, and a separate Memory Broker from the MVP. Mechanism recommendations and remaining probes below are not current implementation gates. The native macOS evidence is retained in case a stronger future threat model warrants revisiting it.
+
 Status: decision evidence for proposed ADR-0011  
 Date: 2026-09-28
 
