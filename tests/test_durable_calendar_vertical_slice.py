@@ -18,6 +18,7 @@ from ada.application.calendar_actions import (
     CalendarActionService,
     CalendarConflictChecker,
     ConflictKind,
+    availability_for_conflicts,
     render_calendar_action_response,
 )
 from ada.core.action_outcomes import (
@@ -546,7 +547,19 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
             location="Location A",
         )
 
-        conflicts = checker.check(candidate, existing_events=(existing,))
+        availability = availability_for_conflicts(
+            (existing,),
+            relevant_calendar_ids={"family"},
+            registered_places={
+                "Location A": "Location A",
+                "Location B": "Location B",
+            },
+        )
+        conflicts = checker.check(
+            candidate,
+            existing_events=availability,
+            candidate_place_key="Location B",
+        )
 
         self.assertEqual(len(conflicts), 1)
         self.assertEqual(conflicts[0].kind, ConflictKind.TRAVEL_TIME)
@@ -573,7 +586,19 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
             location="Location A",
         )
 
-        conflicts = checker.check(candidate, existing_events=(existing,))
+        availability = availability_for_conflicts(
+            (existing,),
+            relevant_calendar_ids={"family"},
+            registered_places={
+                "Location A": "Location A",
+                "Location B": "Location B",
+            },
+        )
+        conflicts = checker.check(
+            candidate,
+            existing_events=availability,
+            candidate_place_key="Location B",
+        )
 
         self.assertEqual(len(conflicts), 1)
         self.assertEqual(conflicts[0].kind, ConflictKind.TRAVEL_TIME)
@@ -600,7 +625,19 @@ class DurableCalendarVerticalSliceTests(unittest.TestCase):
             location=None,
         )
 
-        conflicts = checker.check(candidate, existing_events=(existing,))
+        availability = availability_for_conflicts(
+            (existing,),
+            relevant_calendar_ids={"family"},
+            registered_places={
+                "Location A": "Location A",
+                "Location B": "Location B",
+            },
+        )
+        conflicts = checker.check(
+            candidate,
+            existing_events=availability,
+            candidate_place_key="Location B",
+        )
 
         self.assertEqual(len(conflicts), 1)
         self.assertEqual(conflicts[0].kind, ConflictKind.TIME_OVERLAP)
