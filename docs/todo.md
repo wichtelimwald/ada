@@ -64,8 +64,8 @@ Implementation note: the baseline uses TOML `+++` front matter so it can be pars
 **Gates before real household Memory (ADR-0008):**
 
 - [x] Revise MVP-30 trust boundary (ADR-0012): Ada enforces per-user and audience-scoped data use and disclosure through trusted application APIs, not separate Mac encrypted vaults. Retire the prior host-side service/Keychain/VM IPC requirement.
-- [ ] MVP-30: for the email-only family MVP, map a **verified registered sender address** to the configured actor and bind recipient/audience through trusted routing and AdaGuard/application policy; missing/contradictory scope fails closed. The visible `From:` header, quoted text and model cannot supply identities or grants. Sender verification is an MVP-70 gate, while later chat login may use emailed codes and/or passkeys.
-- [ ] MVP-30: reuse S1 MemoryBrokerPort scope contract only where useful; verify private A, private B and family-shared reads, search/context, writes and response disclosure with synthetic positive and negative tests.
+- [ ] MVP-30: accept an already trustworthy actor/audience/authorization context through a narrow Ada-owned interface and enforce it independently from the model. The **actual registered sender → trusted actor** binding and verification is an MVP-70 gate, not MVP-30; the MVP admin chat handles granting permissions.
+- [ ] MVP-30: reuse S1 MemoryBrokerPort only if helpful; preserve deterministic positive/negative checks against unauthorized contexts. Validate full behavior with **real registered family users**, deliberately non-sensitive records and the eventual verified email adapter; do not substitute fabricated household identities for live acceptance.
 - [ ] MVP-30: enforce the same scope on independently configured source/document providers and derived retrieval caches, without unrestricted model-facing filesystem tools.
 - [ ] MVP-30: explicitly document the host-level residual: same-user Mac apps and compromised trusted Ada code may read accessible Memory files. Device encryption, backup/sync and accounts remain operator responsibilities, not Ada guarantees.
 - [ ] Route every model-originated Memory write/promotion through a deterministic Ada-owned validation boundary for source/trust, private-by-default scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction handling.
@@ -96,6 +96,14 @@ Implementation note: the baseline uses TOML `+++` front matter so it can be pars
 - [ ] Guard robustness follow-up: reject invalid `AuthenticationAssurance` types as `invalid_request` rather than raising during context construction.
 - [ ] Implement ADR-0007 context-aware interpretation behind Ada-owned types/ports: trusted `InterpretationContext`, raw temporal expressions, and explicit/context-derived/defaulted derivation evidence.
 - [ ] Close ADR-0007 resolver adoption gates before adding a production temporal dependency: safe/reproducible Quickadd JSON artifact and license provenance (or an alternative resolver), full dependency lock, target container/Linux validation, source-span attribution, determinism, thread safety, footprint, and independent review.
+**Calendar-first immediate milestone (MVP-60 → MVP-70 → MVP-CAL; roadmap):**
+
+- [ ] MVP-60: finish real CalDAV provider integration, including safe write/retry/reconciliation; stage a separate calendar with deliberately non-sensitive test events.
+- [ ] MVP-70: verify registered real email senders beyond the visible `From:` header; route replies safely; do not allow calendar effects until sender checks, grants and retry handling pass.
+- [ ] MVP-CAL: provide a **restricted, trusted MVP admin chat** to configure/revoke narrowly scoped AdaGuard grants. Do not allow model-generated policy edits or automatic authority from email. The development CLI is not inherently an admin channel.
+- [ ] MVP-CAL: conduct a reversible live calendar trial with the actual registered household participants, on harmless events only; ensure no duplicates, no unapproved changes and truthful replies. Retain automated regression checks without treating fabricated identities as product acceptance.
+- [ ] Prioritize calendar-first use; general Family Memory learning/retrieval is not a gate for the initial calendar pilot, but remains in the broader roadmap.
+
 **Gates before real calendar data (MVP-60, [step plan](plans/MVP-60-real-calendar-provider.md)):**
 
 - [x] Accept [ADR-0009](decisions/ADR-0009-calendar-provider-integration.md): provider-neutral CalDAV adapter with declarative provider profiles, IONOS Mail Business first, Ada-owned calendars shared read-only (accepted 2026-09-26).
