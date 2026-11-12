@@ -3,7 +3,7 @@
 Status: implementation  
 Roadmap: docs/product/mvp-roadmap.md  
 Depends on: MVP-20  
-Owner PR: #46
+Owner PR: S1 #46 (merged); S2 research #47 (draft, not adopted)
 
 ## Goal
 
@@ -15,6 +15,10 @@ when intentionally unlocked.
 ## Current state / evidence
 
 - MVP-20 is done on main via PR #41.
+- S1's broker/domain contract was merged in PR #46.
+- PR #47's synthetic native macOS A/B/C evidence is retained in
+  `docs/research/memory-protection-evaluation.md`; it does not establish the
+  Docker Desktop VM-to-host production boundary.
 - ADR-0008 already selects a host-side Memory Broker and private-by-default,
   independently protected Memory domains.
 - ADR-0010 provides safe current-file semantics and Git recovery history, but leaves
@@ -51,13 +55,10 @@ when intentionally unlocked.
 These remain blockers for ADR-0011 acceptance, not invitations to guess:
 
 1. target-Mac Keychain access-control shape for a broker process;
-2. the concrete OS-level enforcement mechanism (for example a distinct service
-   identity/POSIX user, filesystem ACLs, a code-signing-scoped Keychain
-   access-control list, or an app-sandbox/entitlement boundary) that prevents a
-   same-user ordinary Ada runtime process from directly reading an unrelated
-   domain's unlocked plaintext mount or retrieving its Keychain secret; no
-   mechanism is assumed until proven by the S2 target-Mac negative probes
-   (see ADR-0011 point 2 and "Review focus" below);
+2. the **container-first** runtime-to-host broker transport, trusted identity/
+   scope binding and no direct Memory/Keychain authority. A dedicated macOS
+   service account or Ada-specific system LaunchDaemon is explicitly ruled out;
+   native PR #47 probes are not container validation (ADR-0011 point 2);
 3. exact platform encrypted-image command/format after the macOS probe;
 4. whether ADR-0010's final late non-cooperating-save race is accepted as an MVP
    residual or closed through a separately designed synchronization slice;
@@ -134,22 +135,23 @@ provider credentials entirely behind the host-side broker/provider adapters.
   domain/path/key fields;
 - add reuse evidence and proposed ADR-0011.
 
-### S2 — Host process + encrypted-vault provider probe
+### S2 — Container-to-host broker boundary and encrypted-vault provider
 
-- decide and target-Mac-validate the concrete OS-level enforcement mechanism
-  for same-user process isolation (open decision 2 above) **before**
-  implementing the encrypted-vault provider; do not assume Unix-socket IPC
-  permissions alone isolate a mounted vault or a Keychain item from the
-  ordinary Ada runtime process;
-- add the two required negative target-Mac probes run from the ordinary
-  runtime process: it must fail to read an unrelated domain's unlocked
-  plaintext mount, and it must fail to retrieve an unrelated domain's
-  Keychain secret;
-- implement local-only broker IPC with restrictive permissions;
-- define EncryptedVaultProvider behind the adapter boundary;
-- target-Mac synthetic probe for encrypted create/unlock/lock/restart;
-- validate Keychain item access restrictions and secret handling;
-- keep platform command details out of core/ports.
+- retain PR #47's already-run native macOS encrypted-image, distinct-UID and
+  peer-UID probes as **research evidence**, not production acceptance;
+- do **not** provision an Ada macOS system daemon, new dedicated non-login OS
+  account, or launchd system service;
+- evaluate and validate a narrow broker connection from the accepted
+  container-first runtime to the host (including Docker Desktop VM transport,
+  trusted request identity, scope enforcement and lifecycle) **before**
+  implementing production IPC or encrypted vaults;
+- prove from the actual runtime that unrelated unlocked domain roots,
+  decryption secrets and Keychain entries are inaccessible directly;
+- implement the smallest approved broker access transport and
+  `EncryptedVaultProvider` behind Ada-owned interfaces;
+- target-Mac synthetic tests for encrypted create/unlock/lock/restart, Keychain
+  restrictions, multi-domain denial and cleanup;
+- keep platform commands out of core/ports.
 
 ### S3 — Protected current Memory + separated history
 
@@ -219,9 +221,8 @@ evidence is commit-specific and belongs in the PR.
 - a resolved MemoryScope/domain ID being accepted anywhere as proof of storage
   access instead of re-presenting MemoryAccessContext to the broker (PR #46 M1);
 - any normal runtime process that still receives all vault credentials;
-- an assumed-but-unproven OS enforcement mechanism for same-user isolation of
-  mounted vaults/Keychain secrets between the broker and the ordinary runtime
-  (PR #46 M2; see ADR-0011 point 2 and open decision 2 above);
+- mistakenly treating native same-user/restricted-user/`getpeereid(3)` probes
+  as proof of the Docker Desktop VM-to-host boundary (PR #47; ADR-0011 point 2);
 - plaintext Git objects/config outside encrypted broker-controlled storage;
 - Keychain access broader than the broker needs;
 - mount/unlock crash cleanup and stale mounted volumes;

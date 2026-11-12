@@ -51,37 +51,43 @@ permissions. Do not open a TCP/network listener merely for convenience.
 The exact message serialization is an implementation detail and must remain behind
 the Ada-owned port.
 
-#### Unresolved: same-user OS enforcement for mounted vaults and Keychain secrets
+#### Isolation boundary: research evidence and non-adopted native approach
 
-A separate broker process is necessary but not sufficient. If the broker and the
-ordinary Ada runtime run under the same macOS user/security context, Unix-domain
-socket permissions restrict who can talk to the broker over IPC, but they do
-**not** by themselves prevent the ordinary runtime from directly reading an
-unrelated domain's already-unlocked plaintext mount on disk, nor from directly
-querying the platform credential store for that domain's Keychain item. Both are
-same-user, same-machine resources unless a distinct OS-level enforcement
-mechanism scopes them to the broker specifically.
+**Decision update (2026-11-12): do not provision a separate Ada macOS
+system service, dedicated non-login runtime user, or Ada-specific system
+LaunchDaemon.** The maintainer explicitly ruled out that operating model.
+This does not remove ADR-0008's approved host-side, request-scoped Memory
+Broker; its production implementation and lifecycle are still undecided.
+ADR-0003's accepted container-first runtime is the baseline.
 
-This is an explicitly **unresolved** problem, not a solved one. No enforcement
-mechanism is adopted by this ADR. Before S2 implements the encrypted-vault
-provider, S2 must run a target-Mac decision gate that selects and validates a
-concrete OS-level enforcement mechanism — for example a distinct service
-identity/POSIX user for the broker, filesystem ACLs on the mount point, a
-code-signing-scoped Keychain access-control list restricted to the broker
-binary, an app-sandbox/entitlement boundary, or another equivalent, tested
-mechanism. Do not invent or assume a solution ahead of that probe.
+Research-only [PR #47](https://github.com/wichtelimwald/ada/pull/47)
+produced three target-Mac results, archived with sources in
+[the Memory protection evaluation](../research/memory-protection-evaluation.md):
 
-S2 must add, at minimum, these negative target-Mac probes, run from the
-ordinary (non-broker) Ada runtime process:
+- **A:** AES-256 APFS encrypted-image operations passed, but a second
+  **same-user native process read the unlocked plaintext**. A local process
+  boundary alone is insufficient.
+- **B:** the existing restricted `nobody` identity was denied access to a
+  synthetic unlocked vault and synthetic user Keychain item. This proves a
+  tested **native distinct-OS-identity** separation, not a production Ada
+  service or a reason to install one.
+- **C:** a local Unix-domain peer UID (`getpeereid(3)`) rejected a wrong UID
+  before parsing the payload and admitted the expected test UID. This is
+  **not a validated transport/authentication boundary across a Linux VM**.
 
-- the ordinary runtime process cannot read an unrelated domain's unlocked
-  plaintext mount;
-- the ordinary runtime process cannot retrieve an unrelated domain's Keychain
-  secret.
+The container-first deployment must not silently receive Memory mounts,
+encryption keys, Keychain authority or a broad host-filesystem view.
+Before production IPC or an encrypted-vault provider is implemented,
+**re-evaluate and validate** the *actual* container-to-host broker access
+model: transport across Docker Desktop's Linux VM, authenticating trusted
+application context, fail-closed domain selection, permitted host resources,
+negative cross-domain tests, and storage/history encryption. Do not assume
+Unix-socket peer UID is transferable across that boundary. The fully
+compromised runtime's context-forgery residual from ADR-0008 is unchanged.
 
-Until both probes pass on the target Mac, this ADR remains Proposed and the
-topology provides encryption at rest without the claimed runtime domain
-isolation.
+**ADR-0011 remains Proposed.** The native probes settle useful mechanism
+questions but do not constitute validation of the accepted runtime topology
+or a final Memory-protection implementation.
 
 ### 3. Use one encrypted current-Memory vault per protection domain
 
@@ -191,13 +197,12 @@ API shape; that remains future work, deliberately out of S1 scope.
 ## Validation required before acceptance
 
 - independent architecture/security review of the broker binding contract;
-- a decided and target-Mac-validated OS-level enforcement mechanism (service
-  identity / ACL / code-signing Keychain access control / equivalent) for
-  same-user process isolation of mounted vaults and Keychain secrets (see
-  point 2);
-- the two required negative target-Mac probes from the ordinary runtime
-  process: it cannot read an unrelated domain's unlocked plaintext mount, and
-  it cannot retrieve an unrelated domain's Keychain secret;
+- a decided and validated **container-first** runtime-to-host-broker
+  transport and authenticated scope binding, without introducing a dedicated
+  macOS system daemon/account or exposing broad Memory roots/Keychain authority;
+- negative tests from the **actual proposed runtime/container** proving no
+  direct access to unrelated unlocked Memory domains or decryption secrets.
+  The native PR #47 A/B/C probes are evidence, not substitutes for these tests;
 - target-Mac encrypted vault create/unlock/lock/restart probe with synthetic data;
 - proof that unrelated domains cannot be opened through normal broker requests;
 - proof that the normal Ada runtime receives no key/root for an unrelated domain;
