@@ -15,6 +15,7 @@
 9. **Backup and sync are data egress.** A local file that is synchronized through iCloud, Dropbox, OneDrive, Git, backup software, or another service is not local-only. Sync/backup behavior must be explicit.
 10. **Cloud fallback must be transparent.** If a task would materially benefit from remote processing, the UI should make the provider and data scope understandable before sensitive data is sent.
 11. **Plugins and extensions are a trust boundary.** Third-party plugins, skills, MCP servers, models, and binaries must not be installed or executed solely because an agent requested them.
+12. **User/audience protection is an Ada API requirement, not Mac disk isolation.** Under ADR-0012, Ada controls which user and audience may read, retrieve, write or receive private/shared Memory through its interfaces. The MVP does not provide same-user OS process isolation or Ada-managed encryption. The operator owns Mac account protection, storage encryption, sync and backups; compromised code with those filesystem rights may bypass Ada's application policy.
 
 ## Required documentation before implementation
 
