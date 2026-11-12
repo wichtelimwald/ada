@@ -1,6 +1,6 @@
 # Representative MVP scenarios
 
-**Status:** Confirmed-scope acceptance scenarios derived from the product discovery baseline.
+**Status:** Historical product-discovery acceptance scenarios. **MVP channel correction (2026-11-12):** the family-facing MVP operates by email only. Local-chat scenario S6 remains a valid development-harness regression scenario but is no longer a release gate for family interaction; future interactive chat may use emailed login codes and/or passkeys. Apply S1–S5 through email when in MVP scope. See [MVP roadmap](mvp-roadmap.md).
 
 These scenarios are synthetic. They contain no household-specific personal data and are intended to drive architecture, tests, and later capability evaluations.
 
