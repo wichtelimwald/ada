@@ -5,9 +5,10 @@ Roadmap: docs/product/mvp-roadmap.md
 Depends on: MVP-00 (done)
 Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR, merged);
 S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (merged);
-S4 implementation PR: https://github.com/wichtelimwald/ada/pull/48 (merged).
-Further implementation PRs follow for S5 and S6-S7 (roadmap stays `ready`
-until S7); S5 is the next implementation slice.
+S4 implementation PR: https://github.com/wichtelimwald/ada/pull/48 (merged);
+S5 implementation draft: https://github.com/wichtelimwald/ada/pull/54
+(unreviewed; tests not run on the exact head).
+S6-S7 remain pending, so the roadmap stays `ready` until their gates pass.
 
 ## Goal
 
@@ -367,8 +368,18 @@ S6-S7 (roadmap `done` only in the last PR).
   `version_conflict`/`event_absent` reports). Not part of S4: the operation record and
   payload purge (S6/D5), the Ada-created-events distinction of D3 (needs the
   S6 operation record), conflict detection (S5).
-- **S5 Conflict detection:** busy semantics, occurrences, travel table (D4),
-  explicit unknown travel, availability-only inputs.
+- **S5 Conflict detection (draft PR #54):** `CalendarEvent` reads are
+  projected to ephemeral `CalendarBusyInterval` values for the
+  **already-authorized relevant calendars**; transparent entries are skipped,
+  original titles/locations/provider IDs are not passed to the checker.
+  The existing CalDAV adapter expands recurring occurrences beforehand.
+  A local configured, directional travel-time table uses only registered
+  place keys and reports unknown routes or missing places explicitly.
+  Deterministic tests cover visibility, overlap, occurrences, known/unknown
+  travel and omitted unrelated calendars. This is not the sender-verified
+  live household pilot: S6 must configure and compose the trusted calendar
+  read path; S7 requires provider acceptance. Independent review and exact-head
+  tests are pending.
 - **S6 Operations:** credential source (D2), durable payload retention (D5),
   configuration, `ada doctor` checks (reachability, privileges vs configured
   mode, no credential echo), `docs/manual-setup.md`, README, NOTICE.md.
