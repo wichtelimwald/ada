@@ -1,7 +1,9 @@
 # ADR-0011: Memory Broker and protection-domain storage topology
 
-- **Status:** Proposed
+- **Status:** Superseded by ADR-0012 (2026-11-12); never accepted
 - **Date:** 2026-09-28
+
+> **Archived proposal, not an implementation instruction.** The maintainer removed Ada-managed vault encryption and same-user host isolation from MVP scope. [ADR-0012](ADR-0012-memory-access-mvp-boundary.md) defines the new boundary. Research below remains historical, including formerly open gates.
 
 ## Context
 

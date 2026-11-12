@@ -4,6 +4,8 @@
 - **Date:** 2026-09-21
 - **Accepted:** 2026-09-25
 
+> **MVP scope correction (2026-11-12):** [ADR-0012](ADR-0012-memory-access-mvp-boundary.md) supersedes this ADR's prior requirement for OS-enforced private-vault isolation, a host-side Memory Broker process, encryption at rest, and encrypted history **for the MVP**. Those historic passages remain for decision traceability, not as implementation gates. Ada-level actor/audience authorization of reads, writes, retrieval and disclosure now defines the MVP boundary. All other file-native Memory, learning, correction, provenance, source-ownership and history decisions remain accepted.
+
 ## Context
 
 Ada's first MVP requires persistent personal and household memory. This ADR records the accepted architecture boundary; implementation details and optional derived components remain separately gated.

@@ -3,6 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-09-20
 
+> **Memory access amendment (2026-11-12):** [ADR-0012](ADR-0012-memory-access-mvp-boundary.md) supersedes the later ADR-0008 host-side Memory Broker/process requirement for the MVP. The container-first runtime direction of this ADR remains accepted, but its historical references to a mandatory separate Memory broker are no longer MVP implementation gates.
+
 ## Context
 
 Ada needs an execution topology that preserves the modularity strategy from ADR-0002 while remaining practical for:

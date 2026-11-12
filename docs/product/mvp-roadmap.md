@@ -15,35 +15,49 @@ and acceptance outcome**.
 
 ## MVP product outcome
 
-The first MVP is complete when the family can use Ada for these four primary
-capabilities with the already accepted privacy and authority boundaries:
+The MVP uses **email for family-facing requests** and a separate, restricted
+**MVP admin chat** for initial setup and changes to permissions/grants. The
+admin chat must establish trusted administrator authority outside model text;
+it is not a general family chat or an email-based self-approval path. Its exact
+authentication and implementation remain to be designed. The existing native
+local-chat CLI is a development harness, not automatically the privileged admin
+interface. General family-facing interactive chat is later, with emailed
+one-time login code and/or passkey still to be selected.
+
+**Immediate working milestone: family calendar via email.** Prioritize a
+narrow live vertical slice: registered family users request ordinary calendar
+information and changes by email, with narrowly scoped grants configured in
+the MVP admin chat. Validate using the actual participating users/accounts,
+a deliberately non-sensitive test calendar/events and a reversible trial.
+Do not create fake household identities as a substitute for this acceptance.
+Do not expose real calendar effects until sender verification (MVP-70),
+authorization (AdaGuard), duplicate prevention and recovery gates pass.
+Calendar-first progress does **not** depend on completing general Memory
+learning/retrieval. The broader Family Memory and learning outcome below
+remains planned; it is not a prerequisite for the first calendar trial.
+
+The MVP is complete when the family can use Ada for these three capabilities
+with the accepted privacy and authority boundaries:
 
 1. **Family Memory including learning**
    - private Memory per person plus shared family Memory;
    - human-readable/correctable authoritative Memory;
    - controlled learning and promotion;
-   - encrypted-at-rest protection domains;
-   - Git-style history/versioning per protection domain, without treating history
-     as current Memory.
+   - AdaGuard-enforced private/shared scopes and audience-safe disclosure;
+   - Git-style edit history/versioning, not current Memory.
 
-2. **Local chat**
-   - local text interaction;
-   - identity/audience-aware access to permitted Memory;
-   - no implicit cloud egress;
-   - consequential actions still cross AdaGuard and durable-action boundaries.
-
-3. **Calendar maintenance**
+2. **Calendar maintenance**
    - read, create, update and cancel ordinary events through a real provider;
    - conflict detection including approximate travel time;
    - source-owned calendar truth remains separate from Memory;
    - consequential writes use AdaGuard + durable execution/reconciliation.
 
-4. **Email communication**
+3. **Email interaction**
    - receive mail through an Ada-controlled channel;
-   - distinguish trusted sender instructions from forwarded/untrusted content;
-   - ask questions and send authorized replies;
-   - extract appointment information and hand consequential calendar changes to
-     the normal guarded action path.
+   - map verified registered sender addresses to configured user identities;
+   - distinguish direct instructions from forwarded/quoted/untrusted text;
+   - read only scoped Memory, ask questions and send authorized replies;
+   - extract appointment information and use the guarded calendar path.
 
 The cross-cutting MVP trust requirements from product discovery remain part of
 the definition of done: private/shared disclosure boundaries, action logging,
@@ -65,15 +79,26 @@ starting duplicate work.
 
 ## Agent step-selection contract
 
+**Calendar-first priority (maintainer 2026-11-12):** Until the narrow
+email-to-family-calendar pilot passes, take the next independently ready
+calendar-path work package: **MVP-60**, then **MVP-70**, then **MVP-CAL**.
+MVP-30/40/50 remain planned for broader family Memory but are not blockers
+for the initial calendar pilot. A maintainer-specified step ID still wins.
+Once MVP-CAL is done, return to the normal ordering below. Do not bypass
+the real-mail authentication, administrator grant, AdaGuard or recovery gates.
+
 When the maintainer says **"implement the next step"**:
 
 1. Read `AGENTS.md`, `docs/handover.md`, this roadmap, and
    `docs/plans/README.md`.
 2. Inspect open PRs and current `main`.
-3. If an active non-draft PR already owns the earliest executable MVP step,
-   continue that work instead of opening a duplicate.
-4. Otherwise choose the first work package in canonical order whose status is
-   `ready` and whose dependencies are all `done`.
+3. If an active non-draft PR already owns the next step under the
+   calendar-first priority above (or ordinary ordering once it is complete),
+   continue it instead of opening a duplicate.
+4. Otherwise, while the calendar pilot is pending, choose the earliest
+   independently ready package in MVP-60 → MVP-70 → MVP-CAL order.
+   Afterwards, choose the first ready work package in canonical table order
+   whose dependencies are all done.
 5. Create/update that step's plan before implementation, then execute it under
    the normal branch/PR/review rules.
 
@@ -82,8 +107,9 @@ When the maintainer says **"implement the step after next"** or
 
 1. Determine the step that would have been selected as "next".
 2. Skip it.
-3. Select the next work package in canonical order that is independently
-   `ready` with all dependencies already `done`.
+3. During calendar-first work, select the next independently `ready` calendar
+   package (MVP-60, MVP-70, MVP-CAL). After that milestone, use ordinary
+   canonical table order. The skipped package stays pending.
 4. Do **not** implement a blocked dependent step merely to satisfy the ordinal
    request. If no second ready step exists, report that rather than inventing
    missing architecture.
@@ -100,12 +126,13 @@ boundary.
 | MVP-00 | Core foundation | done | — | PydanticAI boundary, Cedar/AdaGuard, DBOS action semantics, local Ollama, modular monolith baseline |
 | MVP-10 | File-native Memory baseline | done | MVP-00 | Current Markdown authority, `memory/` vs `learning/`, seed-once personality, conservative promotion/forget baseline |
 | MVP-20 | Memory semantics, safe writes and versioning | done | MVP-10 | Close baseline residuals; define correction/forget/id semantics; safe Git-style history/edit capture/concurrency |
-| MVP-30 | Memory Broker, protection domains and encryption | ready | MVP-20 | Enforce private/shared domains, request-scoped broker access, encrypted-at-rest per-domain storage/history |
+| MVP-30 | User- and audience-scoped Memory access | ready | MVP-20 | Scope Memory through a trusted actor/audience contract; email identity integration later in MVP-70; no Ada-managed vault encryption |
 | MVP-40 | Learning pipeline and retrieval | blocked | MVP-20, MVP-30 | Trusted learning validation, class A-D handling, lifecycle rules, current-only retrieval; start simple and measure before richer RAG |
-| MVP-50 | Chat + Family Memory | blocked | MVP-40 | Identity/audience-aware local chat using real protected family Memory and learning |
-| MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Can proceed in parallel with Memory; connect real provider for read/create/update/cancel and preserve durable action semantics |
-| MVP-70 | Email channel baseline | ready | MVP-00 | Can proceed in parallel; authenticated intake/reply channel, forwarding separation, no direct privileged execution |
-| MVP-80 | Family end-to-end integration | blocked | MVP-50, MVP-60, MVP-70 | Join chat/email/calendar/Memory; conflict detection, audience-safe briefings, representative scenarios |
+| MVP-50 | Email + Family Memory | blocked | MVP-40, MVP-70 | Connect authenticated email requests to audience-scoped Memory and learning; local chat remains a development harness |
+| MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Direct IONOS CalDAV provider acceptance (no email channel or admin-chat dependency), durable read/create/update/cancel semantics |
+| MVP-70 | Email channel baseline | ready | MVP-00 | Real registered-user mail intake/reply and non-executable proposals; no calendar effects or admin-chat dependency |
+| MVP-CAL | Live family-calendar pilot with admin chat | blocked | MVP-60, MVP-70 | Narrow grants through restricted MVP admin chat, verified registered mail, safe calendar operations and replies; non-sensitive real-user pilot, no Memory prerequisite |
+| MVP-80 | Family end-to-end integration | blocked | MVP-50, MVP-CAL | Extend working email/calendar pilot with family Memory, conflict detection, audience-safe briefings and remaining scenarios |
 | MVP-90 | MVP operational hardening and delivery | blocked | MVP-80 | Backup/restore, recovery, startup/pause/resume, security gates, packaging decision, reproducible supported setup |
 | MVP | First usable family MVP | blocked | MVP-90 | All primary capabilities and acceptance scenarios pass with real family-ready protection |
 
@@ -166,33 +193,38 @@ that final check but before same-working-tree publication is a documented MVP-20
 residual; MVP-30 must evaluate the commit-based multi-workspace model and remove
 obsolete shared-working-tree safeguards if that model is selected.
 
-### MVP-30 — Memory Broker, protection domains and encryption
+### MVP-30 — User- and audience-scoped Memory access
 
-**Goal:** make real private/shared family Memory storage technically enforceable.
+**Goal:** Ada uses and discloses only data permitted for the trusted actor,
+intended audience and task. This is an application-level authorization boundary,
+not macOS process isolation or Ada-provided encryption (ADR-0012).
 
 **Plan must decide and prove:**
 
-- protection domains for each person and family-shared Memory;
-- broker request contract and trusted actor/audience binding;
-- no standing all-vault access in normal runtime paths;
-- encryption-at-rest/key ownership and unlock behavior;
-- encrypted Git-style history/versioning per domain without making Git an auth
-  boundary;
-- concurrency/synchronization model for human-edited and Ada-edited Memory,
-  explicitly evaluating separate Git worktrees/clones with commit-based
-  synchronization and expected base commits so divergent edits become conflicts
-  rather than silent last-writer-wins; define commit ownership, conflict handling,
-  offline behavior and private/local transport without assuming a cloud remote;
-- KISS simplification review: if a commit-based multi-workspace model is selected,
-  identify and remove MVP-20 shared-working-tree concurrency machinery that is no
-  longer required rather than layering the new model on top of obsolete safeguards;
-- separately configurable source/document providers per domain;
-- backup/restore responsibilities for encrypted vaults;
-- cross-domain negative tests and residual threat model.
+- trusted actor/audience supplied by an authenticated channel or the restricted
+  MVP admin chat, independent of the model; the email verification mechanism
+  is an MVP-70 decision, not a blocker for the Memory interface itself;
+- deterministic AdaGuard/application checks for private and shared reads, writes,
+  source-provider access, retrieval, model context and response disclosure;
+- reuse S1's MemoryBrokerPort scope contract if helpful, without imposing a
+  separate process, IPC, Keychain service or encrypted volume;
+- private-by-default logical scopes with explicit sharing, including indexes and
+  minimized derivatives; no unrestricted model filesystem tools;
+- independent source/document providers respecting the same scopes;
+- current Markdown and Git history preserved, including Git executable-config safety;
+- human/Ada write concurrency model: evaluate separate worktrees/commits without
+  assuming normal human editors follow a synchronization protocol; remove
+  redundant MVP-20 guards if a superior mechanism is accepted;
+- restart/recovery and operator-managed backup/restore responsibilities;
+- explicit residual that same-user host applications or fully compromised
+  Ada code can read locally accessible files outside scoped APIs.
 
-**DoD:** synthetic private domains cannot read or disclose each other through
-normal/model-driven paths; shared access is explicit; encrypted storage/history
-survives restart and restore.
+**DoD:** Ada's trusted access path enforces permitted scopes with deterministic
+negative regression checks; with real registered users and non-sensitive pilot
+data, later end-to-end acceptance verifies no unauthorized Memory disclosure.
+Ambiguous identity fails closed; history/recovery, concurrency and backup
+responsibilities are addressed. No claim of Mac-level isolation or encryption.
+No fabricated family identities are an MVP acceptance substitute.
 
 ### MVP-40 — Learning pipeline and retrieval
 
@@ -218,25 +250,32 @@ strategy**, never authoritative Memory.
 **DoD:** representative synthetic learning/correction/contradiction/forget
 scenarios pass across protection domains and restarts.
 
-### MVP-50 — Chat + Family Memory
+### MVP-50 — Email + Family Memory
 
-**Goal:** local chat becomes a real family-facing Memory client rather than an
-ephemeral development harness.
+**Goal:** make authenticated email Ada's family-facing interface to current
+scoped Memory and its learning lifecycle. The local chat CLI remains a
+development-only harness and is not a second family-facing channel.
 
 **Plan must cover:**
 
-- authenticated/selected actor and audience;
-- broker-scoped context acquisition;
-- minimum relevant Memory context;
-- private vs family-shared disclosure;
-- trusted confirmation path for remember/correct/forget;
-- learning evidence from interaction;
+- reuse MVP-70's verified registered sender identity and intended recipient
+  audience (recipient address is an audience hint, not permission);
+- trusted actor/audience policy-scoped context acquisition;
+- minimum relevant Memory content, private/shared disclosure and source scope;
+- trusted confirmation path for remember/correct/forget within allowed grants;
+- learning evidence from email interaction;
 - no model-direct privileged Memory tools;
-- local model failure/restart behavior.
+- local model failure/restart behavior and email reply outcome truth;
+- routine requests operate only within previously configured narrow grants;
+  **new, revoked or expanded grants go through the restricted MVP admin chat**,
+  never ordinary email or model output; its trusted admin authority is a
+  prerequisite before that workflow is enabled;
 
-**DoD:** multiple synthetic family identities receive different permitted
-contexts; manual Memory corrections affect the next interaction; unauthorized
-private content never appears in shared chat.
+**DoD:** end-to-end checks with actual registered household accounts and
+deliberately non-sensitive content confirm permitted responses and denial of
+cross-user requests; manual Memory corrections affect later replies when
+Memory integration is enabled. Contract tests remain useful but are not a
+substitute for live acceptance.
 
 ### MVP-60 — Real calendar provider and full calendar management
 
@@ -259,41 +298,93 @@ architecture: ADR-0009 (accepted).
 - recurring-event MVP boundary;
 - travel-time input/source;
 - offline/provider-error behavior;
-- tests without real personal event fixtures.
+- opt-in **direct CalDAV provider acceptance** against a dedicated IONOS
+  test calendar with deliberately non-sensitive, reversible events. Exercise
+  the provider adapter and durable action path using Ada's configured
+  provider credentials, **without email intake, sender identity, or admin-chat
+  grant setup**. Verify before/after state and recovery; no private
+  household appointments or live registered-user workflow at this step.
 
-**DoD:** real-provider acceptance proves exactly one intended side effect across
-retry/restart, correct reporting of unknown outcomes, and conflict detection with
-travel time.
+**DoD:** direct real-provider acceptance demonstrates read/create/update/cancel
+on the dedicated non-sensitive test calendar, exactly one intended effect across
+retry/restart, accurate unknown-outcome reporting and conflict detection
+including approximate travel time. No user-email or admin-chat integration is
+needed to finish MVP-60; the household pilot is exclusively MVP-CAL.
 
 ### MVP-70 — Email channel baseline
 
-**Goal:** email becomes Ada's first external asynchronous interaction channel.
+**Goal:** email becomes Ada's **only family-facing MVP interaction channel**.
 
 **Plan must cover:**
 
 - Ada mailbox/account/provider;
-- sender authentication/allowlist semantics beyond visible `From:`;
+- registered sender-address mapping to a configured user; sender authenticity verified beyond the forgeable visible `From:` header (provider/authentication evidence and fail-closed fallback);
 - trusted direct instruction vs quoted/forwarded/untrusted content;
 - reply recipient and disclosure controls;
 - threading/idempotency;
 - attachment handling as source material;
 - appointment extraction into typed drafts/proposals, never direct calendar
   mutation;
-- response timing while Ada is operating and pause behavior.
+- response timing while Ada is operating and pause behavior;
+- no self-service broad permission grants through ordinary incoming email;
+  permission creation/changes belong to a restricted MVP admin chat
+  implemented at MVP-CAL, **not** a prerequisite for the MVP-70 channel;
+- verify real registered senders and safe reply recipients independently of
+  calendar operations; provider-authentication mechanics are decided here,
+  not in MVP-30. Only a **non-executable** appointment draft/proposal can be
+  emitted at this stage; no provider calendar writes are enabled.
 
-**DoD:** synthetic authorized email can produce a safe reply or calendar proposal;
-forwarded text cannot grant authority; retry does not send duplicate replies.
+**DoD:** actual registered senders can email Ada and receive correctly
+addressed, deduplicated replies or **non-executable** appointment drafts from
+deliberately non-sensitive messages. Sender verification works beyond visible
+`From:`; unverified/unknown senders and forwarded text cannot grant
+authority or expose other users' data. Retries do not duplicate replies.
+No calendar provider effects, admin-chat grants or completed household
+calendar workflow are required or allowed in MVP-70. The first integrated
+live authorized calendar action is reserved for MVP-CAL.
+
+### MVP-CAL — First working family-calendar pilot
+
+**Goal:** close one complete email → permitted calendar operation → email
+reply loop, for the *actual registered household users* and a non-sensitive
+test calendar. This is the immediate milestone, separate from the broader
+Family Memory/learning release scope.
+
+**Plan must cover:**
+
+- restricted MVP admin chat on a trusted administrative path for setup and
+  grant creation/revocation; no permissions inferred from model responses,
+  incoming emails or generic development-chat content;
+- initial explicitly configured grants for reading/creating/updating ordinary
+  family events; potentially destructive actions remain narrowly scoped,
+  reviewable and recoverable;
+- authenticated real-email sender → configured actor/audience → AdaGuard
+  → CalDAV provider → confirmed outcome → correctly addressed response;
+- allowlist, unknown-sender rejection, no forwarded authority, deduplication,
+  retry/restart recovery and no ambiguous success claims;
+- pilot on deliberately non-sensitive real calendar events with a defined
+  recovery/rollback path. Do not put private family records into the trial
+  simply to make a test realistic.
+
+**DoD:** after explicit operator setup in the admin chat, the actual registered
+users can email Ada to read and maintain the test family calendar within the
+configured grants. Wrong/no sender authority does not cause an effect or
+disclosure, a retry does not duplicate an event, and failure states are
+reported accurately. This live acceptance does not require fabricated
+household identities or general-purpose Memory/learning.
 
 ### MVP-80 — Family end-to-end integration
 
-**Goal:** demonstrate that the individually working channels form one trustworthy
+**Goal:** demonstrate that the email, calendar and Memory components form one trustworthy
 family assistant.
 
 **Required acceptance:**
 
-- representative scenarios S1-S6 pass end to end where in MVP scope;
+- email-based calendar scenarios run end to end with the registered
+  household users and non-sensitive test events; development-only chat
+  scenario S6 remains a regression, not a family-channel release gate;
 - email -> interpretation -> conflict check -> authorization -> calendar effect;
-- chat and email observe the same allowed current Memory;
+- verified email senders see only their allowed current Memory in replies;
 - private appointment can contribute availability without leaking details;
 - correction propagates to future answers without automatically mutating a source
   system;
@@ -301,8 +392,11 @@ family assistant.
 - approximate travel assumptions remain visible;
 - pause/restart does not invent outcomes.
 
-**DoD:** a synthetic household acceptance suite passes, followed by a deliberately
-small real-family pilot only after all real-data gates are closed.
+**DoD:** MVP-CAL's live calendar acceptance still passes, and the additional
+Family Memory/learning, correction, privacy-limited briefing and calendar
+conflict scenarios pass their own deterministic checks and controlled
+end-to-end acceptance. Admission of actual private household information
+requires the separate real-data privacy gates first.
 
 ### MVP-90 — Operational hardening and delivery
 
@@ -312,7 +406,7 @@ small real-family pilot only after all real-data gates are closed.
 
 - startup/stop/pause/resume;
 - family Mac sleep/offline behavior;
-- encrypted-vault backup/restore test;
+- operator-controlled Memory and edit-history backup/restore test;
 - secret management;
 - operational logging without sensitive leakage;
 - supported installation/update shape;
@@ -351,6 +445,7 @@ These are deliberately outside the first MVP and are not selected by the
 | POST-20 | Speech input and output | Evaluate local-first STT/TTS, wake/listening/privacy implications and interruption UX |
 | POST-30 | Animated avatar | Add as a face/presentation layer without coupling it to authority or Memory |
 | POST-40 | Untis integration | Revisit direct WebUntis/API options after email/calendar flows are stable; school data gets its own access/disclosure review |
+| POST-50 | Interactive authenticated chat | Provide family-facing chat after the email-only MVP; evaluate emailed one-time login codes and/or passkeys with trusted session/audience binding, revocation and approval semantics |
 
 Ternary Bonsai 2 remains a later local-model benchmark candidate rather than an
 MVP dependency. Google Artemis and GLM-5.3-FlashX are not current Ada priorities.
