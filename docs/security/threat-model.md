@@ -38,6 +38,7 @@
 - DBOS workflow steps ↔ external providers with their own idempotency/reconciliation semantics,
 - Ada agent-runtime adapter ↔ separately running loopback Ollama/model process,
 - verified actor/audience ↔ AdaGuard authorization ↔ scoped Memory/source access,
+- restricted MVP admin chat ↔ trusted administrator authority ↔ grant setup/change/revocation (no model-derived privileges),
 - Ada's trusted Memory API ↔ locally accessible files and separately configured source/document providers,
 - model/data/quoted input ↔ trusted Memory access APIs (no unrestricted model filesystem tools),
 - native macOS local-chat process ↔ host resources accessible to the logged-in
@@ -106,6 +107,7 @@
 - persistent personality changes must be inspectable, reversible, attributable, and isolated from permissions/privacy/action-truth rules,
 - untrusted content/model output cannot directly persist personality changes,
 - every model-originated Memory write/promotion passes an Ada-owned deterministic validation boundary for source/trust, privacy scope, learning class/sensitivity, provenance/lifecycle, and contradiction/correction semantics,
+- require trusted administrator binding for the restricted MVP admin chat before granting/revoking permissions; an arbitrary prompt or ordinary email cannot elevate authority;
 - bind reliable actor identity, audience and authorization to Memory reads,
   writes, retrieval/context construction, source-provider access and disclosure;
   ambiguity or absence must fail closed;
@@ -122,6 +124,7 @@
   neither a separate broker service nor per-person encryption is promised;
 - configure source/document providers independently by logical scope, while
   enforcing the same application-level permissions across those providers;
+- for the first live calendar trial, use real registered household accounts with only deliberately non-sensitive test records, and require verified sender, scoped grants, deduplication and recovery before enabling any provider effects; no confidential data during pilot does not replace authorization;
 - keep the first macOS chat CLI native alongside a loopback-bound Ollama and
   run development and tests in the default bridged Dev Container; review any
   future container-to-host Ollama connection before enabling it.
