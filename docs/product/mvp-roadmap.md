@@ -107,8 +107,9 @@ When the maintainer says **"implement the step after next"** or
 
 1. Determine the step that would have been selected as "next".
 2. Skip it.
-3. Select the next work package in canonical order that is independently
-   `ready` with all dependencies already `done`.
+3. During calendar-first work, select the next independently `ready` calendar
+   package (MVP-60, MVP-70, MVP-CAL). After that milestone, use ordinary
+   canonical table order. The skipped package stays pending.
 4. Do **not** implement a blocked dependent step merely to satisfy the ordinal
    request. If no second ready step exists, report that rather than inventing
    missing architecture.
@@ -380,10 +381,11 @@ family assistant.
 - approximate travel assumptions remain visible;
 - pause/restart does not invent outcomes.
 
-**DoD:** a small, opt-in pilot with real registered household users and
-non-sensitive family-calendar data passes the authentication, permission,
-idempotency, recovery and response checks. Broader personal Memory/learning
-and real private calendar contents remain gated until separately validated.
+**DoD:** MVP-CAL's live calendar acceptance still passes, and the additional
+Family Memory/learning, correction, privacy-limited briefing and calendar
+conflict scenarios pass their own deterministic checks and controlled
+end-to-end acceptance. Admission of actual private household information
+requires the separate real-data privacy gates first.
 
 ### MVP-90 — Operational hardening and delivery
 
