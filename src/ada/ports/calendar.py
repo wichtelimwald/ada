@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
 from typing import Protocol, Sequence
@@ -75,7 +75,7 @@ class CalendarBusyInterval:
     calendar_id: str
     start: datetime
     end: datetime
-    place_key: str | None = None
+    place_key: str | None = field(default=None, repr=False)
 
 
 class CalendarCreateStatus(str, Enum):
