@@ -61,6 +61,23 @@ class CalendarEvent:
     sequence: int = 0
 
 
+@dataclass(frozen=True, slots=True)
+class CalendarBusyInterval:
+    """Availability-only input to scheduling checks.
+
+    No title, original location or provider resource reference crosses this
+    boundary. `slot_id` is a per-query opaque token, not an event identity.
+    `place_key` is present only for a location explicitly registered in
+    household configuration. This type conveys no read/disclosure grant.
+    """
+
+    slot_id: str
+    calendar_id: str
+    start: datetime
+    end: datetime
+    place_key: str | None = None
+
+
 class CalendarCreateStatus(str, Enum):
     COMMITTED = "committed"
     # No create was sent by *this call*. That says nothing about an earlier
