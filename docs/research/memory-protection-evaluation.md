@@ -106,3 +106,64 @@ runtime for the live-vault problem at this stage. Re-evaluate gocryptfs or anoth
 maintained provider when Linux/server deployment becomes an implemented
 requirement. Re-evaluate age separately for backup/export if its simpler
 file-encryption model fits that later slice.
+
+## Native macOS isolation evidence retained from PR #47 (2026-11-12)
+
+**Status:** research evidence only; not an accepted production architecture.
+Original research/probe branch: [PR #47](https://github.com/wichtelimwald/ada/pull/47)
+at commit [`5a0cca1`](https://github.com/wichtelimwald/ada/commit/5a0cca1bccf1d03b931568234f2006dfa41cdc8b).
+Tests used **synthetic data** on the maintainer's target Mac (macOS 26.6.2,
+arm64). Results below are recorded from maintainer-run PR comments, not
+independently rerun in this documentation change.
+
+| Probe | Observed result | What it demonstrates |
+| --- | --- | --- |
+| A: encrypted APFS vault | AES-256 sparse-bundle create/attach/detach/reattach, persistence and cleanup passed. Another process under the **same macOS user could read** the unlocked test file. Mounted root reported uid 501, gid 20, mode 0755. | Encryption at rest and process separation under one logged-in user **do not isolate unlocked plaintext** from that user's other processes. |
+| B: different OS identity | The logged-in user could read the test vault and Keychain item. An existing restricted `nobody` identity could read neither: `vault_read_exit=1`, `keychain_read_exit=44`. Synthetic Keychain item, image and workspace were cleaned up. | Native macOS OS-user boundaries can deny those two accesses in the **tested configuration**; not a packaged Ada service or general proof. |
+| C: local Unix peer credentials | With `getpeereid(3)` on a macOS Unix-domain stream socket, a connection from the wrong local UID was rejected **before payload processing**. The temporary restricted peer was accepted (`accepted_peer_uid=4294967294`) and completed synthetic `PING`; cleanup passed. | The tested **native macOS local socket** can authenticate a peer by kernel-supplied UID, not by caller-provided identity. This does **not** establish identity across Docker Desktop's Linux VM boundary. |
+
+Primary observations: [Probe A](https://github.com/wichtelimwald/ada/pull/47#issuecomment-5883326260),
+[Probe B denial](https://github.com/wichtelimwald/ada/pull/47#issuecomment-5920046554)
+and [cleanup](https://github.com/wichtelimwald/ada/pull/47#issuecomment-5920057704),
+[Probe C](https://github.com/wichtelimwald/ada/pull/47#issuecomment-6779919234).
+The probe harness's **nine** regression tests passed at the cited PR head:
+[exact-head test record](https://github.com/wichtelimwald/ada/pull/47#issuecomment-5925248723).
+The failed first Probe C attempt and its diagnosis are also retained in
+[PR #47](https://github.com/wichtelimwald/ada/pull/47#issuecomment-6779826213).
+
+**Reproducibility/source:** exact research-only source files at that commit:
+[`probe_encrypted_vault.py`](https://github.com/wichtelimwald/ada/blob/5a0cca1bccf1d03b931568234f2006dfa41cdc8b/research/memory/mvp-30-s2/probe_encrypted_vault.py),
+[`probe_restricted_runtime.py`](https://github.com/wichtelimwald/ada/blob/5a0cca1bccf1d03b931568234f2006dfa41cdc8b/research/memory/mvp-30-s2/probe_restricted_runtime.py),
+[`probe_ipc_peer_identity.py`](https://github.com/wichtelimwald/ada/blob/5a0cca1bccf1d03b931568234f2006dfa41cdc8b/research/memory/mvp-30-s2/probe_ipc_peer_identity.py)
+and [harness tests](https://github.com/wichtelimwald/ada/blob/5a0cca1bccf1d03b931568234f2006dfa41cdc8b/tests/test_mvp30_s2_probe.py).
+**Do not run the research README's obsolete optional Probe A `sudo -v` /
+`--runtime-user` instructions.** Those commands do not match the code; see
+[documented finding](https://github.com/wichtelimwald/ada/pull/47#issuecomment-6777692091).
+No research script is copied into the production tree by this evidence record.
+
+### Decision and remaining proof
+
+The maintainer **rules out a dedicated Ada macOS system service**:
+no additional non-login OS runtime account and no Ada-specific launchd system
+daemon. The native restricted-user direction tested in PR #47 is **not selected**
+for production. Retain the already accepted **container-first runtime**
+([ADR-0003](../decisions/ADR-0003-execution-topology-containerization.md))
+and scoped host-side Memory Broker
+([ADR-0008](../decisions/ADR-0008-memory-architecture.md))
+as the current design constraints; do not silently replace either.
+
+A separate decision/probe is needed for a narrow container-to-host broker
+connection, authenticated actor/audience binding, filesystem and Keychain
+isolation **from the actual container**, and encryption of both current Memory
+and Git history. A native `getpeereid(3)` result is not proof of a
+container-to-host authentication mechanism. In particular, a remote Git
+account does not protect a local checkout already available to the runtime.
+The accepted ADR-0008 residual risk of a fully compromised runtime forging
+trusted context is unchanged. **MVP-30 and ADR-0011 remain open.**
+
+PR #47 also contains read-only evaluations of Octop (including a
+[commit-pinned Memory backend inspection](https://github.com/wichtelimwald/ada/pull/47#issuecomment-6806187706)),
+Hermes, OpenJarvis, Agent Wiki and Paperless-ngx
+([comparison record](https://github.com/wichtelimwald/ada/pull/47#issuecomment-6780374557)).
+Those are **research candidates, not adopted replacements**. The existing
+Markdown/Git-authoritative Memory requirement in ADR-0008 is still accepted.
