@@ -4,6 +4,8 @@ Ada is a local-first, privacy-first personal AI assistant project named after Ad
 
 > **Status:** Initial implementation foundation. PydanticAI is the first replaceable agent-runtime adapter, Ada starts as a Python-first container-first modular monolith, Cedar is implemented behind AdaGuard, DBOS is the accepted durable-execution substrate behind Ada-owned action/outcome semantics, and the development-only file-native Memory layer now has Ada-owned safe-write/versioning semantics while protected household Memory remains a later gate.
 
+**First family-facing MVP (scope revised 2026-11-12):** Ada interacts with registered family users **by email only**. The existing local chat is a development/test harness, not an MVP family channel. Incoming registered sender addresses map to configured identities only after sender verification; the visible `From:` header alone is not proof. A later interactive chat may authenticate through an emailed one-time code and/or passkey (not yet selected). See the [MVP roadmap](docs/product/mvp-roadmap.md).
+
 ## Vision
 
 Ada should feel like a capable personal companion rather than a developer console: natural voice interaction, persistent user-controlled memory, contextual awareness, and useful computer control — while keeping privacy, transparency, and human control as first-class requirements.
