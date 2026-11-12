@@ -20,6 +20,12 @@ The later host-side broker, per-person encrypted vault, Keychain and container-t
 5. **No Ada-managed host security in the MVP.** Ada does not need per-person encrypted images, Keychain vault passwords, separately encrypted Git stores, dedicated macOS user or daemon, container-to-host broker IPC, or OS-level same-user isolation. The operator is responsible for Mac accounts, optional FileVault, device protection, backup and sync. This is not a claim that those protections are actually configured.
 6. **Preserve other security requirements.** Least privilege, secrets exclusion, prompt-injection resistance, data minimization, explicit remote disclosure, deterministic Memory write validation, safe file/history access, current-only retrieval, and historical forgetting distinctions remain unchanged.
 
+## MVP channel identity (clarification 2026-11-12)
+
+The **only family-facing MVP channel is email**. Map a registered sender address to a configured actor only after the inbound channel supplies credible authentication evidence; a visible `From:` header or forwarded sender name alone is not proof. Authentication and reply/recipient checks are owned by MVP-70, not by the Memory store. The intended audience comes from trusted configuration and the actual mail-routing context, never merely from quoted content or a recipient string that could expand access. Unknown or unverified senders receive no private Memory. AdaGuard decides what that verified actor may read or approve.
+
+The existing native local-chat CLI stays a development/test harness. Later family-facing chat may use an emailed one-time login code and/or a passkey; the exact authentication and session design is deferred. This does not authorize general/high-impact permission grants through ordinary email; higher-assurance approval requirements must be resolved explicitly or held out of MVP scope.
+
 ## Explicit trade-off / residual risk
 
 Ada's authorization is an **application behavior guarantee**, not a separate host-process security boundary. Other applications of the same macOS user — or compromised Ada code/dependencies with its filesystem rights — may read available local Memory files without calling Ada's scoped API. The native local-chat path runs under the logged-in user's permissions; running a process in a container does not by itself provide per-person confidentiality. No stronger guarantee may be advertised.
