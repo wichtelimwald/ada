@@ -2,6 +2,8 @@
 
 Status: confirmed scope for the first MVP iteration. This is a discovery baseline, not a completed architecture specification. Unresolved decisions are explicitly marked. The user chose to continue learning through use rather than finish every detailed question before starting.
 
+> **Later MVP scope correction (2026-11-12):** The maintainer clarified that the first *family-facing* MVP operates **only via email**. The already implemented local chat remains a development/test harness; interactive family chat is deferred, with eventual sign-in by emailed one-time code and/or passkey (selection pending). Registered sender addresses map to configured identities, but visible `From:` is forgeable and must not count as authentication on its own. The earlier local-chat MVP passages below document the original discovery baseline; the current execution scope is in [the MVP roadmap](mvp-roadmap.md). No weakened authorization or approval assurance is implied by this change.
+
 ## 1. Executive Summary
 
 Ada is a public open-source personal assistant named after Ada Lovelace. Project-owned code is intended to use the MIT license. The initial real-world setting is a family: adults and children should be able to contribute information and receive appropriate assistance. Other households should be able to use the project from the beginning, although developer knowledge may initially be required.
