@@ -46,22 +46,38 @@ MVP-20 FileMemoryStore/GitMemoryHistory still operate on one Memory root.
 Git configuration/attribute execution safety and the late concurrent
 non-cooperating human save remain real follow-ups independent of encryption.
 
-## Identity binding — next implementation gate
+## Identity and integration boundary
 
-The maintainer confirmed **email-only** family interaction for the MVP on
-2026-11-12. A registered sender address maps to a configured actor only after
-MVP-70 validates the sender beyond the forgeable visible `From:` header.
-The intended recipient/audience must be bound from trusted mail routing and
-configured permissions; it is not authority by itself. Forwarded text or a
-model cannot impersonate that sender or expand scope. Reject unverifiable
-identity and missing/ambiguous audience. The next concrete design question is
-what verifiable inbound authentication evidence the selected email provider
-exposes, and what fail-closed behavior applies when evidence is absent.
+The **restricted MVP admin chat** establishes and changes permissions. It
+requires a trusted administrator, never model output, forwarded email or a
+generic unverified chat turn. How that local administrative authority is
+verified and bound to AdaGuard is a concrete implementation gate for the
+admin-chat slice, **not** permission for the model to edit policies.
 
-The native chat CLI remains only a development harness. A future chat login
-may use an emailed one-time code and/or passkey, outside MVP-30. No broad/new
-privileges are granted by ordinary incoming email; stronger approval methods
-remain a separate product/security gate.
+For MVP-30, establish a small application-level contract for **already
+trusted** actor, intended audience, action and grant, then integrate that
+with the existing AdaGuard and Memory APIs. MVP-30 does **not** decide how
+email sender authentication works: MVP-70 will verify registered real sender
+addresses and supply trusted context, failing closed before live side effects.
+
+The maintainer explicitly prefers **learning by doing** with actual family
+participants and non-sensitive calendar appointments, **not fake family
+identities or a synthetic household as a product acceptance substitute**.
+Continue deterministic regression tests of API/permission invariants; those
+are not evidence that the live email-calendar flow is ready. Pilot only
+after mail authentication, grants, duplicate prevention and recovery work.
+The family calendar is the first vertical milestone; generalized Memory
+learning is not a prerequisite for that calendar pilot.
+
+General user chat remains post-MVP. The restricted admin chat is a separate
+function; the current development CLI chat must not implicitly become an
+administrator.
+
+## Next implementation question
+
+What is the smallest reuse of AdaGuard and the S1 scope contract that
+enforces permissions for an **already verified actor/audience** without
+another service or parallel authorization engine?
 
 ## Implementation slices
 
@@ -72,11 +88,12 @@ infrastructure, not proof of per-user storage isolation.
 
 ### S2 — Policy-scoped reads and context
 
-Bind authenticated actor, intended audience and applicable AdaGuard grant
-to the existing Memory access path. Use S1's contract where it helps.
-Validate direct reads, search and model-context construction for two
-synthetic private people and one shared audience. Deny model/quoted
-instructions that try to widen scope.
+Bind an already trusted actor, intended audience and AdaGuard grant to the
+existing Memory access path; reuse S1 only where it helps. Prove the
+scope enforcement, including deny-by-default and no model/quoted escalation,
+with deterministic checks. End-to-end audience validation uses actual
+registered users after MVP-70 establishes their email identity; do not
+create simulated people as a substitute for that pilot.
 
 ### S3 — Scoped writes, sources and history
 
@@ -89,14 +106,19 @@ from untrusted repo-local config/attributes. No generic model file tools.
 Resolve/document ADR-0010's last late human-save race, including an honest
 evaluation of separate worktrees vs normal uncooperative editor saves.
 Validate restart, history and operator-owned backup/restore.
-Review identity ambiguity, cross-scope denial, safe sharing, derived
-retrieval and disclosed responses. Update threat/privacy docs accordingly.
+Review missing identity, cross-scope denial, safe sharing, derived retrieval
+and disclosed responses. For the initial calendar milestone, use the actual
+registered family accounts and non-sensitive test events only after the email
+and admin-grant gates are implemented. Update threat/privacy docs.
 
 ## Definition of done
 
-Synthetic A-private cannot be read, searched, modified or disclosed through
-Ada by B or a family-shared context without an explicit grant. Shared access
-is audience-scoped and minimal; unavailable identity/grants fail closed.
+Authorized personal data cannot be read, searched, modified or disclosed
+through Ada to another registered user without a corresponding grant.
+Validate the end-to-end behavior with actual registered users on
+non-sensitive pilot records; keep deterministic unauthorized-scope
+regressions but do not treat simulated identities as the MVP pilot.
+Shared access is scoped; unavailable identity/grants fail closed.
 The model cannot mint an authorization or access filesystem bypasses.
 Current Markdown and edit history remain correct across restart; Git
 executable-metadata safety, concurrency residual and backup responsibilities
@@ -109,5 +131,8 @@ Existing: python -m unittest tests.test_memory_broker_contract
 Existing: python -m unittest tests.test_architecture_boundaries
 Repository: sh scripts/validate.sh
 
-These S1 checks do not yet validate end-to-end authorization. Implement
-new synthetic positive/negative tests alongside scoped integration.
+These S1 checks do not validate end-to-end authorization. Preserve
+deterministic allow/deny regression coverage and verify the actual
+registered-user flow later, once MVP-70 sender authentication and the
+MVP admin-chat grant interface are available. No real user data or
+calendar side effects are part of this documentation change.
