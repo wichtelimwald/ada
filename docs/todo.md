@@ -64,7 +64,7 @@ Implementation note: the baseline uses TOML `+++` front matter so it can be pars
 **Gates before real household Memory (ADR-0008):**
 
 - [x] Revise MVP-30 trust boundary (ADR-0012): Ada enforces per-user and audience-scoped data use and disclosure through trusted application APIs, not separate Mac encrypted vaults. Retire the prior host-side service/Keychain/VM IPC requirement.
-- [ ] MVP-30: bind trustworthy actor and audience identity per supported channel to AdaGuard/application policy; missing or contradictory scope fails closed and model text cannot supply identities or grants.
+- [ ] MVP-30: for the email-only family MVP, map a **verified registered sender address** to the configured actor and bind recipient/audience through trusted routing and AdaGuard/application policy; missing/contradictory scope fails closed. The visible `From:` header, quoted text and model cannot supply identities or grants. Sender verification is an MVP-70 gate, while later chat login may use emailed codes and/or passkeys.
 - [ ] MVP-30: reuse S1 MemoryBrokerPort scope contract only where useful; verify private A, private B and family-shared reads, search/context, writes and response disclosure with synthetic positive and negative tests.
 - [ ] MVP-30: enforce the same scope on independently configured source/document providers and derived retrieval caches, without unrestricted model-facing filesystem tools.
 - [ ] MVP-30: explicitly document the host-level residual: same-user Mac apps and compromised trusted Ada code may read accessible Memory files. Device encryption, backup/sync and accounts remain operator responsibilities, not Ada guarantees.
