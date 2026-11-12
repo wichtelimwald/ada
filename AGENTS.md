@@ -2,18 +2,23 @@
 
 This file applies to coding and review agents working in this repository.
 
-## Communication
+## Collaboration (always-on development-agent rules)
 
-- Everything written to GitHub or committed to the repository is English: source, comments, docs, issues, commits, PRs, and review comments.
-- Direct chat/session communication with the maintainer is German unless asked otherwise.
-- Be concise and interactive; do not bury decisions in long monologues.
-- State facts as facts. Label uncertainty and proposals clearly.
-- Do not make product or architecture assumptions when a decision is unresolved.
-- Point out missing requirements, contradictions, security/privacy risks, licensing issues, and simpler alternatives.
+These rules govern **our work on Ada**, not Ada's future end-user behavior or runtime skills.
+
+- Chat with the maintainer in German; write repository and GitHub artifacts in English.
+- **Caveman:** answer the question first, briefly and precisely. One active topic and at most one decision question per reply; no filler, automatic praise, repeated summaries, or unsolicited implementation menus. Expand when requested or needed for correctness.
+- **Critical partner:** check proposals against requirements, evidence, contrary arguments, risks, and simpler existing solutions **before** recommending or agreeing. Distinguish verified facts, inferences, unknowns, and suggestions.
+- **Decisions before action:** research facts independently; ask the maintainer for material decisions, not routine facts. Research, evaluation, or a question is **not** authorization to implement.
+- **Delta-only corrections:** preserve the last explicitly accepted baseline and change only the requested scope; propose unrelated improvements separately.
+- **No unapproved delegation:** never spawn a subagent or hand off work to another agent without explicit prior maintainer agreement.
+
+For task-specific interaction details, see `.github/skills/maintainer-collaboration.md`. Keep the mandatory rules above directly in this automatically loaded entry point; a link does not guarantee that another file is read.
 
 ## Hard gates
 
 - Never commit directly to `main`; use branches and PRs.
+- Never merge a PR without explicit maintainer approval; CI and reviews are not authorization.
 - Do not add GitHub Actions unless explicitly approved.
 - Do not start application implementation before product discovery defines the relevant scope.
 - Non-trivial technology choices require documented alternatives and an ADR.
@@ -44,18 +49,7 @@ Security, privacy, accessibility, and usability are requirements, not optional p
 
 ## Project continuity
 
-- Use `docs/handover.md` as the durable entry point for a new chat/session and follow `.github/skills/project-continuity.md` at the start and before stopping material work.
-- For requests such as "implement the next step" or "implement the step after next", select work through `docs/product/mvp-roadmap.md` and follow the step-plan process in `docs/plans/README.md`; do not infer roadmap order from chat history.
-- Follow the stable maintainer working preferences in `.github/skills/maintainer-collaboration.md`.
-- Keep the handover pointer-based. Persist changing facts in their canonical source (for example PR state/reviews/validation and task-specific authorization in the PR, MVP work-package state in the roadmap, detailed backlog in `docs/todo.md`, decisions in ADRs) instead of copying volatile state into instructions or the handover.
-
-## Project state
-
-Do not maintain a volatile project-status snapshot in this file. Use
-`docs/handover.md` for the durable entry point, `docs/decisions/` for accepted
-architecture, `docs/product/mvp-roadmap.md` for MVP work-package order/state,
-`docs/todo.md` for detailed open work, and current Git/PR state for active
-implementation and review facts. Preserve the accepted modular boundaries and
-advance the smallest useful representative slice.
-
-Use repository skills and review agents only when relevant. Their presence does not require executing external tools referenced by documentation.
+- At the start of a new session and before handover, use `docs/handover.md` and `.github/skills/project-continuity.md`. Verify actual Git/PR state.
+- For "implement the next step" requests, use `docs/product/mvp-roadmap.md` and `docs/plans/README.md`; do not infer step order from chat history.
+- Keep decisions, implementation evidence, and changing state in their canonical sources; the source-of-truth map is in `docs/handover.md`.
+- The flat `.github/skills/*.md` files are **task-specific guidance, not automatically discoverable Agent Skills** (which require a `SKILL.md` in a skill directory). Read relevant guides explicitly. Review-role definitions in `.github/agents/` are optional; their existence is not permission to delegate or run tools.

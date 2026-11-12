@@ -27,8 +27,7 @@ When a maintainer asks an agent to implement a roadmap step:
     changing code.
 11. Persist residual follow-ups in `docs/todo.md`; do not leave important work
     only in PR comments.
-12. Mark the roadmap package `done` only when the implementation PR itself is
-    complete, reviewed, validated, and ready for maintainer-authorized merge.
+12. Stage any roadmap `done` update in the implementing PR only after review and validation. The package is `done` **on `main` only after that PR is merged** with explicit maintainer authorization; a ready-to-merge PR is not yet `done`.
 13. Never merge without explicit maintainer authorization.
 
 A plan may evolve during implementation. It should remain concise enough to be
@@ -92,7 +91,7 @@ also be copied to docs/todo.md.
 
 ## Parallel work
 
-Parallel work is encouraged only through stable boundaries.
+Parallel work is encouraged only through stable boundaries. This is **not** permission for an agent to delegate or spawn subagents; that requires the maintainer's explicit prior agreement under `AGENTS.md`.
 
 - Two steps may proceed in parallel when both are `ready` in the roadmap and
   they do not modify the same unresolved authority/data-ownership decision.
