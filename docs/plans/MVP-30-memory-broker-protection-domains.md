@@ -46,13 +46,22 @@ MVP-20 FileMemoryStore/GitMemoryHistory still operate on one Memory root.
 Git configuration/attribute execution safety and the late concurrent
 non-cooperating human save remain real follow-ups independent of encryption.
 
-## Next architecture question
+## Identity binding — next implementation gate
 
-How does a trusted user identity and intended audience enter the Memory
-operation for each real channel, **before** constructing MemoryAccessContext?
-Review existing AdaGuard and channel authentication first; a model assertion
-or a developer CLI selector is not production authentication. Select the
-simplest in-process scoping integration if adequate, not a new service.
+The maintainer confirmed **email-only** family interaction for the MVP on
+2026-11-12. A registered sender address maps to a configured actor only after
+MVP-70 validates the sender beyond the forgeable visible `From:` header.
+The intended recipient/audience must be bound from trusted mail routing and
+configured permissions; it is not authority by itself. Forwarded text or a
+model cannot impersonate that sender or expand scope. Reject unverifiable
+identity and missing/ambiguous audience. The next concrete design question is
+what verifiable inbound authentication evidence the selected email provider
+exposes, and what fail-closed behavior applies when evidence is absent.
+
+The native chat CLI remains only a development harness. A future chat login
+may use an emailed one-time code and/or passkey, outside MVP-30. No broad/new
+privileges are granted by ordinary incoming email; stronger approval methods
+remain a separate product/security gate.
 
 ## Implementation slices
 
