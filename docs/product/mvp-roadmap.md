@@ -129,8 +129,8 @@ boundary.
 | MVP-30 | User- and audience-scoped Memory access | ready | MVP-20 | Scope Memory through a trusted actor/audience contract; email identity integration later in MVP-70; no Ada-managed vault encryption |
 | MVP-40 | Learning pipeline and retrieval | blocked | MVP-20, MVP-30 | Trusted learning validation, class A-D handling, lifecycle rules, current-only retrieval; start simple and measure before richer RAG |
 | MVP-50 | Email + Family Memory | blocked | MVP-40, MVP-70 | Connect authenticated email requests to audience-scoped Memory and learning; local chat remains a development harness |
-| MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Can proceed in parallel with Memory; connect real provider for read/create/update/cancel and preserve durable action semantics |
-| MVP-70 | Email channel baseline | ready | MVP-00 | Can proceed in parallel; authenticated intake/reply channel, forwarding separation, no direct privileged execution |
+| MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Direct IONOS CalDAV provider acceptance (no email channel or admin-chat dependency), durable read/create/update/cancel semantics |
+| MVP-70 | Email channel baseline | ready | MVP-00 | Real registered-user mail intake/reply and non-executable proposals; no calendar effects or admin-chat dependency |
 | MVP-CAL | Live family-calendar pilot with admin chat | blocked | MVP-60, MVP-70 | Narrow grants through restricted MVP admin chat, verified registered mail, safe calendar operations and replies; non-sensitive real-user pilot, no Memory prerequisite |
 | MVP-80 | Family end-to-end integration | blocked | MVP-50, MVP-CAL | Extend working email/calendar pilot with family Memory, conflict detection, audience-safe briefings and remaining scenarios |
 | MVP-90 | MVP operational hardening and delivery | blocked | MVP-80 | Backup/restore, recovery, startup/pause/resume, security gates, packaging decision, reproducible supported setup |
@@ -298,13 +298,18 @@ architecture: ADR-0009 (accepted).
 - recurring-event MVP boundary;
 - travel-time input/source;
 - offline/provider-error behavior;
-- live pilot with the actual registered participants and a dedicated
-  non-sensitive calendar/test events, with explicit before/after verification
-  and recovery; no real private appointment data for the initial trial.
+- opt-in **direct CalDAV provider acceptance** against a dedicated IONOS
+  test calendar with deliberately non-sensitive, reversible events. Exercise
+  the provider adapter and durable action path using Ada's configured
+  provider credentials, **without email intake, sender identity, or admin-chat
+  grant setup**. Verify before/after state and recovery; no private
+  household appointments or live registered-user workflow at this step.
 
-**DoD:** real-provider acceptance proves exactly one intended side effect across
-retry/restart, correct reporting of unknown outcomes, and conflict detection with
-travel time.
+**DoD:** direct real-provider acceptance demonstrates read/create/update/cancel
+on the dedicated non-sensitive test calendar, exactly one intended effect across
+retry/restart, accurate unknown-outcome reporting and conflict detection
+including approximate travel time. No user-email or admin-chat integration is
+needed to finish MVP-60; the household pilot is exclusively MVP-CAL.
 
 ### MVP-70 — Email channel baseline
 
@@ -322,15 +327,21 @@ travel time.
   mutation;
 - response timing while Ada is operating and pause behavior;
 - no self-service broad permission grants through ordinary incoming email;
-  permission creation/changes belong to a restricted MVP admin chat;
-- verification of real senders and safe reply recipients before **live**
-  calendar actions; provider-authentication mechanics are decided here,
-  not in MVP-30.
+  permission creation/changes belong to a restricted MVP admin chat
+  implemented at MVP-CAL, **not** a prerequisite for the MVP-70 channel;
+- verify real registered senders and safe reply recipients independently of
+  calendar operations; provider-authentication mechanics are decided here,
+  not in MVP-30. Only a **non-executable** appointment draft/proposal can be
+  emitted at this stage; no provider calendar writes are enabled.
 
-**DoD:** real registered senders, with deliberately non-sensitive test
-messages, can request an authorized calendar proposal/reply; unverified or
-forwarded text cannot grant authority; retries do not duplicate replies or
-calendar effects. Automated regressions complement live pilot evidence.
+**DoD:** actual registered senders can email Ada and receive correctly
+addressed, deduplicated replies or **non-executable** appointment drafts from
+deliberately non-sensitive messages. Sender verification works beyond visible
+`From:`; unverified/unknown senders and forwarded text cannot grant
+authority or expose other users' data. Retries do not duplicate replies.
+No calendar provider effects, admin-chat grants or completed household
+calendar workflow are required or allowed in MVP-70. The first integrated
+live authorized calendar action is reserved for MVP-CAL.
 
 ### MVP-CAL — First working family-calendar pilot
 
