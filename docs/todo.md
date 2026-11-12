@@ -35,7 +35,7 @@ Before final capability ADRs, document integration constraints that could make i
 
 Create separate evidence-based evaluations only for capabilities required by the agreed scope:
 
-- [ ] Face — UI / interaction approach. The local CLI chat is a development/MVP interaction harness, not the final UI decision.
+- [ ] Face — UI / interaction approach. The local CLI chat is a development/test harness, not a family-facing MVP channel; interactive chat is deferred until after the email-only MVP.
 - [ ] Ears — wake word / speech input.
 - [ ] Voice — speech output.
 - [x] Brain — initial agent-runtime/orchestration foundation ([ADR-0002](decisions/ADR-0002-agent-runtime-foundation.md)).
