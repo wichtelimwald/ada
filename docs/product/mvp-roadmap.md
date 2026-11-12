@@ -79,15 +79,26 @@ starting duplicate work.
 
 ## Agent step-selection contract
 
+**Calendar-first priority (maintainer 2026-11-12):** Until the narrow
+email-to-family-calendar pilot passes, take the next independently ready
+calendar-path work package: **MVP-60**, then **MVP-70**, then **MVP-CAL**.
+MVP-30/40/50 remain planned for broader family Memory but are not blockers
+for the initial calendar pilot. A maintainer-specified step ID still wins.
+Once MVP-CAL is done, return to the normal ordering below. Do not bypass
+the real-mail authentication, administrator grant, AdaGuard or recovery gates.
+
 When the maintainer says **"implement the next step"**:
 
 1. Read `AGENTS.md`, `docs/handover.md`, this roadmap, and
    `docs/plans/README.md`.
 2. Inspect open PRs and current `main`.
-3. If an active non-draft PR already owns the earliest executable MVP step,
-   continue that work instead of opening a duplicate.
-4. Otherwise choose the first work package in canonical order whose status is
-   `ready` and whose dependencies are all `done`.
+3. If an active non-draft PR already owns the next step under the
+   calendar-first priority above (or ordinary ordering once it is complete),
+   continue it instead of opening a duplicate.
+4. Otherwise, while the calendar pilot is pending, choose the earliest
+   independently ready package in MVP-60 → MVP-70 → MVP-CAL order.
+   Afterwards, choose the first ready work package in canonical table order
+   whose dependencies are all done.
 5. Create/update that step's plan before implementation, then execute it under
    the normal branch/PR/review rules.
 
@@ -119,7 +130,8 @@ boundary.
 | MVP-50 | Email + Family Memory | blocked | MVP-40, MVP-70 | Connect authenticated email requests to audience-scoped Memory and learning; local chat remains a development harness |
 | MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Can proceed in parallel with Memory; connect real provider for read/create/update/cancel and preserve durable action semantics |
 | MVP-70 | Email channel baseline | ready | MVP-00 | Can proceed in parallel; authenticated intake/reply channel, forwarding separation, no direct privileged execution |
-| MVP-80 | Family end-to-end integration | blocked | MVP-50, MVP-60, MVP-70 | Join email/calendar/Memory; conflict detection, audience-safe briefings, representative scenarios |
+| MVP-CAL | Live family-calendar pilot with admin chat | blocked | MVP-60, MVP-70 | Narrow grants through restricted MVP admin chat, verified registered mail, safe calendar operations and replies; non-sensitive real-user pilot, no Memory prerequisite |
+| MVP-80 | Family end-to-end integration | blocked | MVP-50, MVP-CAL | Extend working email/calendar pilot with family Memory, conflict detection, audience-safe briefings and remaining scenarios |
 | MVP-90 | MVP operational hardening and delivery | blocked | MVP-80 | Backup/restore, recovery, startup/pause/resume, security gates, packaging decision, reproducible supported setup |
 | MVP | First usable family MVP | blocked | MVP-90 | All primary capabilities and acceptance scenarios pass with real family-ready protection |
 
@@ -318,6 +330,36 @@ travel time.
 messages, can request an authorized calendar proposal/reply; unverified or
 forwarded text cannot grant authority; retries do not duplicate replies or
 calendar effects. Automated regressions complement live pilot evidence.
+
+### MVP-CAL — First working family-calendar pilot
+
+**Goal:** close one complete email → permitted calendar operation → email
+reply loop, for the *actual registered household users* and a non-sensitive
+test calendar. This is the immediate milestone, separate from the broader
+Family Memory/learning release scope.
+
+**Plan must cover:**
+
+- restricted MVP admin chat on a trusted administrative path for setup and
+  grant creation/revocation; no permissions inferred from model responses,
+  incoming emails or generic development-chat content;
+- initial explicitly configured grants for reading/creating/updating ordinary
+  family events; potentially destructive actions remain narrowly scoped,
+  reviewable and recoverable;
+- authenticated real-email sender → configured actor/audience → AdaGuard
+  → CalDAV provider → confirmed outcome → correctly addressed response;
+- allowlist, unknown-sender rejection, no forwarded authority, deduplication,
+  retry/restart recovery and no ambiguous success claims;
+- pilot on deliberately non-sensitive real calendar events with a defined
+  recovery/rollback path. Do not put private family records into the trial
+  simply to make a test realistic.
+
+**DoD:** after explicit operator setup in the admin chat, the actual registered
+users can email Ada to read and maintain the test family calendar within the
+configured grants. Wrong/no sender authority does not cause an effect or
+disclosure, a retry does not duplicate an event, and failure states are
+reported accurately. This live acceptance does not require fabricated
+household identities or general-purpose Memory/learning.
 
 ### MVP-80 — Family end-to-end integration
 
