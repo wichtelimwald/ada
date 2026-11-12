@@ -148,7 +148,7 @@ class ConflictDetectionTests(unittest.TestCase):
         self.assertEqual(result[0].available_gap, timedelta(minutes=30))
         self.assertEqual(result[0].required_travel, timedelta(minutes=45))
         self.assertEqual(result[0].travel_source, "configured")
-        self.assertEqual(result[0].event_id, "slot-1")
+        self.assertEqual(result[0].slot_id, "slot-1")
 
     def test_known_route_with_enough_time_is_not_a_conflict(self) -> None:
         result = self.checker().check(
@@ -193,7 +193,7 @@ class ConflictDetectionTests(unittest.TestCase):
         )
         self.assertEqual(len(result), 1)
         self.assertEqual(result[0].kind, ConflictKind.TIME_OVERLAP)
-        self.assertEqual(result[0].event_id, "slot-2")
+        self.assertEqual(result[0].slot_id, "slot-2")
 
     def test_transparent_event_never_causes_conflict(self) -> None:
         result = self.checker().check(
