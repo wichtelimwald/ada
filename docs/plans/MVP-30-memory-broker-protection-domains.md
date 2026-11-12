@@ -52,6 +52,41 @@ when intentionally unlocked.
 
 ## Open decisions
 
+### Next question to decide — same-user macOS host-process isolation
+
+**Question for the maintainer:** For the first macOS MVP, must an unrelated
+application running as the *same logged-in macOS user* be unable to read an
+*unlocked* private Memory vault, or is the enforceable boundary aimed at Ada's
+container/model-driven access paths plus encryption at rest?
+
+This comes before selecting S2 transport: native Probe A in PR #47 demonstrated
+same-user access to unlocked plaintext. Probes B/C demonstrate distinct-user
+and native peer-UID mechanisms, **not** the accepted container-to-host topology.
+A host-side broker or authenticated IPC alone does not prevent same-user host
+applications from reading an accessible unlocked mount.
+
+- **A — isolate Ada runtime/model access only (provisional simpler direction,
+  not accepted):** no direct Memory/Keychain mounts or broad host access in the
+  container; trusted, scoped requests through the host broker; per-domain
+  encryption at rest. Lower operational cost, but unrelated same-user host
+  applications may still read unlocked plaintext. This residual must be
+  explicitly accepted and checked against ADR-0008's domain-isolation requirement,
+  not silently described as full per-person host isolation.
+- **B — also isolate from unrelated same-user host applications (unproven):**
+  require an independently validated OS-enforced boundary while vaults are
+  unlocked. More platform-specific complexity; feasibility under the ruled-out
+  dedicated macOS account/system-service approach is unknown. If no compliant
+  solution exists, reconsider conflicting constraints explicitly, not via an
+  unverified IPC assumption.
+
+**Decision needed:** choose the threat boundary, including any accepted residual,
+*before* settling container-to-host transport, Keychain permissions, broker
+lifecycle, or vault adapter. No option above is approved yet. After this choice,
+evaluate the narrow transport and verify both authorized access and negative
+cross-domain/direct-access cases from the actual Docker Desktop runtime.
+
+### Other unresolved gates
+
 These remain blockers for ADR-0011 acceptance, not invitations to guess:
 
 1. target-Mac Keychain access-control shape for a broker process;
