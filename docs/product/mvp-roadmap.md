@@ -22,7 +22,7 @@ capabilities with the already accepted privacy and authority boundaries:
    - private Memory per person plus shared family Memory;
    - human-readable/correctable authoritative Memory;
    - controlled learning and promotion;
-   - encrypted-at-rest protection domains;
+   - AdaGuard-enforced private/shared scopes and audience-safe disclosure;
    - Git-style history/versioning per protection domain, without treating history
      as current Memory.
 
@@ -100,7 +100,7 @@ boundary.
 | MVP-00 | Core foundation | done | — | PydanticAI boundary, Cedar/AdaGuard, DBOS action semantics, local Ollama, modular monolith baseline |
 | MVP-10 | File-native Memory baseline | done | MVP-00 | Current Markdown authority, `memory/` vs `learning/`, seed-once personality, conservative promotion/forget baseline |
 | MVP-20 | Memory semantics, safe writes and versioning | done | MVP-10 | Close baseline residuals; define correction/forget/id semantics; safe Git-style history/edit capture/concurrency |
-| MVP-30 | Memory Broker, protection domains and encryption | ready | MVP-20 | Enforce private/shared domains, request-scoped broker access, encrypted-at-rest per-domain storage/history |
+| MVP-30 | User- and audience-scoped Memory access | ready | MVP-20 | Trusted actor/audience-scoped read, write, retrieval and disclosure; no Ada-managed vault encryption |
 | MVP-40 | Learning pipeline and retrieval | blocked | MVP-20, MVP-30 | Trusted learning validation, class A-D handling, lifecycle rules, current-only retrieval; start simple and measure before richer RAG |
 | MVP-50 | Chat + Family Memory | blocked | MVP-40 | Identity/audience-aware local chat using real protected family Memory and learning |
 | MVP-60 | Real calendar provider and full calendar management | ready | MVP-00 | Can proceed in parallel with Memory; connect real provider for read/create/update/cancel and preserve durable action semantics |
@@ -166,33 +166,34 @@ that final check but before same-working-tree publication is a documented MVP-20
 residual; MVP-30 must evaluate the commit-based multi-workspace model and remove
 obsolete shared-working-tree safeguards if that model is selected.
 
-### MVP-30 — Memory Broker, protection domains and encryption
+### MVP-30 — User- and audience-scoped Memory access
 
-**Goal:** make real private/shared family Memory storage technically enforceable.
+**Goal:** Ada uses and discloses only data permitted for the trusted actor,
+intended audience and task. This is an application-level authorization boundary,
+not macOS process isolation or Ada-provided encryption (ADR-0012).
 
 **Plan must decide and prove:**
 
-- protection domains for each person and family-shared Memory;
-- broker request contract and trusted actor/audience binding;
-- no standing all-vault access in normal runtime paths;
-- encryption-at-rest/key ownership and unlock behavior;
-- encrypted Git-style history/versioning per domain without making Git an auth
-  boundary;
-- concurrency/synchronization model for human-edited and Ada-edited Memory,
-  explicitly evaluating separate Git worktrees/clones with commit-based
-  synchronization and expected base commits so divergent edits become conflicts
-  rather than silent last-writer-wins; define commit ownership, conflict handling,
-  offline behavior and private/local transport without assuming a cloud remote;
-- KISS simplification review: if a commit-based multi-workspace model is selected,
-  identify and remove MVP-20 shared-working-tree concurrency machinery that is no
-  longer required rather than layering the new model on top of obsolete safeguards;
-- separately configurable source/document providers per domain;
-- backup/restore responsibilities for encrypted vaults;
-- cross-domain negative tests and residual threat model.
+- trusted user identity and audience from each channel, independent of the model;
+- deterministic AdaGuard/application checks for private and shared reads, writes,
+  source-provider access, retrieval, model context and response disclosure;
+- reuse S1's MemoryBrokerPort scope contract if helpful, without imposing a
+  separate process, IPC, Keychain service or encrypted volume;
+- private-by-default logical scopes with explicit sharing, including indexes and
+  minimized derivatives; no unrestricted model filesystem tools;
+- independent source/document providers respecting the same scopes;
+- current Markdown and Git history preserved, including Git executable-config safety;
+- human/Ada write concurrency model: evaluate separate worktrees/commits without
+  assuming normal human editors follow a synchronization protocol; remove
+  redundant MVP-20 guards if a superior mechanism is accepted;
+- restart/recovery and operator-managed backup/restore responsibilities;
+- explicit residual that same-user host applications or fully compromised
+  Ada code can read locally accessible files outside scoped APIs.
 
-**DoD:** synthetic private domains cannot read or disclose each other through
-normal/model-driven paths; shared access is explicit; encrypted storage/history
-survives restart and restore.
+**DoD:** synthetic private data does not cross user/audience boundaries through
+Ada's normal and model-driven paths; ambiguous identity fails closed; history
+and recovery work; concurrency and backup responsibilities are decided;
+no false claims of Mac-level vault isolation or encryption.
 
 ### MVP-40 — Learning pipeline and retrieval
 
@@ -226,7 +227,7 @@ ephemeral development harness.
 **Plan must cover:**
 
 - authenticated/selected actor and audience;
-- broker-scoped context acquisition;
+- trusted actor/audience policy-scoped context acquisition;
 - minimum relevant Memory context;
 - private vs family-shared disclosure;
 - trusted confirmation path for remember/correct/forget;
@@ -312,7 +313,7 @@ small real-family pilot only after all real-data gates are closed.
 
 - startup/stop/pause/resume;
 - family Mac sleep/offline behavior;
-- encrypted-vault backup/restore test;
+- operator-controlled Memory and edit-history backup/restore test;
 - secret management;
 - operational logging without sensitive leakage;
 - supported installation/update shape;
