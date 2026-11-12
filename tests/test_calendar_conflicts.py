@@ -78,6 +78,7 @@ class AvailabilityProjectionTests(unittest.TestCase):
         )
         self.assertNotIn("Confidential meeting", repr(slots))
         self.assertNotIn("Old Hall", repr(slots))
+        self.assertNotIn("place_key", repr(slots))
         self.assertNotIn("provider-private-identifier", repr(slots))
 
     def test_transparent_and_unrelated_personal_events_are_excluded(self) -> None:
