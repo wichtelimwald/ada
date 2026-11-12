@@ -176,24 +176,29 @@ Responsibility:
 
 This is deliberately a **narrow semantic slice of Memory**, introduced because local chat needs a concrete personality lifecycle. ADR-0008 now defines the general authoritative-Memory and derived-retrieval architecture; this port remains narrow until concrete Memory scenarios justify broader contracts.
 
-### MemoryBroker boundary
+### Scoped Memory access boundary
 
-ADR-0008 selects a **host-side Memory Broker** as the MVP storage-access
-boundary for protected Memory domains.
+ADR-0012 replaces ADR-0008's originally proposed host-side broker topology
+for the MVP. The access boundary is in **trusted Ada application code**, not
+an Ada-managed encrypted vault or a separate macOS service.
 
-Responsibility:
+Responsibilities:
 
-- mediate access to authoritative vaults, independently configured source/document providers per protection domain, and protection-domain-specific derived retrieval state;
-- accept only trusted Ada-owned actor/audience/authorization context, never raw model claims of scope;
-- expose only the domain(s) required for the current authorized task;
-- fail closed on missing/ambiguous scope;
-- keep filesystem/provider paths, keys/credentials and unrelated vault/source contents outside the model/runtime boundary;
-- preserve direct human access to each user's own Markdown Memory without requiring Ada.
+- authenticate/establish actor and audience, bind to AdaGuard grants and
+  requested operation, then resolve permitted logical Memory scopes;
+- reuse the existing S1 MemoryAccessContext / MemoryBrokerPort contract if
+  useful; a resolved scope is never a standalone authorization capability;
+- reject missing, ambiguous and model-supplied permissions, identities,
+  paths or domain IDs;
+- apply the same checks before authoritative reads/writes, retrieval, source
+  and document provider calls, derived caches and disclosures;
+- preserve human-editable Markdown and independent source ownership.
 
-The broker is not an authorization engine: AdaGuard and application context
-decide what access is permitted; the broker enforces the resulting scoped
-storage capability. Exact local IPC/API, process shape, ACL/encryption/key
-mechanics and caching strategy are deferred to the implementation slice.
+The running application or another same-user host process may technically
+read local files accessible under its macOS permissions. Ada must not grant
+unrestricted filesystem tools to the model; it does not claim host-level
+confidentiality against other applications or fully compromised code.
+Stronger OS/process isolation needs a new justified requirement.
 
 
 ## 5. Boundaries intentionally deferred
