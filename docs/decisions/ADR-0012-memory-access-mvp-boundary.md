@@ -22,9 +22,32 @@ The later host-side broker, per-person encrypted vault, Keychain and container-t
 
 ## MVP channel identity (clarification 2026-11-12)
 
-The **only family-facing MVP channel is email**. Map a registered sender address to a configured actor only after the inbound channel supplies credible authentication evidence; a visible `From:` header or forwarded sender name alone is not proof. Authentication and reply/recipient checks are owned by MVP-70, not by the Memory store. The intended audience comes from trusted configuration and the actual mail-routing context, never merely from quoted content or a recipient string that could expand access. Unknown or unverified senders receive no private Memory. AdaGuard decides what that verified actor may read or approve.
+For **routine family requests, email is the MVP channel**. Permission setup
+and changes are performed only via a **restricted MVP admin chat** with
+trusted administrator authority; that authority cannot originate in model text
+or emailed requests. The admin-chat interface and its administrator
+authentication remain an implementation gate. A generic development CLI chat
+is not automatically an authorized administration interface.
 
-The existing native local-chat CLI stays a development/test harness. Later family-facing chat may use an emailed one-time login code and/or a passkey; the exact authentication and session design is deferred. This does not authorize general/high-impact permission grants through ordinary email; higher-assurance approval requirements must be resolved explicitly or held out of MVP scope.
+For email, registered sender addresses map to configured actors **only once
+the inbound channel has verified sender authenticity**. The visible `From:`
+header or forwarded text is not proof. Provider-specific sender verification
+and safe reply routing belong to MVP-70, **not MVP-30**. Unverified identity
+fails closed; neither a recipient address nor an email may create new grants.
+AdaGuard decides permitted reads and operations independently of the model.
+
+The existing native local-chat CLI remains a development/test harness.
+General family-facing chat is later and may use an emailed one-time code
+and/or passkey. The restricted MVP admin chat is a distinct, explicit
+administrative function, not the deferred general chat.
+
+**First live milestone:** a family calendar operated over email with narrow
+admin-configured grants, using actual registered household accounts and a
+deliberately non-sensitive test calendar/events. Do not substitute fake family
+identities for acceptance. Testing live does not waive sender authentication,
+AdaGuard, safe recovery, or scoped disclosure; first validate boundaries on
+non-sensitive data and limit effects to reversible operations. This milestone
+does not require full general Memory learning/retrieval.
 
 ## Explicit trade-off / residual risk
 
@@ -34,8 +57,15 @@ Revisit OS/process isolation if untrusted code execution, different OS-level use
 
 ## MVP-30 acceptance gates
 
-- Test two synthetic private users and a shared audience: authorized and forbidden reads, writes, retrieval hits, model-context assembly and responses.
-- Trusted identity and intended audience come from the authenticated interaction/channel, not text. Unknown/forged context fails closed.
+- Keep deterministic tests of allowed/denied access as safeguards, but validate
+  the real end-to-end MVP with actual registered users on deliberately
+  non-sensitive calendar records; no fabricated family identities as the
+  acceptance substitute. Verify cross-user denials before admitting private data.
+- MVP-30 accepts an Ada-owned authenticated-actor/audience contract and
+  enforces scope; it does not choose email sender verification. MVP-70 must
+  establish real email identity and fail closed before acting on live mail.
+  A trusted administrator grants or revokes permissions through the
+  restricted MVP admin chat (not through model statements or email).
 - Apply the same checks to independently configured source/document providers and derived indexes; do not give the model a generic filesystem escape hatch.
 - Preserve Markdown/history/recovery behavior. Explicitly settle ADR-0010's late non-cooperating-save race, Git executable-metadata safety, and operator backup/restore expectations.
 - Document and verify the difference between Ada-level authorization and Mac/device security. Independent review and exact-head tests precede MVP completion.
