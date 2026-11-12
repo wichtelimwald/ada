@@ -200,7 +200,7 @@ class ConflictKind(str, Enum):
 class SchedulingConflict:
     kind: ConflictKind
     # An ephemeral availability token; not a provider ID or event detail.
-    event_id: str
+    slot_id: str
     available_gap: timedelta | None = None
     required_travel: timedelta | None = None
     travel_source: str | None = None
@@ -226,7 +226,7 @@ class CalendarConflictChecker:
                 conflicts.append(
                     SchedulingConflict(
                         kind=ConflictKind.TIME_OVERLAP,
-                        event_id=event.slot_id,
+                        slot_id=event.slot_id,
                     )
                 )
                 continue
@@ -244,7 +244,7 @@ class CalendarConflictChecker:
                 conflicts.append(
                     SchedulingConflict(
                         kind=ConflictKind.TRAVEL_UNKNOWN,
-                        event_id=event.slot_id,
+                        slot_id=event.slot_id,
                         available_gap=available,
                         travel_source="place_not_registered",
                     )
@@ -258,7 +258,7 @@ class CalendarConflictChecker:
                 conflicts.append(
                     SchedulingConflict(
                         kind=ConflictKind.TRAVEL_UNKNOWN,
-                        event_id=event.slot_id,
+                        slot_id=event.slot_id,
                         available_gap=available,
                         travel_source=estimate.source,
                     )
@@ -267,7 +267,7 @@ class CalendarConflictChecker:
                 conflicts.append(
                     SchedulingConflict(
                         kind=ConflictKind.TRAVEL_TIME,
-                        event_id=event.slot_id,
+                        slot_id=event.slot_id,
                         available_gap=available,
                         required_travel=estimate.duration,
                         travel_source=estimate.source,
