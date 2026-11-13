@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -221,6 +223,40 @@ class CredentialNamespaceGateTests(unittest.TestCase):
             patch("ada.adapters.kdbx_secrets.os.listdir", return_value=["1", "self"]),
         ):
             _require_isolated_credential_namespace()
+
+    def test_strict_runtime_enforces_python_and_cgroup_limits(self) -> None:
+        from ada.adapters.kdbx_secrets import _require_strict_credential_runtime
+
+        with (
+            patch("ada.adapters.kdbx_secrets._require_isolated_credential_namespace"),
+            patch("ada.adapters.kdbx_secrets.sys.flags", SimpleNamespace(
+                isolated=1, no_user_site=1
+            )),
+            patch("ada.adapters.kdbx_secrets.os.statvfs",
+                  return_value=SimpleNamespace(f_flag=os.ST_RDONLY)),
+        ):
+            with patch("ada.adapters.kdbx_secrets.Path.read_text",
+                       side_effect=["1073741824", "0"]):
+                _require_strict_credential_runtime()
+            for memory, swap in (("max", "0"), ("1073741824", "max"),
+                                 ("2147483648", "0")):
+                with self.subTest(memory=memory, swap=swap):
+                    with patch("ada.adapters.kdbx_secrets.Path.read_text",
+                               side_effect=[memory, swap]):
+                        with self.assertRaisesRegex(SecretVaultError, "limits not enforced"):
+                            _require_strict_credential_runtime()
+
+    def test_strict_runtime_rejects_normal_python_invocation(self) -> None:
+        from ada.adapters.kdbx_secrets import _require_strict_credential_runtime
+
+        with (
+            patch("ada.adapters.kdbx_secrets._require_isolated_credential_namespace"),
+            patch("ada.adapters.kdbx_secrets.sys.flags", SimpleNamespace(
+                isolated=0, no_user_site=0
+            )),
+        ):
+            with self.assertRaisesRegex(SecretVaultError, "Python runtime is not isolated"):
+                _require_strict_credential_runtime()
 
     def test_adapter_enforces_namespace_gate_when_enabled(self) -> None:
         from unittest.mock import patch as mock_patch
