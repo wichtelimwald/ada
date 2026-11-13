@@ -49,7 +49,7 @@ production dependency gate.
 
 The independent agent review at [PR #57](https://github.com/wichtelimwald/ada/pull/57#pullrequestreview-5897060313) reproduced same-UID memory exposure in Docker Desktop: an unrelated process could read the KDBX master passphrase and plaintext entries from an unlocked Python process. The passphrase can decrypt every accessible backup. `kdbxtool.zeroize_credentials()` does not reliably erase immutable Python strings or the original key bytes; `lock()` must not be described as memory erasure. The VS Code Dev Container runs other same-UID processes with network access. **No real secrets in this PoC.**
 
-Before any real credentials: set `PR_SET_DUMPABLE=0` on Linux before the prompt and verify it fails closed on unsupported environments; discard the reader's stored passphrase/key material immediately after opening; reject weak AES-KDF/Argon2 parameters **before** expensive derivation; enforce a maximum KDF resource budget; hash-pin a reviewed transitive dependency set; re-review the reader's KDBX read path; isolate the actual credential runtime from development tools/extensions and unnecessary egress. A residual process-compromise and immutable-string memory risk remains even then. TOCTOU between `stat` and `open` is not exploitable in the documented synthetic-only deployment but is a future hardening consideration.
+Before any real credentials: **isolate the credential process from startup**, with no other same-UID workloads in its PID namespace and no `docker exec` during unlock. The Linux `PR_SET_DUMPABLE=0` guard prevents *new* same-UID process-memory opens, but is bypassed by file descriptors opened before the guard (PR #59 review B1). Test both an early, pre-opening sibling and a late opener on the actual runtime, and fail closed unless isolation is established. Discard reader-held passphrase/key references immediately after opening, reject weak KDFs before derivation, bound Argon2 work, fully review and hash-lock the dependencies actually executed in the credential process, and audit the reader. Also enforce a runtime memory limit to contain unbounded but authenticated gzip expansion. Python immutable-string remnants, the process's own code, and host privileges remain outside this guarantee. The remaining parent-directory path race is an operator-controlled boundary.
 
 Evidence: maintainer-reported `17/17` focused tests and `333/333` full tests at commit `c3762db30030814e8499d1ffef3ebeab88217421` in Python 3.14.10/Linux ARM64. No CI attestation, independent human review or production-credential validation.
 
@@ -61,18 +61,33 @@ Direct adapter access also checks `PR_GET_DUMPABLE == 0`. The selected
 reader now reads from one `O_NOFOLLOW` file descriptor and checks the
 unauthenticated KDBX header **before** deriving a key.
 
-**Proposed KDF policy for this Ada-only vault:** KDBX4 with Argon2d or
-Argon2id, 64–256 MiB memory, 3–10 iterations, 1–8 parallel lanes.
-Reject legacy AES-KDF, weak KDF settings, and excessive resource requests
-rather than silently opening them. A legitimate vault outside this range
-must be reconfigured in KeePassXC; never bypass the policy via a flag.
+**Implemented PoC KDF policy:** KDBX4 with Argon2d or Argon2id,
+64–256 MiB memory, 3–10 iterations, and 1–8 parallel lanes.
+It rejects legacy AES-KDF and out-of-range resource requests before KDF
+work. **Compatibility limitation (PR #59 I1):** KeePassXC 2.8.0 calibrates
+new databases toward roughly **1 second**, rather than fixing a 10-iteration
+default. In the reviewed target Docker VM, Argon2d/64 MiB/4 lanes required
+about 51 iterations to reach that target, which Ada currently rejects.
+The original claim that KeePassXC defaults to 64 MiB / 3 iterations was
+incorrect and has been removed. For synthetic interoperability tests,
+KeePassXC advanced settings within Ada's explicit bounds can be used,
+for example Argon2id / 256 MiB / 10 iterations / 4 lanes, **only after**
+checking actual unlock cost and available memory. Before live credentials,
+decide/test a bounded work policy that preserves strong offline resistance
+and supports the intended KeePassXC-generated vault, rather than silently
+weakening KDF settings for compatibility.
 
 The adapter calls `zeroize_credentials()` **immediately** after decrypting,
 releasing the reader's stored password/key references. This remains *reference
 release*, **not reliable Python memory zeroization**; decrypted entry strings
-still live for the unlocked session. The test suite includes Linux subprocess
-checks for process non-dumpability and sibling access denial, pending exact-head
-validation on the target Mac.
+still live for the unlocked session. Exact-head Linux/aarch64 tests confirmed
+`PR_SET_DUMPABLE=0` and **late-opening** sibling denial. The independent
+review on `5fb62bb` reproduced the missing case: a pre-existing same-UID
+process opened `/proc/<pid>/mem` **before** `prctl` and read the master
+passphrase during unlock and decrypted entries afterwards (5/5 each).
+Dumpability is checked at descriptor-open time; an already-open descriptor
+remains readable. Dedicated isolation **from startup**, not just `prctl`,
+is mandatory before real credentials.
 
 **Target-specific KDBX subset is now hash-locked (not full Ada):**
 The maintainer ran `scripts/capture_kdbx_wheel_hashes.py` in CPython 3.14 /
@@ -86,13 +101,15 @@ install this subset with `--require-hashes --only-binary=:all:` and
 The rest of Ada and the floating `python:3.14-slim` base image are **not**
 locked by this file; this remains a **synthetic-only** dependency boundary.
 
-The maintainer's terminal output is strong evidence for resolution of the
-seven wheel hashes, not an independent verification of the wheel bytes or a
-license/security audit. The new Docker build and Dev Container post-create
-command have not yet been tested against this PR head. The capture tool still
-prints a candidate without writing untracked files if a future re-resolution
-is necessary. See `NOTICE.md` for provisional license metadata and
-distribution blockers.
+The maintainer's terminal output showed successful resolution of the seven
+wheel hashes, and the independent PR #59 reviewer matched each hash to
+an official non-yanked PyPI wheel. The hash-locked `secrets-poc` Docker build
+succeeded on exact head `5fb62bb`; the **VS Code Dev Container post-create
+install** is still untested. The reviewer also counted **43 additional
+unhashed runtime packages** in that image (plus its build dependency):
+this KDBX-only lock is **not** a complete credential-process supply-chain
+gate. The capture tool prints a candidate without leaving untracked files.
+See `NOTICE.md` for provisional license metadata and distribution blockers.
 
 **Still prohibited:** real credentials. The default/shared VS Code runtime is
 not a production credential environment. Reviewed hash-pinned transitive
@@ -110,13 +127,18 @@ Inspected the exact tagged upstream source `coreyleavitt/kdbxtool@v0.1.7`:
 - `Database.open_bytes` retains ordinary Python `_password` and
   `_transformed_key` fields, confirming the earlier review's finding.
   Our read-only Ada wrapper releases these references immediately after open.
-- `Kdbx4Reader.decrypt` uses unbounded `gzip.decompress` on the authenticated
-  payload. The **encrypted file** is limited to 16 MiB by Ada, but the
-  *decompressed* XML size is not explicitly bounded. This is a **potential
-  resource-exhaustion risk** for unexpectedly large or deliberately crafted
-  password-authorized KDBX content. Evaluate/reproduce before calling it a
-  verified vulnerability. No user-controlled KDBX upload or web endpoint is
-  exposed in Ada's current scope.
+- **Verified unbounded expansion, post-authentication only (PR #59 I2):**
+  `Kdbx4Reader.decrypt` verifies the header HMAC and all encrypted-block
+  HMACs **before** decrypting and calling unbounded `gzip.decompress`.
+  The reviewer opened an authenticated 65 KiB synthetic vault expanding
+  to 64 MiB (approximately 1004:1); peak RSS rose to about 224 MiB versus
+  94 MiB for a baseline vault. Ada's 16 MiB encrypted-file limit does
+  **not** bound decompressed XML (theoretical expansion on the order of
+  16 GiB). A malicious crafted vault requires a party who already knows
+  the passphrase; no pre-authentication gzip attack path was found.
+  The practical remaining risk is process/container OOM from an
+  oversized but password-authorized vault. Run the credential process
+  under a Docker `--memory` cap and verify OOM containment before real use.
 
 A targeted independent reader review remains mandatory before using any real
 credentials, including payload-size behavior and verification that no
