@@ -27,7 +27,7 @@ from ada.ports.calendar import CalendarAccessMode, CalendarAudience, CalendarRef
 _IONOS_URL = "https://dav.mailbusiness.ionos.de"
 _MAX_CONFIG_BYTES = 32_768
 _CALENDAR_ID = re.compile(r"[a-z][a-z0-9_-]*\Z")
-_COLLECTION_PATH = re.compile(r"/caldav/[^/?#]+/?\Z")
+_COLLECTION_PATH = re.compile(r"/caldav/[A-Za-z0-9._~%-]+/?\Z")
 
 
 class IONOSDevelopmentConfigurationError(ValueError):
@@ -101,7 +101,7 @@ def load_ionos_development_settings(path: Path) -> IONOSDevelopmentSettings:
         or any(char in mailbox for char in "\r\n\0")
     ):
         raise IONOSDevelopmentConfigurationError("Invalid IONOS mailbox")
-    if not isinstance(url, str) or url.rstrip("/") != _IONOS_URL:
+    if not isinstance(url, str) or url not in {_IONOS_URL, _IONOS_URL + "/"}:
         raise IONOSDevelopmentConfigurationError(
             "IONOS credentials can only be used with the pinned CalDAV HTTPS origin"
         )
@@ -206,8 +206,9 @@ def build_development_ionos_adapter(
 
     The destination and calendar paths are pinned and validated before the
     credential is read. Tests can inject only a synthetic password reader.
-    Real account actions remain disabled until S6 retention/authority gates
-    and S7 opt-in acceptance are completed.
+    This constructor is not a security gate for writes: its caller must not
+    expose the adapter to real actions before S6/S7 durable-state, authority
+    and acceptance gates have passed.
     """
 
     config = load_ionos_development_settings(config_path)
