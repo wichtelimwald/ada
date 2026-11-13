@@ -255,14 +255,6 @@ class KdbxSecretsTests(unittest.TestCase):
         with (
             patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
             patch(
-                "ada.cli.protect_credential_process",
-                create=True,
-            ) as unused,
-        ):
-            del unused  # The helper is imported directly inside _unlock_vault.
-        with (
-            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
-            patch(
                 "ada.adapters.kdbx_secrets.protect_credential_process",
                 side_effect=lambda: sequence.append("protected"),
             ),
