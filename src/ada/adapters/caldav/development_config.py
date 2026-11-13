@@ -183,9 +183,14 @@ def read_ionos_keychain_password(mailbox: str) -> str:
             "IONOS Keychain item is unavailable"
         )
     # The security CLI appends a line ending; preserve any other characters.
-    password = result.stdout.removesuffix(b"\n").removesuffix(b"\r").decode(
-        "utf-8", errors="strict"
-    )
+    try:
+        password = result.stdout.removesuffix(b"\\n").removesuffix(b"\\r").decode(
+            "utf-8", errors="strict"
+        )
+    except UnicodeError:
+        raise IONOSDevelopmentConfigurationError(
+            "IONOS Keychain item cannot be decoded"
+        ) from None
     if not password:
         raise IONOSDevelopmentConfigurationError("IONOS Keychain item is empty")
     return password
