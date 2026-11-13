@@ -17,13 +17,14 @@ class FakeDatabase:
 
     def __init__(self) -> None:
         self.zeroized = False
+        self.zeroize_calls = 0
         self.entries = [
             SimpleNamespace(title="ionos/calendar", password="synthetic-password")
         ]
         self.__class__.instances.append(self)
 
     @classmethod
-    def open(cls, path: Path, password: str) -> FakeDatabase:
+    def open_bytes(cls, data: bytes, password: str) -> FakeDatabase:
         if password != "test-master":
             raise ValueError("sensitive upstream diagnostic")
         return cls()
@@ -33,6 +34,7 @@ class FakeDatabase:
 
     def zeroize_credentials(self) -> None:
         self.zeroized = True
+        self.zeroize_calls += 1
 
 
 class KdbxSecretsTests(unittest.TestCase):
@@ -52,6 +54,14 @@ class KdbxSecretsTests(unittest.TestCase):
         )
         self.patcher.start()
         self.addCleanup(self.patcher.stop)
+        for target in (
+            "ada.adapters.kdbx_secrets._require_protected_credential_process",
+            "ada.adapters.kdbx_secrets.protect_credential_process",
+            "ada.adapters.kdbx_secrets._validate_kdf_header",
+        ):
+            mocker = patch(target)
+            mocker.start()
+            self.addCleanup(mocker.stop)
 
     def test_locked_by_default_and_deny_unknown_reference(self) -> None:
         self.assertFalse(self.reader.unlocked)
@@ -158,7 +168,7 @@ class KdbxSecretsTests(unittest.TestCase):
         during_session: list[bool] = []
 
         def inspect_session(_runtime: object) -> int:
-            during_session.append(not FakeDatabase.instances[-1].zeroized)
+            during_session.append(FakeDatabase.instances[-1].zeroize_calls)
             return 0
 
         with (
@@ -179,8 +189,9 @@ class KdbxSecretsTests(unittest.TestCase):
             )
 
         self.assertEqual(result, 0)
-        self.assertEqual(during_session, [True])
+        self.assertEqual(during_session, [1])
         self.assertTrue(FakeDatabase.instances[-1].zeroized)
+        self.assertEqual(FakeDatabase.instances[-1].zeroize_calls, 2)
         runtime.aclose.assert_awaited_once_with()
         self.assertNotIn("vault", repr(build.call_args).lower())
 
@@ -194,7 +205,7 @@ class KdbxSecretsTests(unittest.TestCase):
 
         async def close() -> None:
             shutdown_observations.append(
-                not FakeDatabase.instances[-1].zeroized
+                FakeDatabase.instances[-1].zeroize_calls
             )
 
         runtime = SimpleNamespace(aclose=AsyncMock(side_effect=close))
@@ -217,7 +228,7 @@ class KdbxSecretsTests(unittest.TestCase):
             )
 
         self.assertEqual(result, 1)
-        self.assertEqual(shutdown_observations, [True])
+        self.assertEqual(shutdown_observations, [1])
         self.assertTrue(FakeDatabase.instances[-1].zeroized)
         runtime.aclose.assert_awaited_once_with()
 
@@ -236,6 +247,61 @@ class KdbxSecretsTests(unittest.TestCase):
             self.assertEqual(_secrets_check(self.temp.name), 2)
         self.assertNotIn("echo enabled", output.getvalue())
         self.assertFalse(self.reader.unlocked)
+
+    def test_prompt_is_protected_before_getpass(self) -> None:
+        from ada.cli import _secrets_check
+
+        sequence: list[str] = []
+        with (
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
+            patch(
+                "ada.cli.protect_credential_process",
+                create=True,
+            ) as unused,
+        ):
+            del unused  # The helper is imported directly inside _unlock_vault.
+        with (
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
+            patch(
+                "ada.adapters.kdbx_secrets.protect_credential_process",
+                side_effect=lambda: sequence.append("protected"),
+            ),
+            patch(
+                "getpass.getpass",
+                side_effect=lambda _prompt: (sequence.append("prompt"), "test-master")[1],
+            ),
+        ):
+            self.assertEqual(_secrets_check(self.temp.name), 0)
+        self.assertEqual(sequence, ["protected", "prompt"])
+
+    def test_process_protection_failure_does_not_prompt(self) -> None:
+        from contextlib import redirect_stderr
+        from io import StringIO
+        from ada.cli import _secrets_check
+
+        output = StringIO()
+        with (
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
+            patch(
+                "ada.adapters.kdbx_secrets.protect_credential_process",
+                side_effect=SecretVaultError("Ada credential process isolation unavailable"),
+            ),
+            patch("getpass.getpass") as getpass,
+            redirect_stderr(output),
+        ):
+            self.assertEqual(_secrets_check(self.temp.name), 2)
+        getpass.assert_not_called()
+        self.assertIn("process isolation unavailable", output.getvalue())
+
+    def test_reader_refuses_unprotected_direct_use(self) -> None:
+        with patch(
+            "ada.adapters.kdbx_secrets._require_protected_credential_process",
+            side_effect=SecretVaultError("Ada credential process isolation unavailable"),
+        ):
+            with self.assertRaisesRegex(SecretVaultError, "process isolation unavailable"):
+                self.reader.unlock("test-master")
+        self.assertFalse(self.reader.unlocked)
+
 
     def test_chat_cli_vault_opt_in_requires_flag(self) -> None:
         from ada.cli import build_parser
