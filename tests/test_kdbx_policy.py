@@ -108,21 +108,19 @@ class ProcessHardeningTests(unittest.TestCase):
             assert target.stdout is not None
             pid = target.stdout.readline().strip()
             self.assertTrue(pid.isdigit(), "protected process did not start")
-            sibling_program = (
-                "import sys; "
-                "from pathlib import Path; "
-                "path = Path('/proc') / sys.argv[1] / 'mem'; "
-                "try_open = None; "
-                "exec('try:\\n"
-                "    try_open = open(path, \\\"rb\\\")\\n"
-                "except PermissionError:\\n"
-                "    sys.exit(0)\\n"
-                "except OSError:\\n"
-                "    sys.exit(2)\\n"
-                "else:\\n"
-                "    try_open.close()\\n"
-                "    sys.exit(3)')"
-            )
+            sibling_program = """
+import sys
+from pathlib import Path
+
+path = Path("/proc") / sys.argv[1] / "mem"
+try:
+    with path.open("rb"):
+        sys.exit(3)  # Unexpected access to a protected process.
+except PermissionError:
+    sys.exit(0)
+except OSError:
+    sys.exit(2)  # Unrelated process/procfs failure.
+"""
             result = subprocess.run(
                 [sys.executable, "-c", sibling_program, pid],
                 text=True,
