@@ -6,8 +6,10 @@ remain prohibited until the runtime and dependency release gates in #58 pass.
 
 from __future__ import annotations
 
+import ctypes
 import os
 import stat
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,45 @@ _MAX_KDF_PARALLELISM = 8
 
 class SecretVaultError(RuntimeError):
     """Credential vault unavailable or request denied (never includes secrets)."""
+
+
+_PR_GET_DUMPABLE = 3
+_PR_SET_DUMPABLE = 4
+
+
+def _prctl(option: int, value: int = 0) -> int:
+    """Small Linux-only standard-library bridge; no extra runtime dependency."""
+    if sys.platform != "linux":
+        raise SecretVaultError("Ada credential process isolation unavailable")
+    try:
+        libc = ctypes.CDLL(None, use_errno=True)
+        call = libc.prctl
+        call.restype = ctypes.c_int
+        call.argtypes = (
+            ctypes.c_int,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+            ctypes.c_ulong,
+        )
+        result = call(option, value, 0, 0, 0)
+        if result < 0:
+            raise SecretVaultError("Ada credential process isolation unavailable")
+        return result
+    except (AttributeError, OSError, ValueError):
+        raise SecretVaultError("Ada credential process isolation unavailable") from None
+
+
+def protect_credential_process() -> None:
+    """Stop same-UID ptrace/core dumps before reading a master passphrase."""
+    _prctl(_PR_SET_DUMPABLE, 0)
+    _require_protected_credential_process()
+
+
+def _require_protected_credential_process() -> None:
+    """Fail closed even if an adapter is called outside the protected CLI."""
+    if _prctl(_PR_GET_DUMPABLE) != 0:
+        raise SecretVaultError("Ada credential process isolation unavailable")
 
 
 def _validate_kdf_header(data: bytes) -> None:
@@ -114,6 +155,7 @@ class KdbxSecrets:
             raise SecretVaultError("Ada vault is not accessible") from None
 
     def unlock(self, passphrase: str) -> None:
+        _require_protected_credential_process()
         if self.unlocked:
             raise SecretVaultError("Ada vault is already unlocked")
         if not passphrase:
