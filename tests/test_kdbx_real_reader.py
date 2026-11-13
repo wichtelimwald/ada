@@ -17,6 +17,39 @@ except ImportError:
 
 @unittest.skipIf(Database is None, "optional experimental kdbxtool not installed")
 class KdbxRealReaderTests(unittest.TestCase):
+    def test_modified_encrypted_vault_is_rejected_without_details(self) -> None:
+        # The actual authenticated KDBX4 reader must reject altered bytes,
+        # without ever returning an entry or exposing parser details.
+        assert Database is not None
+        with TemporaryDirectory() as root:
+            directory = Path(root) / "secrets"
+            directory.mkdir()
+            path = directory / "ada.kdbx"
+            database = Database.create(password="synthetic-master-for-auth-test")
+            database.root_group.create_entry(
+                title="ionos/calendar",
+                username="synthetic@example.invalid",
+                password="fake-entry-secret",
+            )
+            database.save(path)
+            database.zeroize_credentials()
+
+            data = bytearray(path.read_bytes())
+            self.assertGreater(len(data), 100)
+            data[len(data) // 2] ^= 0x01
+            path.write_bytes(data)
+            path.chmod(0o600)
+            vault = KdbxSecrets(
+                root, allowed_entries=frozenset({"ionos/calendar"})
+            )
+            with patch(
+                "ada.adapters.kdbx_secrets._require_protected_credential_process"
+            ):
+                with self.assertRaises(SecretVaultError) as caught:
+                    vault.unlock("synthetic-master-for-auth-test")
+            self.assertNotIn("fake-entry-secret", str(caught.exception))
+            self.assertFalse(vault.unlocked)
+
     def test_synthetic_kdbx4_unlock_then_lock(self) -> None:
         assert Database is not None
         with TemporaryDirectory() as memory_root:
