@@ -17,8 +17,10 @@ from typing import Any
 _MAX_VAULT_SIZE = 16 * 1024 * 1024
 
 # Deliberately bounded KDF policy for the dedicated Ada vault.
-# KeePassXC's current 64 MiB / 3 passes baseline is accepted; legacy AES-KDF,
-# low-cost Argon2, and attacker-controlled excessive resource costs are denied.
+# This is an Ada PoC policy, NOT KeePassXC's default. KeePassXC 2.8.0
+# calibrates new vaults toward ~1 second and can use >10 iterations, so a
+# default KeePassXC vault may be rejected. See the reader evaluation before
+# choosing a production-compatible KDF work budget.
 _MIN_KDF_MEMORY_KIB = 64 * 1024
 _MAX_KDF_MEMORY_KIB = 256 * 1024
 _MIN_KDF_ITERATIONS = 3
@@ -59,7 +61,12 @@ def _prctl(option: int, value: int = 0) -> int:
 
 
 def protect_credential_process() -> None:
-    """Stop same-UID ptrace/core dumps before reading a master passphrase."""
+    """Deny *new* same-UID ptrace/proc opens; prior open fds remain usable.
+
+    This is defense in depth, NOT same-UID process isolation. A sibling that
+    opened /proc/<pid>/mem before prctl can still read it after protection.
+    Real credentials require an isolated credential process from startup.
+    """
     _prctl(_PR_SET_DUMPABLE, 0)
     _require_protected_credential_process()
 
