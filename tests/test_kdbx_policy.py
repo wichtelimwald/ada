@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from dataclasses import replace
@@ -22,6 +23,36 @@ try:
 except ImportError:
     Database = None
     KdfType = None
+
+
+class KdbxWheelLockTests(unittest.TestCase):
+    def test_committed_lock_matches_expected_versions_and_sha256(self) -> None:
+        from scripts.capture_kdbx_wheel_hashes import PINS
+
+        manifest = (
+            Path(__file__).resolve().parents[1]
+            / "requirements"
+            / "kdbx-py314-linux-aarch64.txt"
+        )
+        lines = [
+            line for line in manifest.read_text(encoding="utf-8").splitlines()
+            if line and not line.startswith("#")
+        ]
+        hashes: dict[str, str] = {}
+        versions: dict[str, str] = {}
+        for line in lines:
+            match = re.fullmatch(
+                r"([a-z0-9-]+)==([0-9.]+) --hash=sha256:([a-f0-9]{64})",
+                line,
+            )
+            self.assertIsNotNone(match, f"Invalid KDBX hash lock entry: {line}")
+            assert match is not None
+            name, version, digest = match.groups()
+            self.assertNotIn(name, hashes)
+            versions[name] = version
+            hashes[name] = digest
+        self.assertEqual(versions, PINS)
+        self.assertEqual(len(hashes), 7)
 
 
 @unittest.skipIf(Database is None, "optional kdbxtool research extra not installed")
