@@ -41,6 +41,26 @@ class AdaRuntimeHashCaptureTests(unittest.TestCase):
         self.assertEqual(pins["kdbxtool"][0], "0.1.7")
 
 
+class CredentialRuntimeInventoryTests(unittest.TestCase):
+    def test_runtime_lock_parser_requires_setuptools_and_kdbx(self) -> None:
+        from scripts.check_credential_runtime_lock import locked_versions
+
+        with TemporaryDirectory() as root:
+            lock = Path(root) / "lock.txt"
+            lock.write_text(
+                "setuptools==80.9.0 --hash=sha256:" + "a" * 64 + "\n"
+                "kdbxtool==0.1.7 --hash=sha256:" + "b" * 64 + "\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                locked_versions(lock),
+                {"setuptools": "80.9.0", "kdbxtool": "0.1.7"},
+            )
+            lock.write_text("kdbxtool==0.1.7 --hash=sha256:" + "b" * 64 + "\n")
+            with self.assertRaisesRegex(ValueError, "Missing build backend"):
+                locked_versions(lock)
+
+
 class KdbxWheelLockTests(unittest.TestCase):
     def test_committed_lock_matches_expected_versions_and_sha256(self) -> None:
         from scripts.capture_kdbx_wheel_hashes import PINS
