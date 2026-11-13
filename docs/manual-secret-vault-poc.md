@@ -22,12 +22,14 @@ chmod 700 "$ADA_MEMORY_ROOT/secrets"
    create `$ADA_MEMORY_ROOT/secrets/ada.kdbx` with **KDBX4/Argon2** and a
    synthetic test master passphrase. Do not add a key file. Create a synthetic
    entry with title `ionos/calendar` and an arbitrary fake password.
-   Ada currently rejects some KeePassXC 2.8.0 auto-calibrated vaults because
-   its PoC policy allows only Argon2d/id, 64–256 MiB memory, 3–10 iterations,
-   1–8 lanes. For synthetic compatibility tests, you may explicitly select
-   Argon2id / 256 MiB / 10 iterations / 4 lanes in KeePassXC's advanced KDF
-   settings. Do **not** reduce a real vault's KDF strength to satisfy the PoC:
-   the production-compatible security policy is still under evaluation.
+   The credential-hardening branch allows Argon2d/id, 64–256 MiB,
+   3–128 iterations and 1–8 lanes, limited further by
+   `memory_kib × iterations ≤ 8,388,608` (8,192 MiB-rounds).
+   Unlike the earlier 10-iteration cap, this admits the KeePassXC 2.8.0
+   calibration observed by the reviewer (64 MiB / ~51 iterations).
+   Actual KeePassXC defaults depend on the machine and may still exceed
+   Ada's finite budget. Test with a synthetic KeePassXC-created vault;
+   **never reduce the KDF strength of a real vault** to satisfy a PoC.
    Afterwards run `chmod 600 "$ADA_MEMORY_ROOT/secrets/ada.kdbx"`.
    The PoC refuses symlinks, oversize vaults and group/world-readable files.
 
