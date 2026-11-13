@@ -1,6 +1,6 @@
 # ADR-0013: Local, manually unlocked Ada credential vault
 
-- **Status:** Accepted direction (implementation and dependency selection pending)
+- **Status:** Accepted vault/unlock direction; optional KDBX reader PoC under review, no production integration
 - **Date:** 2026-11-13
 - **Decision owner:** Maintainer
 - **Related:** [ADR-0003](ADR-0003-execution-topology-containerization.md), [ADR-0008](ADR-0008-memory-architecture.md), [ADR-0009](ADR-0009-calendar-provider-integration.md), [ADR-0012](ADR-0012-memory-access-mvp-boundary.md), [MVP-60](../plans/MVP-60-real-calendar-provider.md)
@@ -30,12 +30,12 @@ The existing macOS Keychain IONOS probe is historical development evidence, not 
 
 ## Unresolved implementation gates
 
-- **Library/license:** KDBX is a file format, not a chosen Python dependency. KeePassXC is GPL-3.0; PyKeePass is also **GPL-3.0** (as of 2026-11-13). Do **not** add or bundle PyKeePass into Ada's MIT codebase without an explicit distribution/copyleft review and a maintained-alternatives assessment. Verify KDBX 4 compatibility and supported algorithms/KDFs against the selected reader.
+- **Library/license:** KDBX is a file format, not an automatic Python-library choice. KeePassXC CLI and PyKeePass are GPL-3.0; Python **kdbxtool 0.1.7 (Apache-2.0)** is used only in an opt-in PoC container target. It is **alpha**, with limited adoption and unverified Python 3.14/KeePassXC interoperability. No production reader accepted. See [reader review](../research/kdbx-reader-evaluation.md).
 - **Runtime unlock:** demonstrate a safe manual unlock in the actual container deployment without secrets in argv, env, Docker inspection output, process logs or chat; a naïve `docker exec` command in a separate process does not by itself unlock a different already-running Ada process.
 - **Persistence/authority:** verify non-indexing and Git exclusions, trusted secret-reference allowlist, missing/wrong password and locked-state denial, restart behavior, ciphertext backup and recovery with synthetic test entries.
 - **Existing credential consumers:** update the MVP-60 calendar source, the D5 operation-fingerprint key source, and later MVP-70 mail, while preserving their existing no-secret-persistence requirements.
 
-No KDBX reader is selected, no runtime wiring or operator setup was performed and no real secrets are migrated by this ADR.
+An experimental KDBX reader and one-shot interactive CLI check have been staged in the ADR implementation PR. No live-runtime wiring, actual IONOS credentials, target-Mac compatibility test, or authorized reader for production is available. No real secrets have been migrated.
 
 ## Revisit if
 
