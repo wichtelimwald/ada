@@ -6,9 +6,11 @@ Depends on: MVP-00 (done)
 Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR, merged);
 S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (merged);
 S4 implementation PR: https://github.com/wichtelimwald/ada/pull/48 (merged);
-S5 implementation draft: https://github.com/wichtelimwald/ada/pull/54
-(unreviewed; tests not run on the exact head).
-S6-S7 remain pending, so the roadmap stays `ready` until their gates pass.
+S5 implementation PR: https://github.com/wichtelimwald/ada/pull/54
+(merged after 316/316 tests passed at exact head `06a4ba3`);
+S6 development configuration/Keychain foundation: proposed in this branch.
+Remaining S6 (operation-record retention, diagnostics and gated composition)
+and S7 acceptance are still pending; roadmap status stays `ready`.
 
 ## Goal
 
@@ -368,7 +370,7 @@ S6-S7 (roadmap `done` only in the last PR).
   `version_conflict`/`event_absent` reports). Not part of S4: the operation record and
   payload purge (S6/D5), the Ada-created-events distinction of D3 (needs the
   S6 operation record), conflict detection (S5).
-- **S5 Conflict detection (draft PR #54):** `CalendarEvent` reads are
+- **S5 Conflict detection (merged PR #54):** `CalendarEvent` reads are
   projected to ephemeral `CalendarBusyInterval` values for the
   **already-authorized relevant calendars**; transparent entries are skipped,
   original titles/locations/provider IDs are not passed to the checker.
@@ -384,11 +386,16 @@ S6-S7 (roadmap `done` only in the last PR).
   travel, nonadjacent false-warning regressions, and omitted unrelated calendars.
   This is not the sender-verified
   live household pilot: S6 must configure and compose the trusted calendar
-  read path; S7 requires provider acceptance. Independent review and exact-head
-  tests are pending.
-- **S6 Operations:** credential source (D2), durable payload retention (D5),
-  configuration, `ada doctor` checks (reachability, privileges vs configured
-  mode, no credential echo), `docs/manual-setup.md`, README, NOTICE.md.
+  read path; S7 requires provider acceptance. PR #54 was reviewed, corrected
+  and tested (316 passing tests) before merge.
+- **S6 Operations (in progress):** first small slice: strict local-only,
+  owner-mode TOML mappings and pinned IONOS HTTPS origin; the macOS Keychain
+  service `ada-caldav` is read only after destination validation. See
+  [local setup](../setup-caldav-development.md); this slice exposes no
+  family-facing requests or live writes. Remaining S6: credential/adapter
+  composition with provider privileges checked against configured modes,
+  D3 authority checks, D5 operation records and crash-safe durable payload
+  scrubbing, `ada doctor` diagnostics, plus target-host integration.
 - **S7 Real-provider acceptance:** maintainer-run on the target Mac with
   synthetic IONOS calendars.
 
