@@ -158,7 +158,7 @@ def _secrets_check(memory_root: str) -> int:
                 del password
             print("Ada vault unlocked for this check; now locked again.")
         return 0
-    except (EOFError, KeyboardInterrupt):
+    except (EOFError, KeyboardInterrupt, OSError):
         print("\nerror: Ada vault unlock cancelled", file=sys.stderr)
         return 2
     except SecretVaultError as exc:
