@@ -100,6 +100,8 @@ class GitMemoryHistory:
             else:
                 self._require_ownership_marker(git_dir)
 
+        self._exclude_secrets_from_git()
+
         head = self._run(
             "rev-parse",
             "--verify",
@@ -114,6 +116,35 @@ class GitMemoryHistory:
                 "-m",
                 "Initialize Ada Memory history",
             )
+
+    def _exclude_secrets_from_git(self) -> None:
+        """Keep Ada's encrypted vault out of ordinary Memory Git staging.
+
+        Git -f can still override ignore rules; refuse a repo that tracks
+        secrets rather than implying ignore rules are an absolute boundary.
+        """
+        info = self.root / ".git" / "info"
+        path = info / "exclude"
+        if info.is_symlink() or path.is_symlink():
+            raise GitMemoryHistoryError("unsafe Git secrets exclusion path")
+        try:
+            info.mkdir(exist_ok=True)
+            lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
+            if "/secrets/" not in lines:
+                with path.open("a", encoding="utf-8") as stream:
+                    stream.write("\n/secrets/\n")
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                self._sync_directory(info)
+            if self._run("ls-files", "-z", "--", "secrets").stdout:
+                raise GitMemoryHistoryError(
+                    "Ada credential directory is already tracked by Memory Git; "
+                    "operator cleanup is required"
+                )
+        except (OSError, UnicodeError) as exc:
+            raise GitMemoryHistoryError(
+                "could not protect Ada secrets from Git"
+            ) from exc
 
     def _ensure_init_marker(self) -> None:
         marker = self.root / self._INIT_MARKER
