@@ -25,6 +25,22 @@ except ImportError:
     KdfType = None
 
 
+class AdaRuntimeHashCaptureTests(unittest.TestCase):
+    def test_capture_accepts_reviewed_kdbx_pins(self) -> None:
+        from scripts.capture_ada_runtime_hashes import (
+            PROJECT_ROOT,
+            _name,
+            _pins_from_lock,
+        )
+
+        self.assertEqual(_name("argon2_cffi.bindings"), "argon2-cffi-bindings")
+        pins = _pins_from_lock(
+            PROJECT_ROOT / "requirements/kdbx-py314-linux-aarch64.txt"
+        )
+        self.assertEqual(len(pins), 7)
+        self.assertEqual(pins["kdbxtool"][0], "0.1.7")
+
+
 class KdbxWheelLockTests(unittest.TestCase):
     def test_committed_lock_matches_expected_versions_and_sha256(self) -> None:
         from scripts.capture_kdbx_wheel_hashes import PINS
