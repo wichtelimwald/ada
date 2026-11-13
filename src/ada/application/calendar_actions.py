@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import timedelta
 from enum import Enum
-from typing import Sequence
+from typing import Collection, Mapping, Sequence
 
 from ada.core.action_outcomes import (
     ActionExecutionResult,
@@ -20,7 +20,7 @@ from ada.core.actions import (
     validate_calendar_update_proposal,
 )
 from ada.core.authorization import AuthorizationRequest, GuardDecision
-from ada.ports.calendar import CalendarEvent
+from ada.ports.calendar import CalendarBusyInterval, CalendarEvent
 from ada.ports.durable_action import (
     DurableActionPort,
     DurableCalendarCancel,
@@ -154,22 +154,67 @@ def _evidence(decision: GuardDecision) -> AuthorizationEvidence:
     )
 
 
+def availability_for_conflicts(
+    events: Sequence[CalendarEvent],
+    *,
+    relevant_calendar_ids: Collection[str],
+    registered_places: Mapping[str, str],
+) -> tuple[CalendarBusyInterval, ...]:
+    """Project authorized calendar reads into availability-only inputs.
+
+    The caller must choose relevant calendars from trusted user/audience
+    configuration, not from a model request. A family calendar is included
+    when it affects the people being scheduled. Provider titles, locations
+    and event identifiers do not enter the resulting conflict inputs.
+    CalDAV already expands recurring occurrences before this projection.
+    """
+
+    allowed = frozenset(relevant_calendar_ids)
+    intervals: list[CalendarBusyInterval] = []
+    for event in events:
+        if not event.busy or event.calendar_id not in allowed:
+            continue
+        intervals.append(
+            CalendarBusyInterval(
+                slot_id=f"slot-{len(intervals) + 1}",
+                calendar_id=event.calendar_id,
+                start=event.start,
+                end=event.end,
+                place_key=(
+                    registered_places.get(event.location)
+                    if event.location is not None
+                    else None
+                ),
+            )
+        )
+    return tuple(intervals)
+
+
 class ConflictKind(str, Enum):
     TIME_OVERLAP = "time_overlap"
     TRAVEL_TIME = "travel_time"
+    TRAVEL_UNKNOWN = "travel_unknown"
 
 
 @dataclass(frozen=True, slots=True)
 class SchedulingConflict:
     kind: ConflictKind
-    event_id: str
+    # An ephemeral availability token; not a provider ID or event detail.
+    slot_id: str
     available_gap: timedelta | None = None
     required_travel: timedelta | None = None
     travel_source: str | None = None
 
 
 class CalendarConflictChecker:
-    """Conflict logic over calendar data whose read authority was established."""
+    """Check one affected person's authorized busy schedule.
+
+    The caller must include shared/family intervals that affect this person.
+    For a family event, invoke the checker separately for each affected
+    person's schedule; combining unrelated people's slots can hide a real
+    nearest-neighbor travel conflict. Authorization and audience selection
+    remain the caller's trusted responsibility.
+    """
 
     def __init__(self, travel_time: TravelTimePort) -> None:
         self._travel_time = travel_time
@@ -178,43 +223,84 @@ class CalendarConflictChecker:
         self,
         proposal: CreateCalendarEventProposal,
         *,
-        existing_events: Sequence[CalendarEvent],
+        existing_events: Sequence[CalendarBusyInterval],
+        candidate_place_key: str | None = None,
     ) -> tuple[SchedulingConflict, ...]:
         conflicts: list[SchedulingConflict] = []
 
+        # All overlapping appointments matter, but travel between the new
+        # appointment and nonadjacent ones does not. Select the immediate
+        # predecessor(s) and successor(s) in this person's schedule.
+        preceding: list[CalendarBusyInterval] = []
+        following: list[CalendarBusyInterval] = []
         for event in existing_events:
             if proposal.start < event.end and proposal.end > event.start:
                 conflicts.append(
                     SchedulingConflict(
                         kind=ConflictKind.TIME_OVERLAP,
-                        event_id=event.event_id,
+                        slot_id=event.slot_id,
+                    )
+                )
+            elif event.end <= proposal.start:
+                preceding.append(event)
+            elif proposal.end <= event.start:
+                following.append(event)
+
+        adjacent: list[tuple[CalendarBusyInterval, timedelta, str | None, str | None]] = []
+        if preceding:
+            nearest_end = max(event.end for event in preceding)
+            for event in preceding:
+                if event.end == nearest_end:
+                    adjacent.append(
+                        (
+                            event,
+                            proposal.start - event.end,
+                            event.place_key,
+                            candidate_place_key,
+                        )
+                    )
+        if following:
+            nearest_start = min(event.start for event in following)
+            for event in following:
+                if event.start == nearest_start:
+                    adjacent.append(
+                        (
+                            event,
+                            event.start - proposal.end,
+                            candidate_place_key,
+                            event.place_key,
+                        )
+                    )
+
+        for event, available, origin, destination in adjacent:
+            if origin is None or destination is None:
+                conflicts.append(
+                    SchedulingConflict(
+                        kind=ConflictKind.TRAVEL_UNKNOWN,
+                        slot_id=event.slot_id,
+                        available_gap=available,
+                        travel_source="place_not_registered",
                     )
                 )
                 continue
 
-            if not proposal.location or not event.location:
-                continue
-
-            if event.end <= proposal.start:
-                available = proposal.start - event.end
-                estimate = self._travel_time.estimate(
-                    origin=event.location,
-                    destination=proposal.location,
+            estimate = self._travel_time.estimate(
+                origin=origin, destination=destination
+            )
+            if estimate.duration is None:
+                conflicts.append(
+                    SchedulingConflict(
+                        kind=ConflictKind.TRAVEL_UNKNOWN,
+                        slot_id=event.slot_id,
+                        available_gap=available,
+                        travel_source=estimate.source,
+                    )
                 )
-            elif proposal.end <= event.start:
-                available = event.start - proposal.end
-                estimate = self._travel_time.estimate(
-                    origin=proposal.location,
-                    destination=event.location,
-                )
-            else:
-                continue
-
-            if estimate.duration > available:
+            elif estimate.duration > available:
                 conflicts.append(
                     SchedulingConflict(
                         kind=ConflictKind.TRAVEL_TIME,
-                        event_id=event.event_id,
+                        slot_id=event.slot_id,
                         available_gap=available,
                         required_travel=estimate.duration,
                         travel_source=estimate.source,
@@ -222,7 +308,6 @@ class CalendarConflictChecker:
                 )
 
         return tuple(conflicts)
-
 
 def render_calendar_action_response(
     proposal: CreateCalendarEventProposal,
