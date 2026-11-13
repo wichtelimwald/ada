@@ -27,6 +27,9 @@ _MAX_KDF_ITERATIONS = 128
 _MIN_KDF_PARALLELISM = 1
 _MAX_KDF_PARALLELISM = 8
 _MAX_KDF_MEMORY_ITERATIONS_KIB = 8 * 1024 * 1024
+# Strict credential runtime rejects a low-cost KDF even if the synthetic
+# reader remains compatible with older / cheaper test fixtures.
+_MIN_STRICT_KDF_MEMORY_ITERATIONS_KIB = 2 * 1024 * 1024
 
 
 class SecretVaultError(RuntimeError):
@@ -132,6 +135,10 @@ def _validate_kdf_header(data: bytes) -> None:
             and _MIN_KDF_ITERATIONS <= iterations <= _MAX_KDF_ITERATIONS
             and _MIN_KDF_PARALLELISM <= parallelism <= _MAX_KDF_PARALLELISM
             and memory * iterations <= _MAX_KDF_MEMORY_ITERATIONS_KIB
+            and (
+                os.environ.get("ADA_REQUIRE_ISOLATED_CREDENTIALS") != "1"
+                or memory * iterations >= _MIN_STRICT_KDF_MEMORY_ITERATIONS_KIB
+            )
         ):
             raise SecretVaultError("Ada vault KDF policy rejected this file")
     except SecretVaultError:
