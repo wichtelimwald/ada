@@ -148,7 +148,7 @@ class IONOSKeychainTests(unittest.TestCase):
 
     def test_macos_reads_existing_item_without_shell_or_secret_arguments(self) -> None:
         result = subprocess.CompletedProcess(
-            args=[], returncode=0, stdout=b"synthetic-pass\\n", stderr=b""
+            args=[], returncode=0, stdout=b"synthetic-pass\n", stderr=b""
         )
         with (
             patch("ada.adapters.caldav.development_config.sys.platform", "darwin"),
@@ -166,14 +166,14 @@ class IONOSKeychainTests(unittest.TestCase):
         self.assertEqual(argv[-1], "-w")
         self.assertNotIn("synthetic-pass", repr(argv))
         self.assertNotIn("shell", kwargs)
-        self.assertIs(kwargs["stderr"], subprocess.DEVNULL)
+        self.assertEqual(kwargs["stderr"], subprocess.DEVNULL)
 
     def test_failures_do_not_echo_keychain_output(self) -> None:
         outputs = (
             subprocess.CompletedProcess(args=[], returncode=1,
                                         stdout=b"do-not-log", stderr=b"secret"),
             subprocess.CompletedProcess(args=[], returncode=0,
-                                        stdout=b"\\xff", stderr=b""),
+                                        stdout=b"\xff", stderr=b""),
         )
         for fake in outputs:
             with self.subTest(status=fake.returncode), (
