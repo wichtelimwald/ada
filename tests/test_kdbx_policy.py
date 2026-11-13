@@ -88,6 +88,52 @@ class KdbxPolicyTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "linux", "Linux prctl is required")
 class ProcessHardeningTests(unittest.TestCase):
+    def test_same_uid_sibling_cannot_open_protected_process_memory(self) -> None:
+        # Target and reader are sibling subprocesses with the same UID.
+        # No real secrets or memory bytes are inspected by this test.
+        target_program = (
+            "import os, sys; "
+            "from ada.adapters.kdbx_secrets import protect_credential_process; "
+            "protect_credential_process(); print(os.getpid(), flush=True); "
+            "sys.stdin.readline()"
+        )
+        target = subprocess.Popen(
+            [sys.executable, "-u", "-c", target_program],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        try:
+            assert target.stdout is not None
+            pid = target.stdout.readline().strip()
+            self.assertTrue(pid.isdigit(), "protected process did not start")
+            sibling_program = (
+                "import sys; "
+                "from pathlib import Path; "
+                "path = Path('/proc') / sys.argv[1] / 'mem'; "
+                "try_open = None; "
+                "exec('try:\\n"
+                "    try_open = open(path, \\\"rb\\\")\\n"
+                "except PermissionError:\\n"
+                "    sys.exit(0)\\n"
+                "except OSError:\\n"
+                "    sys.exit(2)\\n"
+                "else:\\n"
+                "    try_open.close()\\n"
+                "    sys.exit(3)')"
+            )
+            result = subprocess.run(
+                [sys.executable, "-c", sibling_program, pid],
+                text=True,
+                capture_output=True,
+                timeout=10,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+        finally:
+            target.terminate()
+            target.communicate(timeout=10)
+
     def test_linux_kernel_reports_not_dumpable_in_fresh_process(self) -> None:
         # Never alter the unittest runner's own dumpable flag.
         command = (
