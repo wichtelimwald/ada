@@ -221,6 +221,22 @@ class KdbxSecretsTests(unittest.TestCase):
         self.assertTrue(FakeDatabase.instances[-1].zeroized)
         runtime.aclose.assert_awaited_once_with()
 
+    def test_unlock_fails_if_terminal_echo_cannot_be_disabled(self) -> None:
+        from contextlib import redirect_stderr
+        from getpass import GetPassWarning
+        from io import StringIO
+        from ada.cli import _secrets_check
+
+        output = StringIO()
+        with (
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
+            patch("getpass.getpass", side_effect=GetPassWarning("echo enabled")),
+            redirect_stderr(output),
+        ):
+            self.assertEqual(_secrets_check(self.temp.name), 2)
+        self.assertNotIn("echo enabled", output.getvalue())
+        self.assertFalse(self.reader.unlocked)
+
     def test_chat_cli_vault_opt_in_requires_flag(self) -> None:
         from ada.cli import build_parser
 
