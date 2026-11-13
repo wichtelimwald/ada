@@ -104,30 +104,36 @@ def main() -> int:
         )
     )
 
+    # Validate the candidate in a temporary file first. Never leave a
+    # misleading lockfile behind if pip's hash-only dependency check fails.
+    with TemporaryDirectory(prefix="ada-kdbx-lock-verify-") as directory:
+        candidate = Path(directory) / "candidate.txt"
+        candidate.write_text(contents, encoding="utf-8")
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "--isolated",
+                "install",
+                "--dry-run",
+                "--ignore-installed",
+                "--only-binary=:all:",
+                "--index-url",
+                "https://pypi.org/simple",
+                "--require-hashes",
+                "-r",
+                str(candidate),
+            ],
+            check=True,
+        )
+
     if OUTPUT.exists() and OUTPUT.read_text(encoding="utf-8") != contents:
         raise SystemExit(f"{OUTPUT} differs; review explicitly before replacing")
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT.write_text(contents, encoding="utf-8")
     print(f"Generated {OUTPUT} with {len(found)} verified wheel hashes.")
     print(contents)
-    subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "--isolated",
-            "install",
-            "--dry-run",
-            "--ignore-installed",
-            "--only-binary=:all:",
-            "--index-url",
-            "https://pypi.org/simple",
-            "--require-hashes",
-            "-r",
-            str(OUTPUT),
-        ],
-        check=True,
-    )
     print("Hash-locked dry-run resolution passed.")
     return 0
 
