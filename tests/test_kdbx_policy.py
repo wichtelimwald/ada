@@ -119,8 +119,10 @@ class KdbxPolicyTests(unittest.TestCase):
 
 @unittest.skipUnless(sys.platform == "linux", "Linux prctl is required")
 class ProcessHardeningTests(unittest.TestCase):
-    def test_same_uid_sibling_cannot_open_protected_process_memory(self) -> None:
-        # Target and reader are sibling subprocesses with the same UID.
+    def test_late_same_uid_sibling_cannot_open_protected_process_memory(self) -> None:
+        # Target protects itself before the sibling attempts to open /proc.
+        # This intentionally tests only LATE openers. A sibling that opened
+        # /proc/<pid>/mem before prctl keeps access (PR #59 review B1).
         # No real secrets or memory bytes are inspected by this test.
         target_program = (
             "import os, sys; "
