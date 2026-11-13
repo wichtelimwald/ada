@@ -76,7 +76,7 @@ def protect_credential_process() -> None:
     # synthetic-only. This is a diagnostic check, NOT a replacement for the
     # private PID namespace established by the container launcher.
     if os.environ.get("ADA_REQUIRE_ISOLATED_CREDENTIALS") == "1":
-        _require_isolated_credential_namespace()
+        _require_strict_credential_runtime()
 
 
 def _require_isolated_credential_namespace() -> None:
@@ -99,6 +99,33 @@ def _require_isolated_credential_namespace() -> None:
         raise SecretVaultError("Ada credential PID namespace is not isolated") from None
     if visible_pids != {1}:
         raise SecretVaultError("Ada credential PID namespace is not isolated")
+
+
+_MAX_CREDENTIAL_CGROUP_MEMORY_BYTES = 1024 * 1024 * 1024
+
+
+def _require_strict_credential_runtime() -> None:
+    """Fail closed on accidental execution outside the reviewed Docker profile.
+
+    The container is isolated from startup. A Docker/host administrator can
+    bypass these checks; they are defense in depth, not a new trust boundary.
+    """
+    _require_isolated_credential_namespace()
+    if sys.flags.isolated != 1 or not sys.flags.no_user_site:
+        raise SecretVaultError("Ada credential Python runtime is not isolated")
+    try:
+        memory = Path("/sys/fs/cgroup/memory.max").read_text(encoding="ascii").strip()
+        swap = Path("/sys/fs/cgroup/memory.swap.max").read_text(encoding="ascii").strip()
+        root_flags = os.statvfs("/").f_flag
+    except OSError:
+        raise SecretVaultError("Ada credential resource limits unavailable") from None
+    if (
+        not memory.isdecimal()
+        or not 0 < int(memory) <= _MAX_CREDENTIAL_CGROUP_MEMORY_BYTES
+        or swap != "0"
+        or not (root_flags & os.ST_RDONLY)
+    ):
+        raise SecretVaultError("Ada credential resource limits not enforced")
 
 
 def _require_protected_credential_process() -> None:
@@ -199,7 +226,7 @@ class KdbxSecrets:
     def unlock(self, passphrase: str) -> None:
         _require_protected_credential_process()
         if os.environ.get("ADA_REQUIRE_ISOLATED_CREDENTIALS") == "1":
-            _require_isolated_credential_namespace()
+            _require_strict_credential_runtime()
         if self.unlocked:
             raise SecretVaultError("Ada vault is already unlocked")
         if not passphrase:
