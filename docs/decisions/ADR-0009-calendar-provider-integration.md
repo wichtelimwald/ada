@@ -86,11 +86,17 @@ access for people the provider cannot share with.
 
 ### 4. Credentials
 
-- Ada authenticates with an **app password of its own account**, with
-  two-step verification enabled. No family member credentials exist in Ada.
-- Credentials are class *Secret*: never in Memory, model context, logs,
-  environment variables, command-line arguments, fixtures or durable workflow
-  state. The development credential lives in the macOS Keychain.
+- Ada authenticates to IONOS with an **app password of its own account**, with
+  two-step verification enabled. Ada does not hold family members' personal
+  calendar credentials; later third-party services may require scoped,
+  user-linked service credentials.
+- Credentials are class *Secret*: never in semantic Memory, model context,
+  logs, environment variables, command-line arguments, fixtures or durable
+  workflow state. **ADR-0013** selects a dedicated local KDBX vault, manually
+  unlocked by the operator, for the Ada runtime. The encrypted file may reside
+  in the persistent Memory storage area but must be excluded from semantic
+  Memory, indexing and Git history. The earlier macOS Keychain IONOS probe
+  remains historical research; it is **not** Ada's runtime secret source.
 - Provider app passwords may not be limited to calendar access. Ada therefore
   uses a **separate app password per purpose** (calendar, mail) so each can be
   revoked independently.
