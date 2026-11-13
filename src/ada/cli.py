@@ -170,7 +170,8 @@ def _chat(
 
 def _unlock_vault(vault_root: str):
     """Unlock only from a trusted local terminal, never from model input."""
-    from getpass import getpass
+    from getpass import GetPassWarning, getpass
+    from warnings import catch_warnings, simplefilter
     from ada.adapters.kdbx_secrets import KdbxSecrets, SecretVaultError
 
     if not sys.stdin.isatty():
@@ -178,8 +179,12 @@ def _unlock_vault(vault_root: str):
 
     vault = KdbxSecrets(vault_root)
     try:
-        passphrase = getpass("Ada vault passphrase: ")
-    except (EOFError, KeyboardInterrupt, OSError):
+        # getpass falls back to visible stdin when terminal echo cannot be
+        # disabled. A password prompt must fail closed instead.
+        with catch_warnings():
+            simplefilter("error", GetPassWarning)
+            passphrase = getpass("Ada vault passphrase: ")
+    except (EOFError, KeyboardInterrupt, OSError, GetPassWarning):
         raise SecretVaultError("Ada vault unlock cancelled") from None
 
     try:
