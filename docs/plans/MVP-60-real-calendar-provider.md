@@ -54,7 +54,7 @@ trade-offs.
 4. Provider-native duplicate prevention and reconciliation for each write kind.
 5. Conflict detection over real data, including recurring occurrences, busy
    semantics and configured travel times.
-6. Development credential handling and durable-state minimization for real
+6. Runtime credential handling and durable-state minimization for real
    event data.
 7. Real-provider acceptance on IONOS with synthetic calendars.
 
@@ -136,7 +136,7 @@ See the evaluation. Summary:
 
 - **Identities:** Ada's own IONOS mailbox owns all family calendars; family
   members receive outward shares. The Ada app password is class *Secret*
-  (never in Memory, prompts, logs, env, argv, fixtures, DBOS state).
+  (never in semantic Memory, prompts, logs, env, argv, fixtures, DBOS state).
 - **Authority:** every create/update/cancel passes AdaGuard with the action and
   resource derived from the typed proposal. Configured calendar access modes
   are cross-checked against provider-reported privileges at startup; a mismatch
@@ -524,9 +524,10 @@ To be copied to `docs/todo.md` before the implementation PRs merge:
   per protection domain instead of one account holding every family calendar.
 - Read-only import of appointments kept outside Ada's calendars (for example
   ICS feeds) if conflict detection must cover them.
-- Production credential management (MVP-90). Historical probe only: the development adapter reads
-  the app password from the Keychain service `ada-caldav` (same item as the
-  probe); a separate app password is used for mail (MVP-70).
+- Credential packaging, manual unlock lifecycle and restore hardening (MVP-90),
+  after S6 integrates the ADR-0013 KDBX source. The earlier macOS Keychain
+  service `ada-caldav` remains historical probe-only evidence; a separate
+  IONOS app password is required for mail (MVP-70).
 - IONOS shares calendars only with mailboxes in the same contract and offers
   no external guest passwords: decide after the MVP how people outside the
   contract get access.
