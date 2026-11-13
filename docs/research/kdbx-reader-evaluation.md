@@ -61,21 +61,22 @@ Direct adapter access also checks `PR_GET_DUMPABLE == 0`. The selected
 reader now reads from one `O_NOFOLLOW` file descriptor and checks the
 unauthenticated KDBX header **before** deriving a key.
 
-**Implemented PoC KDF policy:** KDBX4 with Argon2d or Argon2id,
-64–256 MiB memory, 3–10 iterations, and 1–8 parallel lanes.
-It rejects legacy AES-KDF and out-of-range resource requests before KDF
-work. **Compatibility limitation (PR #59 I1):** KeePassXC 2.8.0 calibrates
-new databases toward roughly **1 second**, rather than fixing a 10-iteration
-default. In the reviewed target Docker VM, Argon2d/64 MiB/4 lanes required
-about 51 iterations to reach that target, which Ada currently rejects.
-The original claim that KeePassXC defaults to 64 MiB / 3 iterations was
-incorrect and has been removed. For synthetic interoperability tests,
-KeePassXC advanced settings within Ada's explicit bounds can be used,
-for example Argon2id / 256 MiB / 10 iterations / 4 lanes, **only after**
-checking actual unlock cost and available memory. Before live credentials,
-decide/test a bounded work policy that preserves strong offline resistance
-and supports the intended KeePassXC-generated vault, rather than silently
-weakening KDF settings for compatibility.
+**Current hardening branch (issue #58 / PR #60):** KDBX4 with
+Argon2d or Argon2id, **64–256 MiB**, **3–128 iterations** and **1–8
+parallel lanes**, with a combined `memory_kib × iterations` ceiling
+of **8,388,608 KiB-rounds (8,192 MiB-rounds)**. Legacy AES-KDF and
+out-of-budget resource requests fail closed **before derivation**.
+This replaces the 10-iteration ceiling from merged PR #59.
+
+**Why:** KeePassXC 2.8.0 targets ~1 second by calibrating a vault's
+Argon2 rounds; the reviewer's 64 MiB / 4-lane target-Virtual-Machine
+measurement estimated ~51 iterations. That setting now passes header
+preflight without relaxing the minimum memory/iteration checks. This
+does **not** establish a universal one-second runtime budget: Argon2
+costs vary with hardware, lanes, and workload. Before live credentials
+verify an *actual KeePassXC 2.8.0 synthetic vault* and worst-case
+derivation in the bounded container. Do not weaken a real vault's KDF
+to fit these bounds.
 
 The adapter calls `zeroize_credentials()` **immediately** after decrypting,
 releasing the reader's stored password/key references. This remains *reference
