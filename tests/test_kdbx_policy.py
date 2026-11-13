@@ -153,6 +153,49 @@ class KdbxPolicyTests(unittest.TestCase):
             self.assertFalse(vault.unlocked)
 
 
+@unittest.skipUnless(sys.platform == "linux", "Linux procfs is required")
+class CredentialNamespaceGateTests(unittest.TestCase):
+    def test_strict_mode_rejects_non_pid_one(self) -> None:
+        from ada.adapters.kdbx_secrets import _require_isolated_credential_namespace
+
+        with patch("ada.adapters.kdbx_secrets.os.getpid", return_value=77):
+            with self.assertRaisesRegex(SecretVaultError, "namespace is not isolated"):
+                _require_isolated_credential_namespace()
+
+    def test_strict_mode_rejects_co_resident_process(self) -> None:
+        from ada.adapters.kdbx_secrets import _require_isolated_credential_namespace
+
+        with (
+            patch("ada.adapters.kdbx_secrets.os.getpid", return_value=1),
+            patch("ada.adapters.kdbx_secrets.os.listdir", return_value=["1", "2", "self"]),
+        ):
+            with self.assertRaisesRegex(SecretVaultError, "namespace is not isolated"):
+                _require_isolated_credential_namespace()
+
+    def test_strict_mode_accepts_pid_one_alone(self) -> None:
+        from ada.adapters.kdbx_secrets import _require_isolated_credential_namespace
+
+        with (
+            patch("ada.adapters.kdbx_secrets.os.getpid", return_value=1),
+            patch("ada.adapters.kdbx_secrets.os.listdir", return_value=["1", "self"]),
+        ):
+            _require_isolated_credential_namespace()
+
+    def test_adapter_enforces_namespace_gate_when_enabled(self) -> None:
+        from unittest.mock import patch as mock_patch
+
+        with (
+            mock_patch.dict("os.environ", {"ADA_REQUIRE_ISOLATED_CREDENTIALS": "1"}),
+            mock_patch("ada.adapters.kdbx_secrets._require_protected_credential_process"),
+            mock_patch(
+                "ada.adapters.kdbx_secrets._require_isolated_credential_namespace",
+                side_effect=SecretVaultError("Ada credential PID namespace is not isolated"),
+            ),
+        ):
+            with self.assertRaisesRegex(SecretVaultError, "namespace is not isolated"):
+                KdbxSecrets("/synthetic-only").unlock("synthetic-master")
+
+
 @unittest.skipUnless(sys.platform == "linux", "Linux prctl is required")
 class ProcessHardeningTests(unittest.TestCase):
     def test_late_same_uid_sibling_cannot_open_protected_process_memory(self) -> None:
