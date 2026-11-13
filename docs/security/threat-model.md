@@ -86,6 +86,14 @@ review is not an independent human security audit.
   Run a **dedicated restricted container/process** without IDE, extensions,
   arbitrary `exec` or unnecessary network egress. Explicitly reassess
   backups/sync and all host-root access.
+- **Hardening in progress (issue #58):** Linux `PR_SET_DUMPABLE=0` before
+  passphrase entry, a second non-dumpable check at the KDBX adapter, bounded
+  KDBX4/Argon2 policy before derivation, one-descriptor `O_NOFOLLOW` file
+  read, and immediate release of the reader's passphrase/key references.
+  These are proposed code changes, **not yet independently verified on the
+  target runtime**. The parent directory is still operator-controlled and
+  the KDBX reader is still alpha. The IDE/Dev Container remains
+  **synthetic-only**; no real credential approval follows from these changes.
 - **Residual even after hardening:** code in the credential-bearing Ada
   process can read every decrypted credential. OS administrators/container
   host privilege, possible compromised dependencies, immutable Python string
