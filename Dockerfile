@@ -13,6 +13,11 @@ COPY src ./src
 
 FROM base AS development
 
+# File-native Memory history and its tests require the Git CLI.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN python -m pip install --no-cache-dir --editable /app \
     && mkdir -p /workspace \
     && chown ada:ada /workspace
