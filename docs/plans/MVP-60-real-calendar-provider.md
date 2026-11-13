@@ -375,8 +375,14 @@ S6-S7 (roadmap `done` only in the last PR).
   The existing CalDAV adapter expands recurring occurrences beforehand.
   A local configured, directional travel-time table uses only registered
   place keys and reports unknown routes or missing places explicitly.
+  Following Copilot review, only the **immediate predecessor and successor
+  within one affected person's busy schedule** are checked for travel;
+  overlapping slots are all reported, including tied nearest neighbors.
+  For a family appointment the caller checks each affected person's own
+  personal + family schedule separately instead of merging unrelated people.
   Deterministic tests cover visibility, overlap, occurrences, known/unknown
-  travel and omitted unrelated calendars. This is not the sender-verified
+  travel, nonadjacent false-warning regressions, and omitted unrelated calendars.
+  This is not the sender-verified
   live household pilot: S6 must configure and compose the trusted calendar
   read path; S7 requires provider acceptance. Independent review and exact-head
   tests are pending.
