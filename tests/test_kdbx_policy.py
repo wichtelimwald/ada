@@ -80,11 +80,31 @@ class KdbxPolicyTests(unittest.TestCase):
                 with self.assertRaisesRegex(SecretVaultError, "KDF policy rejected"):
                     _validate_kdf_header(header.to_bytes())
 
+    def test_kee_passxc_autocalibrated_cost_is_accepted(self) -> None:
+        # KeePassXC 2.8.0 targets ~1 second, not a fixed 10 rounds.
+        # This header-only test does NOT derive a key or claim speed on all hosts.
+        assert KdfType is not None
+        for version in (KdfType.ARGON2ID, KdfType.ARGON2D):
+            with self.subTest(version=version):
+                header = replace(
+                    self.header,
+                    kdf_type=version,
+                    argon2_memory_kib=64 * 1024,
+                    argon2_iterations=51,
+                    argon2_parallelism=4,
+                )
+                _validate_kdf_header(header.to_bytes())
+
     def test_excessive_argon2_cost_rejected_before_derivation(self) -> None:
         cases = [
             replace(self.header, argon2_memory_kib=1024 * 1024),
             replace(self.header, argon2_iterations=1000),
             replace(self.header, argon2_parallelism=256),
+            replace(
+                self.header,
+                argon2_memory_kib=256 * 1024,
+                argon2_iterations=33,
+            ),
         ]
         for header in cases:
             with self.subTest(header=header.argon2_memory_kib):
