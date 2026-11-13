@@ -77,7 +77,7 @@ was confirmed the same day.
 | --- | --- | --- | --- |
 | D0 | Accept ADR-0009 | accepted 2026-09-26 after probe runs 1–4 and M6; ADR made provider-neutral (declarative CalDAV profiles instead of provider-specific adapters) | decided |
 | D1 | Recurrence expansion | `recurring-ical-events` (LGPL-3.0-or-later) + `x-wr-timezone`, unmodified | decided |
-| D2 | Development credential store | macOS Keychain via `/usr/bin/security` on the Mac host; owner-only `0600` file only for synthetic accounts in dev containers | decided |
+| D2 | Runtime credential source (revised 2026-11-13) | ADR-0013: local Ada-only KDBX vault in persistent Memory storage, manually unlocked on each start; no runtime access to personal macOS Keychain. Prior Keychain probe remains historical; synthetic-only test files remain permitted outside live operation. | decided; implementation pending |
 | D3 | Update/cancel authority | Ada-created events within the grant; other events only with explicit per-action confirmation; Cedar policy decides; Ada records references of events it created | decided |
 | D4 | Travel-time source | configured approximate durations between registered places; unknown pairs reported as unknown | decided |
 | D5 | Durable payload retention | purge the workflow state after a terminal outcome and keep a content-free operation record; details below (revised after review, 2026-09-27) | decided |
@@ -92,7 +92,7 @@ needs a replacement record and a crash-safe order:
 - **Operation record** (Ada-owned local store, no event content):
   `operation_id`, action kind, **keyed action fingerprint** (HMAC-SHA-256 over
   the canonical action binding with a per-installation key kept in the
-  Keychain; a plain hash of low-entropy fields such as title and time could be
+  Ada-only KDBX vault (ADR-0013); a plain hash of low-entropy fields such as title and time could be
   brute-forced), provider event reference, terminal provider/business outcome,
   resulting version and a **purge state** (`pending` → `workflow_deleted` →
   `scrubbed`). It also records which events Ada created (D3).
@@ -524,7 +524,7 @@ To be copied to `docs/todo.md` before the implementation PRs merge:
   per protection domain instead of one account holding every family calendar.
 - Read-only import of appointments kept outside Ada's calendars (for example
   ICS feeds) if conflict detection must cover them.
-- Production credential management (MVP-90). The development adapter reads
+- Production credential management (MVP-90). Historical probe only: the development adapter reads
   the app password from the Keychain service `ada-caldav` (same item as the
   probe); a separate app password is used for mail (MVP-70).
 - IONOS shares calendars only with mailboxes in the same contract and offers
