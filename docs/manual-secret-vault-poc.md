@@ -2,22 +2,33 @@
 
 **Research-only. No actual IONOS/Untis passwords yet.**
 
-1. Install KeePassXC separately on macOS (operator-managed). Choose a test
-   directory inside the **existing persistent Ada Memory root**, e.g.
-   `<memory-root>/secrets/`. Use KeePassXC to create
-   `<memory-root>/secrets/ada.kdbx` with **KDBX4/Argon2** and a
-   synthetic test master passphrase. Do not add a key file. Create a
-   synthetic entry with title `ionos/calendar` and an arbitrary fake password.
-
-2. Ensure the file is owned only by the operator (`chmod 600` on macOS).
-   The PoC refuses symlinks, oversize vaults and group/world-readable files.
-
-3. In the Ada repo root, with Docker Desktop running, execute:
+1. Decide which persistent Ada Memory root to use. `<memory-root>` is
+   a placeholder, **not** a directory Ada creates for this experiment. If you
+   already configured an Ada Memory root, use exactly that path. Otherwise,
+   the following is an **example location for the PoC only**, not an
+   established project default. Run once on the Mac:
 
 ```sh
-# Set this to your actual local Memory root, not a Git project checkout.
-export ADA_MEMORY_ROOT="/absolute/path/to/ada-memory"
+export ADA_MEMORY_ROOT="$HOME/ada-memory"
+umask 077
+mkdir -p "$ADA_MEMORY_ROOT/secrets"
+chmod 700 "$ADA_MEMORY_ROOT/secrets"
+```
 
+   Keep the `ADA_MEMORY_ROOT` value for the Docker command below. Do not put
+   this directory inside the Ada **source-code** repository.
+
+2. Install KeePassXC separately on macOS (operator-managed), then use it to
+   create `$ADA_MEMORY_ROOT/secrets/ada.kdbx` with **KDBX4/Argon2** and a
+   synthetic test master passphrase. Do not add a key file. Create a synthetic
+   entry with title `ionos/calendar` and an arbitrary fake password.
+   Afterwards run `chmod 600 "$ADA_MEMORY_ROOT/secrets/ada.kdbx"`.
+   The PoC refuses symlinks, oversize vaults and group/world-readable files.
+
+3. In the Ada **source-code** repository root, with Docker Desktop running
+   and the `ADA_MEMORY_ROOT` environment variable set as above, execute:
+
+```sh
 docker build --target secrets-poc -t ada-secrets-poc .
 
 docker run --rm -it --network none --read-only --cap-drop ALL \
@@ -38,9 +49,10 @@ weakening file permissions or running Ada as root.
    second run. The wrong passphrase must produce a generic failure without
    revealing user names or titles. No network is needed.
 
-5. If using `FileMemoryStore`, the Memory Git repo's local
-   `.git/info/exclude` ignores `/secrets/`. Do not force-add vaults to Git;
-   check `git -C "$ADA_MEMORY_ROOT" ls-files -- secrets` is empty.
+5. If using `FileMemoryStore`, the initialized Memory Git repo's
+   local `.git/info/exclude` ignores `/secrets/`. Do not force-add vaults
+   to Git; **if the Memory root contains a `.git` directory**, check
+   `git -C "$ADA_MEMORY_ROOT" ls-files -- secrets` is empty.
    Back up the encrypted KDBX file separately, preserving ownership/mode.
    The master passphrase must be recoverable by the operator.
 
