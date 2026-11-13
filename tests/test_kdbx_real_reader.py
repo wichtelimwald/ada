@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 
 from ada.adapters.kdbx_secrets import KdbxSecrets, SecretVaultError
 
@@ -39,11 +40,16 @@ class KdbxRealReaderTests(unittest.TestCase):
             vault = KdbxSecrets(
                 memory_root, allowed_entries=frozenset({"ionos/calendar"})
             )
-            with self.assertRaises(SecretVaultError):
-                vault.unlock("incorrect")
-            with vault:
-                vault.unlock("synthetic-master-not-a-real-credential")
-                self.assertEqual(vault.password("ionos/calendar"), "synthetic-only-password")
+            # The reader/KDF test runs in the test process: kernel-wide
+            # dumpability protection is covered separately in a subprocess.
+            with patch(
+                "ada.adapters.kdbx_secrets._require_protected_credential_process"
+            ):
+                with self.assertRaises(SecretVaultError):
+                    vault.unlock("incorrect")
+                with vault:
+                    vault.unlock("synthetic-master-not-a-real-credential")
+                    self.assertEqual(vault.password("ionos/calendar"), "synthetic-only-password")
             self.assertFalse(vault.unlocked)
             with self.assertRaisesRegex(SecretVaultError, "locked"):
                 vault.password("ionos/calendar")

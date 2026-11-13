@@ -20,5 +20,5 @@
     "--security-opt=no-new-privileges",
     "--pids-limit=256"
   ],
-  "postCreateCommand": "python -m pip install --editable '.[secrets-poc]' && sh ./scripts/validate.sh"
+  "postCreateCommand": "python -m pip install --editable . && python -m pip install --no-cache-dir --only-binary=:all: --require-hashes --force-reinstall -r requirements/kdbx-py314-linux-aarch64.txt && sh ./scripts/validate.sh"
 }

@@ -75,17 +75,41 @@ review is not an independent human security audit.
   Code KDBX Dev Container is a shared, networked development process space,
   not a production secret runtime. Existing secret-reference allowlists
   constrain calls by trusted code, **not** already-compromised processes.
-- **Mandatory before any real credentials:** enforce Linux
-  `PR_SET_DUMPABLE=0` *before* master-password entry, fail closed if process
-  isolation cannot be established, release the reader's retained passphrase
-  and derived key references immediately after decrypting, and test the
-  mitigation with a sibling process in the actual deployment kernel.
-  Accept only strong Argon2 KDF settings before expensive derivation (also
-  enforce maximum memory/CPU), enforce reviewed hash-pinned dependencies,
-  and review the `kdbxtool` reader's security and maintenance status.
-  Run a **dedicated restricted container/process** without IDE, extensions,
-  arbitrary `exec` or unnecessary network egress. Explicitly reassess
-  backups/sync and all host-root access.
+- **Verified limitation of non-dumpability (PR #59 review B1):** Linux checks
+  `/proc/<pid>/mem` and `/proc/<pid>/maps` access when the descriptor is
+  **opened**, not at every subsequent read. A same-UID sibling that opens
+  the victim's `mem` descriptor during Python startup, **before**
+  `PR_SET_DUMPABLE=0`, can keep reading after the flag is set. The reviewer
+  reproduced this 5/5 using a real terminal prompt: both a master passphrase
+  during unlock and a decrypted entry after unlock were accessible.
+  Freshly opened descriptors **after** `prctl` were correctly denied.
+  `PR_SET_DUMPABLE=0` is only defense against **late** readers, not a
+  standalone same-UID isolation mechanism.
+- **Mandatory before any real credentials:** ensure that **from process
+  startup** no untrusted same-UID process shares the credential process's
+  PID namespace. Use a dedicated single-purpose container/process and a UID
+  not shared with IDE extensions, agents, helper processes or workloads;
+  forbid `docker exec`/sidecars in that namespace during unlock. Applying
+  `PR_SET_DUMPABLE=0` *before the prompt* remains defense in depth and must
+  fail closed. The acceptance test must cover both a fresh late-opening
+  sibling **and an attacker already running before unlock that pre-opens a
+  descriptor during process startup**; the latter must have no access in
+  the chosen runtime topology. Optionally add a fail-closed process
+  enumeration gate, understanding that a `/proc` snapshot has races and
+  is **not** a substitute for isolation. Host/root privilege remains out of
+  scope. Release retained password/key references promptly, reject weak
+  Argon2 before derivation, review and lock the **entire** dependency
+  graph, audit `kdbxtool` and prevent unnecessary network egress.
+  Put a Docker `--memory` limit around the credential process to bound
+  post-authentication decompression/resource exhaustion. Review backups,
+  sync and crash/swap handling before live use.
+- **Hardening state (issue #58):** `PR_SET_DUMPABLE=0`, its adapter-side
+  check, bounded KDBX4/Argon2 preflight, a single `O_NOFOLLOW` file
+  descriptor, and early reader credential-reference release are implemented
+  and have synthetic target-side tests. The tests prove **late-opener**
+  denial, not the required pre-open race defense. The research-only VS
+  Code Dev Container remains unsafe for real credentials. No fully isolated
+  credential runtime or production-reader approval exists.
 - **Residual even after hardening:** code in the credential-bearing Ada
   process can read every decrypted credential. OS administrators/container
   host privilege, possible compromised dependencies, immutable Python string

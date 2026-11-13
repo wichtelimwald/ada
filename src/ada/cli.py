@@ -172,11 +172,17 @@ def _unlock_vault(vault_root: str):
     """Unlock only from a trusted local terminal, never from model input."""
     from getpass import GetPassWarning, getpass
     from warnings import catch_warnings, simplefilter
-    from ada.adapters.kdbx_secrets import KdbxSecrets, SecretVaultError
+    from ada.adapters.kdbx_secrets import (
+        KdbxSecrets,
+        SecretVaultError,
+        protect_credential_process,
+    )
 
     if not sys.stdin.isatty():
         raise SecretVaultError("Ada vault unlock requires an interactive terminal")
-
+    # Deny NEW same-UID /proc memory opens before asking for a passphrase.
+    # Already-open fds survive this prctl: this is not same-UID isolation.
+    protect_credential_process()
     vault = KdbxSecrets(vault_root)
     try:
         # getpass falls back to visible stdin when terminal echo cannot be

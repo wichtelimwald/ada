@@ -22,6 +22,12 @@ chmod 700 "$ADA_MEMORY_ROOT/secrets"
    create `$ADA_MEMORY_ROOT/secrets/ada.kdbx` with **KDBX4/Argon2** and a
    synthetic test master passphrase. Do not add a key file. Create a synthetic
    entry with title `ionos/calendar` and an arbitrary fake password.
+   Ada currently rejects some KeePassXC 2.8.0 auto-calibrated vaults because
+   its PoC policy allows only Argon2d/id, 64–256 MiB memory, 3–10 iterations,
+   1–8 lanes. For synthetic compatibility tests, you may explicitly select
+   Argon2id / 256 MiB / 10 iterations / 4 lanes in KeePassXC's advanced KDF
+   settings. Do **not** reduce a real vault's KDF strength to satisfy the PoC:
+   the production-compatible security policy is still under evaluation.
    Afterwards run `chmod 600 "$ADA_MEMORY_ROOT/secrets/ada.kdbx"`.
    The PoC refuses symlinks, oversize vaults and group/world-readable files.
 
@@ -75,13 +81,18 @@ python -m unittest tests.test_kdbx_secrets -v
 docker build --target secrets-poc -t ada-secrets-poc .
 
 docker run --rm -it --network none --read-only --cap-drop ALL \
-  --security-opt no-new-privileges \
+  --security-opt no-new-privileges --memory=1g \
   --mount "type=bind,source=$ADA_MEMORY_ROOT,target=/ada-memory,readonly" \
   ada-secrets-poc secrets-check --memory-root /ada-memory
 ```
 
 The password prompt runs **inside the foreground Ada CLI process**, from a
-terminal. The passphrase is not passed via Docker arguments, environment
+terminal. The memory cap bounds the damage of a password-authorized,
+excessively compressed vault (not an unauthenticated gzip attack). This
+synthetic-only smoke container must have no co-resident same-UID processes;
+Linux `PR_SET_DUMPABLE=0` denies new process-memory opens but **cannot revoke
+already-open** `/proc/<pid>/mem` descriptors. Do not use `docker exec` during
+an unlock, and do not treat this command as a validated production runtime. The passphrase is not passed via Docker arguments, environment
 variables or a network channel. The command reports only whether decryption
 succeeded and then **closes** the vault. It does *not* unlock a background Ada
 runtime. If Docker cannot read the host-owned 0600 file using its non-root
@@ -109,6 +120,6 @@ evidence**, not repeatable exact-head validation.
 
 The maintainer reported running all **17 focused KDBX tests** and the **333-test full suite** on the exact PR head `c3762db30030814e8499d1ffef3ebeab88217421` (Python 3.14.10 / Linux ARM64). This validates synthetic functions and the mocked in-process lifecycle. An independent agent review confirmed same-UID memory disclosure; it did **not** test a real vault in the VS Code profile. A real local-chat end-to-end credential lifecycle, dependency/release approval and IONOS/mail integration remain open gates.
 
-For future real credentials: use a dedicated single-purpose credential runtime without IDE/server/extensions/agent code or arbitrary `exec`; restrict network and other process access, and enforce `PR_SET_DUMPABLE=0` *before* asking for the passphrase. Enforce Argon2 KDF strength and bound its resource use, pin and verify dependency artifacts and review the reader's cryptographic path. Even then, a compromised runtime can read its own decrypted secrets and Python cannot promise immediate memory erasure. This PoC currently provides **none of those production guarantees**.
+For future real credentials: use a dedicated single-purpose credential runtime **isolated from process startup**, without IDE/server/extensions/agent code, other same-UID processes or arbitrary `docker exec`; restrict network, and enforce `PR_SET_DUMPABLE=0` *before* asking for the passphrase as defense in depth against **late** openers only. Review both pre-open and late-open scenarios and enforce a memory limit. Enforce Argon2 KDF strength and bound its resource use, pin and verify dependency artifacts and review the reader's cryptographic path. Even then, a compromised runtime can read its own decrypted secrets and Python cannot promise immediate memory erasure. This PoC currently provides **none of those production guarantees**.
 
 **No live account migration or provider wiring is part of this test.**

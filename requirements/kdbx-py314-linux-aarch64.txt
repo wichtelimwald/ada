@@ -1,0 +1,10 @@
+# Generated for CPython 3.14 on Linux/aarch64 only.
+# Exact PyPI wheel hashes; NOT a security audit or production approval.
+# Use with: python -m pip install --require-hashes -r <this-file>
+argon2-cffi==25.1.0 --hash=sha256:fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
+argon2-cffi-bindings==26.2.0 --hash=sha256:92d65a0831e78294e19d7297d101eaa871033825ad2aa7cb87af2f706062acd7
+cffi==2.1.1 --hash=sha256:58acb8ab8e295e6c5ea12f888cbb13cf21511ef2a3303a23f4325c29d17fe5c1
+defusedxml==0.7.1 --hash=sha256:a352e7e428770286cc899e2542b6cdaedb2b4953ff269a210103ec58f6198a61
+kdbxtool==0.1.7 --hash=sha256:48c8d5c6499514ff59bd75e29c8714cacfb32bbf178bac10394ce571b29df645
+pycparser==3.12 --hash=sha256:a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e
+pycryptodomex==3.24.2 --hash=sha256:97dc6ea02ec1ed55dca0fbc98758ac23d0ca8ce9d7ea32d538c2851e23b8b27f
