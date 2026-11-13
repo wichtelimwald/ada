@@ -41,6 +41,14 @@ For Ada development:
 
 - **Acreom Quickadd / ctparse, pinned research commit `0b3bfc26a7347a80821e86eb3838556a7adc2a30`** — the repository code is MIT-licensed. Its bundled `ctparse/models/model.pbz` scorer is used only in the disposable research characterization/conversion path. The reviewed source/package metadata does not separately establish the model's origin, training-data provenance, or redistribution terms. Ada therefore does not vendor or redistribute the scorer or its transformed JSON form, and the artifact license/provenance gate remains **CONDITIONAL** pending explicit evidence.
 
+## Experimental optional dependency — not production-approved
+
+- **kdbxtool 0.1.7** — Apache-2.0 (upstream [PyPI](https://pypi.org/project/kdbxtool/), [GitHub](https://github.com/coreyleavitt/kdbxtool)). An **opt-in** `secrets-poc` extra / Docker build stage uses it to test manually unlocking KDBX4 files. **Not** an adopted production Ada dependency. No code vendored. The upstream package is classified **alpha**; it has limited maintainer/adoption evidence. Python 3.14 installation, genuine KeePassXC KDBX4/Argon2 compatibility, release-wheel integrity and security review remain open gates.
+- Declared transitives: `argon2-cffi`, `pycryptodomex`, `defusedxml`. Resolved exact versions, platform wheel contents, security and license obligations are **not yet reviewed**; no PoC image may be published until that review. This keeps the source PoC separate from the production/runtime release gate.
+- **PyKeePass 4.2.0** — GPL-3.0; evaluated but not integrated. **KeePassXC CLI** — separately installed GPL application/CLI, potential fallback, not bundled into Ada.
+
+See [KDBX reader evaluation](docs/research/kdbx-reader-evaluation.md).
+
 ## Adopted dependencies
 
 - **PydanticAI 2.46.0** — MIT License. Used behind Ada's replaceable agent-runtime adapter.

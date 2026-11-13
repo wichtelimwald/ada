@@ -1,0 +1,24 @@
+{
+  "name": "Ada (KDBX research)",
+  "build": {
+    "dockerfile": "../../Dockerfile",
+    "context": "../..",
+    "target": "development"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+  "remoteUser": "ada",
+  "mounts": [
+    "source=${localEnv:HOME}/ada-memory/secrets,target=/ada-memory/secrets,type=bind,readonly"
+  ],
+  "containerEnv": {
+    "PYDANTIC_AI_NO_BANNER": "1",
+    "ADA_VAULT_ROOT": "/ada-memory"
+  },
+  "runArgs": [
+    "--cap-drop=ALL",
+    "--security-opt=no-new-privileges",
+    "--pids-limit=256"
+  ],
+  "postCreateCommand": "python -m pip install --editable '.[secrets-poc]' && sh ./scripts/validate.sh"
+}

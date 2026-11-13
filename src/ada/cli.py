@@ -7,6 +7,7 @@ import os
 import platform
 import sys
 from collections.abc import Callable
+from contextlib import ExitStack
 
 from ada import __version__
 from ada.adapters.file_memory import FileMemoryError, FileMemoryStore
@@ -89,6 +90,8 @@ def _chat(
     model: str,
     ollama_url: str,
     memory_root: str | None = None,
+    unlock_vault: bool = False,
+    vault_root: str | None = None,
 ) -> int:
     from ada.adapters.local_ollama import (
         LocalModelConfigurationError,
@@ -97,6 +100,8 @@ def _chat(
         build_local_ollama_runtime,
         check_local_ollama_ready,
     )
+
+    from ada.adapters.kdbx_secrets import SecretVaultError
 
     config = LocalOllamaConfig(model=model, base_url=ollama_url)
     normalized_memory_root = (
@@ -111,10 +116,6 @@ def _chat(
             personality = bootstrap_personality_memory(memory)
 
         check_local_ollama_ready(config)
-        runtime = build_local_ollama_runtime(
-            config,
-            personality=personality,
-        )
     except (LocalModelConfigurationError, LocalModelUnavailableError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
@@ -122,23 +123,88 @@ def _chat(
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    # PydanticAI's synchronous runner uses the current event loop. Own it for
-    # this CLI session so both the loop and the transport close on exit.
-    with asyncio.Runner() as runner:
-        runner.get_loop()
-        try:
-            return _chat_loop(runtime)
-        except KeyboardInterrupt:
-            print()
-            return 130
-        except Exception as exc:
-            print(f"error: local model request failed: {exc}", file=sys.stderr)
-            return 1
-        finally:
+    # Keep the decrypted vault in the same process as the chat session.
+    # It is deliberately NOT passed to the agent/model runtime as a tool.
+    with ExitStack() as resources:
+        if unlock_vault:
+            location = vault_root or normalized_memory_root
+            if not location:
+                print(
+                    "error: --unlock-vault requires --vault-root or --memory-root",
+                    file=sys.stderr,
+                )
+                return 2
             try:
-                runner.run(runtime.aclose())
+                resources.enter_context(_unlock_vault(location))
+            except SecretVaultError as exc:
+                print(f"error: {exc}", file=sys.stderr)
+                return 2
+
+        try:
+            runtime = build_local_ollama_runtime(
+                config,
+                personality=personality,
+            )
+        except (LocalModelConfigurationError, LocalModelUnavailableError) as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+
+        # The vault is closed AFTER model runtime cleanup, including /quit,
+        # EOF, an interrupt or any request-loop failure.
+        with asyncio.Runner() as runner:
+            runner.get_loop()
+            try:
+                return _chat_loop(runtime)
+            except KeyboardInterrupt:
+                print()
+                return 130
             except Exception as exc:
-                print(f"warning: local model cleanup failed: {exc}", file=sys.stderr)
+                print(f"error: local model request failed: {exc}", file=sys.stderr)
+                return 1
+            finally:
+                try:
+                    runner.run(runtime.aclose())
+                except Exception as exc:
+                    print(f"warning: local model cleanup failed: {exc}", file=sys.stderr)
+
+
+def _unlock_vault(vault_root: str):
+    """Unlock only from a trusted local terminal, never from model input."""
+    from getpass import GetPassWarning, getpass
+    from warnings import catch_warnings, simplefilter
+    from ada.adapters.kdbx_secrets import KdbxSecrets, SecretVaultError
+
+    if not sys.stdin.isatty():
+        raise SecretVaultError("Ada vault unlock requires an interactive terminal")
+
+    vault = KdbxSecrets(vault_root)
+    try:
+        # getpass falls back to visible stdin when terminal echo cannot be
+        # disabled. A password prompt must fail closed instead.
+        with catch_warnings():
+            simplefilter("error", GetPassWarning)
+            passphrase = getpass("Ada vault passphrase: ")
+    except (EOFError, KeyboardInterrupt, OSError, GetPassWarning):
+        raise SecretVaultError("Ada vault unlock cancelled") from None
+
+    try:
+        vault.unlock(passphrase)
+    finally:
+        del passphrase
+    return vault
+
+
+def _secrets_check(memory_root: str) -> int:
+    """Interactive one-shot PoC; does not unlock a different Ada process."""
+    from ada.adapters.kdbx_secrets import SecretVaultError
+
+    try:
+        with _unlock_vault(memory_root):
+            print("Ada vault unlocked for this check; now locked again.")
+        return 0
+    except SecretVaultError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -177,6 +243,26 @@ def build_parser() -> argparse.ArgumentParser:
             "data until protected domains are implemented."
         ),
     )
+    chat.add_argument(
+        "--unlock-vault",
+        action="store_true",
+        help="Experimental: require a terminal passphrase and keep Ada's KDBX "
+             "vault unlocked only during this chat process.",
+    )
+    chat.add_argument(
+        "--vault-root",
+        default=os.getenv("ADA_VAULT_ROOT") or None,
+        help="Root holding secrets/ada.kdbx; defaults to --memory-root.",
+    )
+    secret_check = subparsers.add_parser(
+        "secrets-check",
+        help="Experimental: interactively unlock and close an Ada-only KDBX vault.",
+    )
+    secret_check.add_argument(
+        "--memory-root",
+        required=True,
+        help="Persistent Ada Memory root holding secrets/ada.kdbx.",
+    )
     return parser
 
 
@@ -186,12 +272,16 @@ def main() -> None:
 
     if args.command == "doctor":
         raise SystemExit(_doctor())
+    if args.command == "secrets-check":
+        raise SystemExit(_secrets_check(args.memory_root))
     if args.command == "chat":
         raise SystemExit(
             _chat(
                 model=args.model,
                 ollama_url=args.ollama_url,
                 memory_root=args.memory_root,
+                unlock_vault=args.unlock_vault,
+                vault_root=args.vault_root,
             )
         )
 

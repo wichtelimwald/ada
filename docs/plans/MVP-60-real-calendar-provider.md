@@ -54,7 +54,7 @@ trade-offs.
 4. Provider-native duplicate prevention and reconciliation for each write kind.
 5. Conflict detection over real data, including recurring occurrences, busy
    semantics and configured travel times.
-6. Development credential handling and durable-state minimization for real
+6. Runtime credential handling and durable-state minimization for real
    event data.
 7. Real-provider acceptance on IONOS with synthetic calendars.
 
@@ -77,7 +77,7 @@ was confirmed the same day.
 | --- | --- | --- | --- |
 | D0 | Accept ADR-0009 | accepted 2026-09-26 after probe runs 1–4 and M6; ADR made provider-neutral (declarative CalDAV profiles instead of provider-specific adapters) | decided |
 | D1 | Recurrence expansion | `recurring-ical-events` (LGPL-3.0-or-later) + `x-wr-timezone`, unmodified | decided |
-| D2 | Development credential store | macOS Keychain via `/usr/bin/security` on the Mac host; owner-only `0600` file only for synthetic accounts in dev containers | decided |
+| D2 | Runtime credential source (revised 2026-11-13) | ADR-0013: local Ada-only KDBX vault in persistent Memory storage, manually unlocked on each start; no runtime access to personal macOS Keychain. Prior Keychain probe remains historical; synthetic-only test files remain permitted outside live operation. | decided; implementation pending |
 | D3 | Update/cancel authority | Ada-created events within the grant; other events only with explicit per-action confirmation; Cedar policy decides; Ada records references of events it created | decided |
 | D4 | Travel-time source | configured approximate durations between registered places; unknown pairs reported as unknown | decided |
 | D5 | Durable payload retention | purge the workflow state after a terminal outcome and keep a content-free operation record; details below (revised after review, 2026-09-27) | decided |
@@ -92,7 +92,7 @@ needs a replacement record and a crash-safe order:
 - **Operation record** (Ada-owned local store, no event content):
   `operation_id`, action kind, **keyed action fingerprint** (HMAC-SHA-256 over
   the canonical action binding with a per-installation key kept in the
-  Keychain; a plain hash of low-entropy fields such as title and time could be
+  Ada-only KDBX vault (ADR-0013); a plain hash of low-entropy fields such as title and time could be
   brute-forced), provider event reference, terminal provider/business outcome,
   resulting version and a **purge state** (`pending` → `workflow_deleted` →
   `scrubbed`). It also records which events Ada created (D3).
@@ -136,7 +136,7 @@ See the evaluation. Summary:
 
 - **Identities:** Ada's own IONOS mailbox owns all family calendars; family
   members receive outward shares. The Ada app password is class *Secret*
-  (never in Memory, prompts, logs, env, argv, fixtures, DBOS state).
+  (never in semantic Memory, prompts, logs, env, argv, fixtures, DBOS state).
 - **Authority:** every create/update/cancel passes AdaGuard with the action and
   resource derived from the typed proposal. Configured calendar access modes
   are cross-checked against provider-reported privileges at startup; a mismatch
@@ -524,9 +524,10 @@ To be copied to `docs/todo.md` before the implementation PRs merge:
   per protection domain instead of one account holding every family calendar.
 - Read-only import of appointments kept outside Ada's calendars (for example
   ICS feeds) if conflict detection must cover them.
-- Production credential management (MVP-90). The development adapter reads
-  the app password from the Keychain service `ada-caldav` (same item as the
-  probe); a separate app password is used for mail (MVP-70).
+- Credential packaging, manual unlock lifecycle and restore hardening (MVP-90),
+  after S6 integrates the ADR-0013 KDBX source. The earlier macOS Keychain
+  service `ada-caldav` remains historical probe-only evidence; a separate
+  IONOS app password is required for mail (MVP-70).
 - IONOS shares calendars only with mailboxes in the same contract and offers
   no external guest passwords: decide after the MVP how people outside the
   contract get access.

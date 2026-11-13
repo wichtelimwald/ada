@@ -44,6 +44,54 @@
 - native macOS local-chat process ↔ host resources accessible to the logged-in
   user; a bridged Dev Container does not isolate this separate native process.
 
+## Ada KDBX credentials — observed same-UID attack (PR #57)
+
+**Status:** Proven for the reviewed Docker Desktop/LinuxKit test environment at
+`c3762db30030814e8499d1ffef3ebeab88217421`, with synthetic secrets.
+This is **not** a general Linux/kernel or macOS-wide guarantee. The agent
+review is not an independent human security audit.
+
+- **Assets:** Ada-only `secrets/ada.kdbx` at rest; master passphrase in the
+  unlocked process; **all** plaintext vault entries; encrypted backups
+  decryptable with the same master passphrase.
+- **Trust boundaries:** trusted Ada code vs. any *other process sharing the
+  container's UID and PID namespace*; Python KDBX reader vs. decrypted values
+  in process memory; the IDE/server/extensions/terminals/AI agents vs. a
+  credential-bearing process; container vs. host/root administrative access.
+- **Observed attack:** With the documented Docker `--cap-drop=ALL` and
+  `--security-opt=no-new-privileges` settings, a sibling process with UID
+  `ada` read the master passphrase and decrypted entry passwords through
+  `/proc/<pid>/mem` on the reviewed Docker Desktop LinuxKit kernel without
+  Yama LSM. A read-only KDBX mount does **not** prevent disclosure. Network
+  access in the VS Code container can compound the consequences.
+- **Lifetime risk:** `kdbxtool` retains a normal Python `str` master
+  passphrase and key material while open. Its `zeroize_credentials()` only
+  zeroes a *copy* of the transformed immutable bytes; decrypted entry
+  strings have been observed to persist after `lock()` and garbage collection.
+  `lock()` detaches the database and stops authorized lookups, but does
+  **not** promise memory erasure. Process exit reduces lifetime, without
+  proving that every memory copy is scrubbed.
+- **Current accepted scope:** **synthetic secrets only**. The optional VS
+  Code KDBX Dev Container is a shared, networked development process space,
+  not a production secret runtime. Existing secret-reference allowlists
+  constrain calls by trusted code, **not** already-compromised processes.
+- **Mandatory before any real credentials:** enforce Linux
+  `PR_SET_DUMPABLE=0` *before* master-password entry, fail closed if process
+  isolation cannot be established, release the reader's retained passphrase
+  and derived key references immediately after decrypting, and test the
+  mitigation with a sibling process in the actual deployment kernel.
+  Accept only strong Argon2 KDF settings before expensive derivation (also
+  enforce maximum memory/CPU), enforce reviewed hash-pinned dependencies,
+  and review the `kdbxtool` reader's security and maintenance status.
+  Run a **dedicated restricted container/process** without IDE, extensions,
+  arbitrary `exec` or unnecessary network egress. Explicitly reassess
+  backups/sync and all host-root access.
+- **Residual even after hardening:** code in the credential-bearing Ada
+  process can read every decrypted credential. OS administrators/container
+  host privilege, possible compromised dependencies, immutable Python string
+  remnants and backups remain outside the app's guarantee. A runtime
+  process-hardening flag is not a substitute for a trusted code base.
+
 ## Threats to evaluate
 
 - direct and indirect prompt injection,

@@ -18,6 +18,10 @@ dependencies = [
     "x-wr-timezone==2.0.1",
 ]
 
+[project.optional-dependencies]
+# Laboratory-only KDBX reader. Not yet a production dependency.
+secrets-poc = ["kdbxtool==0.1.7"]
+
 [project.scripts]
 ada = "ada.cli:main"
 

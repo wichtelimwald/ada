@@ -26,6 +26,15 @@ WORKDIR /workspace
 USER ada
 CMD ["sleep", "infinity"]
 
+FROM base AS secrets-poc
+
+# Experimental KDBX compatibility/interactive-unlock test only.
+RUN python -m pip install --no-cache-dir '/app[secrets-poc]'
+
+USER ada
+ENTRYPOINT ["python", "-m", "ada"]
+CMD ["doctor"]
+
 FROM base AS runtime
 
 RUN python -m pip install --no-cache-dir /app
