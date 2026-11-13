@@ -25,11 +25,13 @@ chmod 700 "$ADA_MEMORY_ROOT/secrets"
    Afterwards run `chmod 600 "$ADA_MEMORY_ROOT/secrets/ada.kdbx"`.
    The PoC refuses symlinks, oversize vaults and group/world-readable files.
 
-## Recommended: VS Code Dev Container
+## Synthetic-only: VS Code Dev Container (never use real credentials here)
 
-The repository has an **opt-in** configuration
+The repository has an **opt-in, research-only** configuration
 `.devcontainer/secrets-poc/devcontainer.json`. The normal development
 configuration does not mount the vault or install the experimental reader.
+
+**Security warning:** The optional VS Code container is **shared and networked**. Its VS Code server, extensions, terminals, installed packages and AI agents use the same UID (`ada`). An independent agent review reproduced a **sibling same-UID process** reading an unlocked Ada process's **master passphrase and plaintext entries** through `/proc/<pid>/mem` on Docker Desktop LinuxKit. A read-only KDBX mount, `--cap-drop=ALL` and `no-new-privileges` do **not** mitigate this. The passphrase compromises accessible backups, too. Use *only synthetic passphrases and entries* in this container. Do not use this path for real IONOS/Untis secrets.
 
 1. Open the PR branch in VS Code. Use **Dev Containers: Reopen Folder Locally**
    if you are currently inside a container, then **Dev Containers: Reopen in
@@ -64,7 +66,7 @@ python -m unittest tests.test_kdbx_secrets -v
    it on exit; however, **no live calendar/mail adapter consumes credentials
    yet**. No general Ada background service is started by VS Code.
 
-## Alternate: isolated manual Docker smoke check
+## Alternate: isolated manual Docker smoke check (synthetic only)
 
 3. In the Ada **source-code** repository root, with Docker Desktop running
    and the `ADA_MEMORY_ROOT` environment variable set as above, execute:
@@ -95,7 +97,7 @@ weakening file permissions or running Ada as root.
    to Git; **if the Memory root contains a `.git` directory**, check
    `git -C "$ADA_MEMORY_ROOT" ls-files -- secrets` is empty.
    Back up the encrypted KDBX file separately, preserving ownership/mode.
-   The master passphrase must be recoverable by the operator.
+   The master passphrase must be recoverable by the operator. For any eventual real vault, choose a **unique, high-entropy master passphrase** (e.g. at least five independently random Diceware-style words, preferably more). No application-enforced passphrase strength gate exists yet.
 
 ## Evidence and remaining gates
 
@@ -105,8 +107,8 @@ and the incorrect-passphrase case failed closed. The tested image digest and
 exact code revision were not recorded, so this is **operator-reported smoke
 evidence**, not repeatable exact-head validation.
 
-The VS Code profile, full test suite and in-process chat unlock still require
-target-Mac verification. Dependency/release review and the integration with
-real IONOS/mail consumers remain open gates.
+The maintainer reported running all **17 focused KDBX tests** and the **333-test full suite** on the exact PR head `c3762db30030814e8499d1ffef3ebeab88217421` (Python 3.14.10 / Linux ARM64). This validates synthetic functions and the mocked in-process lifecycle. An independent agent review confirmed same-UID memory disclosure; it did **not** test a real vault in the VS Code profile. A real local-chat end-to-end credential lifecycle, dependency/release approval and IONOS/mail integration remain open gates.
+
+For future real credentials: use a dedicated single-purpose credential runtime without IDE/server/extensions/agent code or arbitrary `exec`; restrict network and other process access, and enforce `PR_SET_DUMPABLE=0` *before* asking for the passphrase. Enforce Argon2 KDF strength and bound its resource use, pin and verify dependency artifacts and review the reader's cryptographic path. Even then, a compromised runtime can read its own decrypted secrets and Python cannot promise immediate memory erasure. This PoC currently provides **none of those production guarantees**.
 
 **No live account migration or provider wiring is part of this test.**
