@@ -64,9 +64,13 @@ unauthenticated KDBX header **before** deriving a key.
 **Current hardening branch (issue #58 / PR #60):** KDBX4 with
 Argon2d or Argon2id, **64–256 MiB**, **3–128 iterations** and **1–8
 parallel lanes**, with a combined `memory_kib × iterations` ceiling
-of **8,388,608 KiB-rounds (8,192 MiB-rounds)**. Legacy AES-KDF and
-out-of-budget resource requests fail closed **before derivation**.
-This replaces the 10-iteration ceiling from merged PR #59.
+of **8,388,608 KiB-rounds (8,192 MiB-rounds)**. The strict isolated
+credential image additionally requires **at least 2,097,152 KiB-rounds
+(2,048 MiB-rounds)**; the synthetic research mode keeps its legacy test
+compatibility. Legacy AES-KDF, weak strict KDFs and out-of-budget
+requests fail closed **before derivation**. These numeric thresholds
+still require target benchmark and independent review. This replaces
+the 10-iteration ceiling from merged PR #59.
 
 **Why:** KeePassXC 2.8.0 targets ~1 second by calibrating a vault's
 Argon2 rounds; the reviewer's 64 MiB / 4-lane target-Virtual-Machine
