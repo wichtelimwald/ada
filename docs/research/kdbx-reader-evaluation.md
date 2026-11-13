@@ -92,6 +92,29 @@ not a production credential environment. Reviewed hash-pinned transitive
 dependencies, reader audit, dedicated runtime isolation and an independent
 security re-review remain uncompleted. See [issue #58](https://github.com/wichtelimwald/ada/issues/58).
 
+## Reader source-inspection notes (not a completed audit)
+
+Inspected the exact tagged upstream source `coreyleavitt/kdbxtool@v0.1.7`:
+
+- `Kdbx4Reader.decrypt` verifies the header SHA-256, derived-key header HMAC,
+  and per-block HMACs using `constant_time_compare` before decrypting the
+  XML payload. This is a positive static observation; it is **not** a
+  cryptographic correctness proof.
+- `Database.open_bytes` retains ordinary Python `_password` and
+  `_transformed_key` fields, confirming the earlier review's finding.
+  Our read-only Ada wrapper releases these references immediately after open.
+- `Kdbx4Reader.decrypt` uses unbounded `gzip.decompress` on the authenticated
+  payload. The **encrypted file** is limited to 16 MiB by Ada, but the
+  *decompressed* XML size is not explicitly bounded. This is a **potential
+  resource-exhaustion risk** for unexpectedly large or deliberately crafted
+  password-authorized KDBX content. Evaluate/reproduce before calling it a
+  verified vulnerability. No user-controlled KDBX upload or web endpoint is
+  exposed in Ada's current scope.
+
+A targeted independent reader review remains mandatory before using any real
+credentials, including payload-size behavior and verification that no
+authenticated content is parsed before cryptographic checks.
+
 ## Decision
 
 The project accepts **KDBX vault format + manual unlock** (ADR-0013).
