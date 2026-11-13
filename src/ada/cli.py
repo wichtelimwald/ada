@@ -141,6 +141,31 @@ def _chat(
                 print(f"warning: local model cleanup failed: {exc}", file=sys.stderr)
 
 
+def _secrets_check(memory_root: str) -> int:
+    """Interactive one-shot PoC; does not unlock a different Ada process."""
+    from getpass import getpass
+    from ada.adapters.kdbx_secrets import KdbxSecrets, SecretVaultError
+
+    if not sys.stdin.isatty():
+        print("error: Ada vault unlock requires an interactive terminal", file=sys.stderr)
+        return 2
+    try:
+        with KdbxSecrets(memory_root) as vault:
+            password = getpass("Ada vault passphrase: ")
+            try:
+                vault.unlock(password)
+            finally:
+                del password
+            print("Ada vault unlocked for this check; now locked again.")
+        return 0
+    except (EOFError, KeyboardInterrupt):
+        print("\nerror: Ada vault unlock cancelled", file=sys.stderr)
+        return 2
+    except SecretVaultError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ada",
@@ -177,6 +202,15 @@ def build_parser() -> argparse.ArgumentParser:
             "data until protected domains are implemented."
         ),
     )
+    secret_check = subparsers.add_parser(
+        "secrets-check",
+        help="Experimental: interactively unlock and close an Ada-only KDBX vault.",
+    )
+    secret_check.add_argument(
+        "--memory-root",
+        required=True,
+        help="Persistent Ada Memory root holding secrets/ada.kdbx.",
+    )
     return parser
 
 
@@ -186,6 +220,8 @@ def main() -> None:
 
     if args.command == "doctor":
         raise SystemExit(_doctor())
+    if args.command == "secrets-check":
+        raise SystemExit(_secrets_check(args.memory_root))
     if args.command == "chat":
         raise SystemExit(
             _chat(
