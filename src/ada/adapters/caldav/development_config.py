@@ -44,7 +44,8 @@ class IONOSDevelopmentSettings:
 def _load_owned_toml(path: Path) -> dict[str, Any]:
     """Read a regular, owner-only file without following the final symlink."""
 
-    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    # Fail closed if no-follow semantics are unavailable on the target host.
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
     try:
         fd = os.open(path, flags)
     except OSError:
