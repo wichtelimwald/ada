@@ -74,21 +74,25 @@ still live for the unlocked session. The test suite includes Linux subprocess
 checks for process non-dumpability and sibling access denial, pending exact-head
 validation on the target Mac.
 
-**Dependency capture (not a completed lock):** `scripts/capture_kdbx_wheel_hashes.py`
-uses only the Python standard library and pip's `--dry-run --report` support.
-It must be executed **from the repo root** on the target **CPython 3.14 /
-Linux aarch64** container. It requests binary-only wheels from PyPI,
-requires precisely the seven package versions recorded during the synthetic
-Docker test, extracts each actual wheel SHA-256 from pip's installation report,
-and constructs a candidate `requirements/kdbx-py314-linux-aarch64.txt`
-**in a temporary directory**. It then checks
-`pip install --dry-run --require-hashes` against that candidate and **prints**
-its contents for review. It deliberately leaves the checkout unchanged, so
-the maintainer can share the non-sensitive wheel hashes for a separate
-reviewed commit without causing local untracked-file conflicts.
-It does not pin the remaining Python application dependency graph,
-so this is **not yet a complete production build lock**.
-There is no claim that a hash makes the upstream wheel trustworthy.
+**Target-specific KDBX subset is now hash-locked (not full Ada):**
+The maintainer ran `scripts/capture_kdbx_wheel_hashes.py` in CPython 3.14 /
+Linux aarch64. Its pip report resolved precisely seven KDBX packages and
+`--require-hashes --dry-run` completed successfully. The exact reported
+wheel hashes are committed as
+[`requirements/kdbx-py314-linux-aarch64.txt`](../../requirements/kdbx-py314-linux-aarch64.txt).
+The opt-in `secrets-poc` Docker stage and VS Code KDBX research profile now
+install this subset with `--require-hashes --only-binary=:all:` and
+`--force-reinstall`; no downloaded source distributions are permitted.
+The rest of Ada and the floating `python:3.14-slim` base image are **not**
+locked by this file; this remains a **synthetic-only** dependency boundary.
+
+The maintainer's terminal output is strong evidence for resolution of the
+seven wheel hashes, not an independent verification of the wheel bytes or a
+license/security audit. The new Docker build and Dev Container post-create
+command have not yet been tested against this PR head. The capture tool still
+prints a candidate without writing untracked files if a future re-resolution
+is necessary. See `NOTICE.md` for provisional license metadata and
+distribution blockers.
 
 **Still prohibited:** real credentials. The default/shared VS Code runtime is
 not a production credential environment. Reviewed hash-pinned transitive
