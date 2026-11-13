@@ -52,8 +52,11 @@ another image name through arguments.
   bloated vault may kill the Ada process; no provider write/retry may
   be misreported as successful after such a crash.
 - Image sets `PYTHONNOUSERSITE=1`, starts `python -I -m ada`, and
-  requires strict credential isolation checks. No unrestricted Python
-  plugin/extension loader is introduced.
+  requires strict credential isolation checks. The strict Argon2 KDF
+  budget requires at least 2,048 MiB-rounds and at most 8,192
+  MiB-rounds, while preserving 64–256 MiB memory and 1–8 lanes.
+  Benchmark this range before activating real vaults. No unrestricted
+  Python plugin/extension loader is introduced.
 
 Container memory and swap limits are mandatory **runtime configuration**.
 An authenticated 65 KiB compressed vault expanded to 64 MiB in the
