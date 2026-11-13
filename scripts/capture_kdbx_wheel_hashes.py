@@ -128,9 +128,14 @@ def main() -> int:
             check=True,
         )
 
-    # Keep the checkout unchanged. The maintainer shares this small,
-    # non-sensitive output for review/commit via the GitHub PR.
+    # Keep the checkout unchanged and detect drift from the committed lock.
+    # A changed PyPI artifact/version must be reviewed in a separate commit.
+    committed = Path(OUTPUT_NAME)
+    if committed.is_file() and committed.read_text(encoding="utf-8") != contents:
+        raise SystemExit(f"Resolved wheels differ from {OUTPUT_NAME}; review required")
     print("Hash-locked dry-run resolution passed.")
+    if committed.is_file():
+        print(f"Committed {OUTPUT_NAME} matches current resolution.")
     print(f"Candidate {OUTPUT_NAME} ({len(found)} wheel hashes):")
     print(contents)
     return 0
