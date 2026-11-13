@@ -184,7 +184,7 @@ def read_ionos_keychain_password(mailbox: str) -> str:
         )
     # The security CLI appends a line ending; preserve any other characters.
     try:
-        password = result.stdout.removesuffix(b"\\n").removesuffix(b"\\r").decode(
+        password = result.stdout.removesuffix(b"\n").removesuffix(b"\r").decode(
             "utf-8", errors="strict"
         )
     except UnicodeError:
