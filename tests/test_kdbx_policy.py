@@ -111,6 +111,27 @@ class KdbxPolicyTests(unittest.TestCase):
                 )
                 _validate_kdf_header(header.to_bytes())
 
+    def test_strict_runtime_rejects_cheap_kdf_but_accepts_calibrated(self) -> None:
+        # Strict credentials require at least 2048 MiB-rounds; a 64 MiB
+        # KeePassXC auto-calibrated 51-round vault still passes.
+        with patch.dict(
+            "os.environ", {"ADA_REQUIRE_ISOLATED_CREDENTIALS": "1"}
+        ):
+            for header in (
+                replace(self.header, argon2_memory_kib=64 * 1024, argon2_iterations=3),
+                replace(self.header, argon2_memory_kib=256 * 1024, argon2_iterations=3),
+            ):
+                with self.subTest(mem=header.argon2_memory_kib):
+                    with self.assertRaisesRegex(SecretVaultError, "KDF policy rejected"):
+                        _validate_kdf_header(header.to_bytes())
+            calibrated = replace(
+                self.header,
+                argon2_memory_kib=64 * 1024,
+                argon2_iterations=51,
+                argon2_parallelism=4,
+            )
+            _validate_kdf_header(calibrated.to_bytes())
+
     def test_excessive_argon2_cost_rejected_before_derivation(self) -> None:
         cases = [
             replace(self.header, argon2_memory_kib=1024 * 1024),
