@@ -207,7 +207,14 @@ class SchedulingConflict:
 
 
 class CalendarConflictChecker:
-    """Check authorized busy intervals without seeing private event details."""
+    """Check one affected person's authorized busy schedule.
+
+    The caller must include shared/family intervals that affect this person.
+    For a family event, invoke the checker separately for each affected
+    person's schedule; combining unrelated people's slots can hide a real
+    nearest-neighbor travel conflict. Authorization and audience selection
+    remain the caller's trusted responsibility.
+    """
 
     def __init__(self, travel_time: TravelTimePort) -> None:
         self._travel_time = travel_time
@@ -221,6 +228,11 @@ class CalendarConflictChecker:
     ) -> tuple[SchedulingConflict, ...]:
         conflicts: list[SchedulingConflict] = []
 
+        # All overlapping appointments matter, but travel between the new
+        # appointment and nonadjacent ones does not. Select the immediate
+        # predecessor(s) and successor(s) in this person's schedule.
+        preceding: list[CalendarBusyInterval] = []
+        following: list[CalendarBusyInterval] = []
         for event in existing_events:
             if proposal.start < event.end and proposal.end > event.start:
                 conflicts.append(
@@ -229,17 +241,38 @@ class CalendarConflictChecker:
                         slot_id=event.slot_id,
                     )
                 )
-                continue
-
-            if event.end <= proposal.start:
-                available = proposal.start - event.end
-                origin, destination = event.place_key, candidate_place_key
+            elif event.end <= proposal.start:
+                preceding.append(event)
             elif proposal.end <= event.start:
-                available = event.start - proposal.end
-                origin, destination = candidate_place_key, event.place_key
-            else:
-                continue
+                following.append(event)
 
+        adjacent: list[tuple[CalendarBusyInterval, timedelta, str | None, str | None]] = []
+        if preceding:
+            nearest_end = max(event.end for event in preceding)
+            for event in preceding:
+                if event.end == nearest_end:
+                    adjacent.append(
+                        (
+                            event,
+                            proposal.start - event.end,
+                            event.place_key,
+                            candidate_place_key,
+                        )
+                    )
+        if following:
+            nearest_start = min(event.start for event in following)
+            for event in following:
+                if event.start == nearest_start:
+                    adjacent.append(
+                        (
+                            event,
+                            event.start - proposal.end,
+                            candidate_place_key,
+                            event.place_key,
+                        )
+                    )
+
+        for event, available, origin, destination in adjacent:
             if origin is None or destination is None:
                 conflicts.append(
                     SchedulingConflict(
