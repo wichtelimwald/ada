@@ -69,6 +69,33 @@ def protect_credential_process() -> None:
     """
     _prctl(_PR_SET_DUMPABLE, 0)
     _require_protected_credential_process()
+    # The dedicated runtime image opts in; ordinary development stays
+    # synthetic-only. This is a diagnostic check, NOT a replacement for the
+    # private PID namespace established by the container launcher.
+    if os.environ.get("ADA_REQUIRE_ISOLATED_CREDENTIALS") == "1":
+        _require_isolated_credential_namespace()
+
+
+def _require_isolated_credential_namespace() -> None:
+    """Fail closed if a private, single-process PID namespace is not evident.
+
+    PID 1 and no other process leaders visible in /proc are necessary, but
+    not sufficient, for runtime isolation. The Docker launcher must establish
+    the private namespace *before* Python startup; otherwise a pre-opened
+    process-memory fd can survive PR_SET_DUMPABLE=0.
+    """
+    if os.getpid() != 1:
+        raise SecretVaultError("Ada credential PID namespace is not isolated")
+    try:
+        visible_pids = {
+            int(entry)
+            for entry in os.listdir("/proc")
+            if entry.isdecimal()
+        }
+    except OSError:
+        raise SecretVaultError("Ada credential PID namespace is not isolated") from None
+    if visible_pids != {1}:
+        raise SecretVaultError("Ada credential PID namespace is not isolated")
 
 
 def _require_protected_credential_process() -> None:
@@ -164,6 +191,8 @@ class KdbxSecrets:
 
     def unlock(self, passphrase: str) -> None:
         _require_protected_credential_process()
+        if os.environ.get("ADA_REQUIRE_ISOLATED_CREDENTIALS") == "1":
+            _require_isolated_credential_namespace()
         if self.unlocked:
             raise SecretVaultError("Ada vault is already unlocked")
         if not passphrase:
