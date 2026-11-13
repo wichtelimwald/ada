@@ -205,5 +205,115 @@ class ConflictDetectionTests(unittest.TestCase):
         self.assertEqual(result, ())
 
 
+    def test_nonadjacent_predecessor_does_not_trigger_unknown_route(self) -> None:
+        # A 09-10, B 11-12, candidate 13-14. Only B -> candidate
+        # matters; A has an unknown place and must not trigger a warning.
+        result = self.checker().check(
+            candidate(start=instant(12, 13), end=instant(12, 14)),
+            existing_events=self.slots(
+                event(event_id="A", start=instant(12, 9), end=instant(12, 10),
+                      location="unregistered distant place"),
+                event(event_id="B", start=instant(12, 11), end=instant(12, 12)),
+            ),
+            candidate_place_key="new",
+        )
+        self.assertEqual(result, ())
+
+    def test_nonadjacent_successor_does_not_trigger_unknown_route(self) -> None:
+        # Candidate 09-10, B 11-12, C 13-14. B is the immediate next
+        # appointment; C has an unregistered place and is not relevant.
+        checker = CalendarConflictChecker(
+            ConfiguredTravelTime({("new", "old"): timedelta(minutes=10)})
+        )
+        result = checker.check(
+            candidate(start=instant(12, 9), end=instant(12, 10)),
+            existing_events=self.slots(
+                event(event_id="B", start=instant(12, 11), end=instant(12, 12)),
+                event(event_id="C", start=instant(12, 13), end=instant(12, 14),
+                      location="unknown place"),
+            ),
+            candidate_place_key="new",
+        )
+        self.assertEqual(result, ())
+
+    def test_nearest_neighbor_is_chosen_independent_of_input_order(self) -> None:
+        # An older, far-away predecessor must be irrelevant even if the
+        # provider returns its event after the immediate predecessor.
+        result = self.checker().check(
+            candidate(start=instant(12, 13), end=instant(12, 14)),
+            existing_events=self.slots(
+                event(event_id="near", start=instant(12, 11), end=instant(12, 12)),
+                event(event_id="far", start=instant(12, 9), end=instant(12, 10),
+                      location="unknown"),
+            ),
+            candidate_place_key="new",
+        )
+        self.assertEqual(result, ())
+
+    def test_tied_predecessors_are_both_checked(self) -> None:
+        # Two concurrently busy calendars both end just before the new
+        # appointment. Neither may be silently chosen over the other.
+        result = self.checker().check(
+            candidate(start=instant(12, 16), end=instant(12, 17)),
+            existing_events=self.slots(
+                event(event_id="registered", start=instant(12, 15),
+                      end=instant(12, 15, 30)),
+                event(event_id="unknown", calendar_id="person-a",
+                      start=instant(12, 15), end=instant(12, 15, 30),
+                      location="other place"),
+            ),
+            candidate_place_key="new",
+        )
+        self.assertEqual(len(result), 2)
+        self.assertEqual(
+            {conflict.kind for conflict in result},
+            {ConflictKind.TRAVEL_TIME, ConflictKind.TRAVEL_UNKNOWN},
+        )
+
+    def test_all_overlaps_are_reported_even_if_not_adjacent(self) -> None:
+        result = self.checker().check(
+            candidate(start=instant(12, 13), end=instant(12, 14)),
+            existing_events=self.slots(
+                event(event_id="one", start=instant(12, 12, 30),
+                      end=instant(12, 13, 30)),
+                event(event_id="two", calendar_id="person-a",
+                      start=instant(12, 13, 15), end=instant(12, 14, 15)),
+            ),
+            candidate_place_key="new",
+        )
+        self.assertEqual(
+            [conflict.kind for conflict in result],
+            [ConflictKind.TIME_OVERLAP, ConflictKind.TIME_OVERLAP],
+        )
+
+    def test_each_persons_schedule_must_be_checked_separately(self) -> None:
+        # A family event can affect two people with different immediate
+        # predecessors. The trusted caller should check each person's
+        # personal+shared busy intervals separately, not merge them.
+        checker = self.checker()
+        p1 = self.slots(
+            event(event_id="person-1", start=instant(12, 11),
+                  end=instant(12, 12), calendar_id="person-a"),
+        )
+        p2 = availability_for_conflicts(
+            (event(event_id="person-2", start=instant(12, 9),
+                   end=instant(12, 10), calendar_id="person-b",
+                   location="unregistered"),),
+            relevant_calendar_ids={"person-b", "family"},
+            registered_places=PLACES,
+        )
+        c = candidate(start=instant(12, 13), end=instant(12, 14))
+        self.assertEqual(
+            checker.check(c, existing_events=p1, candidate_place_key="new"),
+            (),
+        )
+        self.assertEqual(
+            [x.kind for x in checker.check(
+                c, existing_events=p2, candidate_place_key="new"
+            )],
+            [ConflictKind.TRAVEL_UNKNOWN],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
