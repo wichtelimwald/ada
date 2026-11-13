@@ -2,7 +2,7 @@
 """Capture platform-specific KDBX wheel hashes without installing packages.
 
 Run only in Ada's Python 3.14 Linux/aarch64 research container.
-Output is a proposed lockfile, NOT a dependency-security approval.
+Output prints a proposed lockfile for review, NOT a dependency-security approval.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ PINS = {
     "pycryptodomex": "3.24.2",
     "defusedxml": "0.7.1",
 }
-OUTPUT = Path("requirements/kdbx-py314-linux-aarch64.txt")
+OUTPUT_NAME = "requirements/kdbx-py314-linux-aarch64.txt"
 
 
 def normalized(name: str) -> str:
@@ -128,13 +128,11 @@ def main() -> int:
             check=True,
         )
 
-    if OUTPUT.exists() and OUTPUT.read_text(encoding="utf-8") != contents:
-        raise SystemExit(f"{OUTPUT} differs; review explicitly before replacing")
-    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT.write_text(contents, encoding="utf-8")
-    print(f"Generated {OUTPUT} with {len(found)} verified wheel hashes.")
-    print(contents)
+    # Keep the checkout unchanged. The maintainer shares this small,
+    # non-sensitive output for review/commit via the GitHub PR.
     print("Hash-locked dry-run resolution passed.")
+    print(f"Candidate {OUTPUT_NAME} ({len(found)} wheel hashes):")
+    print(contents)
     return 0
 
 
