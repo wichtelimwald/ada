@@ -180,7 +180,8 @@ def _unlock_vault(vault_root: str):
 
     if not sys.stdin.isatty():
         raise SecretVaultError("Ada vault unlock requires an interactive terminal")
-    # Defense against same-UID /proc memory readers: fail before the prompt.
+    # Deny NEW same-UID /proc memory opens before asking for a passphrase.
+    # Already-open fds survive this prctl: this is not same-UID isolation.
     protect_credential_process()
     vault = KdbxSecrets(vault_root)
     try:
