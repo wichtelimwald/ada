@@ -8,7 +8,7 @@ S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (merged);
 S4 implementation PR: https://github.com/wichtelimwald/ada/pull/48 (merged);
 S5 implementation PR: https://github.com/wichtelimwald/ada/pull/54
 (merged after 316/316 tests passed at exact head `06a4ba3`);
-S6 development configuration/Keychain foundation: proposed in this branch.
+S6 development configuration/Keychain foundation: https://github.com/wichtelimwald/ada/pull/56 (review and executable tests pending).
 Remaining S6 (operation-record retention, diagnostics and gated composition)
 and S7 acceptance are still pending; roadmap status stays `ready`.
 
