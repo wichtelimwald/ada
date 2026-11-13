@@ -25,6 +25,47 @@ chmod 700 "$ADA_MEMORY_ROOT/secrets"
    Afterwards run `chmod 600 "$ADA_MEMORY_ROOT/secrets/ada.kdbx"`.
    The PoC refuses symlinks, oversize vaults and group/world-readable files.
 
+## Recommended: VS Code Dev Container
+
+The repository has an **opt-in** configuration
+`.devcontainer/secrets-poc/devcontainer.json`. The normal development
+configuration does not mount the vault or install the experimental reader.
+
+1. Open the PR branch in VS Code. Use **Dev Containers: Reopen Folder Locally**
+   if you are currently inside a container, then **Dev Containers: Reopen in
+   Container** and select **Ada (KDBX research)**.
+2. This profile mounts **only**
+   `$HOME/ada-memory/secrets` read-only as `/ada-memory/secrets`. If your
+   actual Mac directory differs, update the `mounts` source in the optional
+   profile **before reopening**. Do not mount your personal password manager.
+3. In the integrated VS Code terminal (inside the container), run:
+
+```sh
+python -m ada secrets-check --memory-root /ada-memory
+```
+
+   This is the already-tested one-shot check. For the **in-process lifecycle**
+   the existing local chat also supports:
+
+```sh
+python -m ada chat --unlock-vault
+```
+
+   The second command needs a working **local Ollama endpoint reachable from
+   that exact container** before it prompts. If Ollama is not reachable from
+   the dev container, do not relax the loopback-only transport restriction:
+   run the focused synthetic lifecycle tests instead.
+
+```sh
+python -m unittest tests.test_kdbx_secrets -v
+```
+
+   The chat process holds the unlocked vault for its own lifetime and closes
+   it on exit; however, **no live calendar/mail adapter consumes credentials
+   yet**. No general Ada background service is started by VS Code.
+
+## Alternate: isolated manual Docker smoke check
+
 3. In the Ada **source-code** repository root, with Docker Desktop running
    and the `ADA_MEMORY_ROOT` environment variable set as above, execute:
 
@@ -56,9 +97,16 @@ weakening file permissions or running Ada as root.
    Back up the encrypted KDBX file separately, preserving ownership/mode.
    The master passphrase must be recoverable by the operator.
 
-## Not yet tested
+## Evidence and remaining gates
 
-Container build and real KeePassXC KDBX4 interoperability must be run on the
-target Mac. Python 3.14 compatibility and distribution licensing are open gates.
+The maintainer reported (2026-11-13) the correct-passphrase case successfully
+opened a real KeePassXC KDBX file inside the manually started test container
+and the incorrect-passphrase case failed closed. The tested image digest and
+exact code revision were not recorded, so this is **operator-reported smoke
+evidence**, not repeatable exact-head validation.
+
+The VS Code profile, full test suite and in-process chat unlock still require
+target-Mac verification. Dependency/release review and the integration with
+real IONOS/mail consumers remain open gates.
 
 **No live account migration or provider wiring is part of this test.**
