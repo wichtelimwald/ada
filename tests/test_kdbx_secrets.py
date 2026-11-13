@@ -118,6 +118,38 @@ class KdbxSecretsTests(unittest.TestCase):
             self.reader.unlock("test-master")
         self.assertFalse(self.vault_path.exists())
 
+    def test_cli_unlocks_only_in_its_own_process(self) -> None:
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from ada.cli import _secrets_check
+
+        output = StringIO()
+        with (
+            patch("ada.cli.sys.stdin.isatty", return_value=True),
+            patch("getpass.getpass", return_value="test-master"),
+            redirect_stdout(output),
+        ):
+            self.assertEqual(_secrets_check(self.temp.name), 0)
+        self.assertIn("now locked again", output.getvalue())
+        self.assertNotIn("synthetic-password", output.getvalue())
+        self.assertNotIn("test-master", output.getvalue())
+
+    def test_cli_without_tty_never_asks_for_passphrase(self) -> None:
+        from contextlib import redirect_stderr
+        from io import StringIO
+        from ada.cli import _secrets_check
+
+        output = StringIO()
+        with (
+            patch("ada.cli.sys.stdin.isatty", return_value=False),
+            patch("getpass.getpass") as ask,
+            redirect_stderr(output),
+        ):
+            self.assertEqual(_secrets_check(self.temp.name), 2)
+        ask.assert_not_called()
+        self.assertIn("interactive terminal", output.getvalue())
+
+
     def test_memory_git_does_not_stage_vault_even_with_add_all(self) -> None:
         with TemporaryDirectory() as root:
             FileMemoryStore(root)
