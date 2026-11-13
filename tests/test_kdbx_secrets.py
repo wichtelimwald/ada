@@ -184,6 +184,53 @@ class KdbxSecretsTests(unittest.TestCase):
         runtime.aclose.assert_awaited_once_with()
         self.assertNotIn("vault", repr(build.call_args).lower())
 
+    def test_chat_failure_still_closes_runtime_then_vault(self) -> None:
+        from contextlib import redirect_stderr
+        from io import StringIO
+        from unittest.mock import AsyncMock
+        from ada.cli import _chat
+
+        shutdown_observations: list[bool] = []
+
+        async def close() -> None:
+            shutdown_observations.append(
+                not FakeDatabase.instances[-1].zeroized
+            )
+
+        runtime = SimpleNamespace(aclose=AsyncMock(side_effect=close))
+        with (
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
+            patch("getpass.getpass", return_value="test-master"),
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch(
+                "ada.adapters.local_ollama.build_local_ollama_runtime",
+                return_value=runtime,
+            ),
+            patch("ada.cli._chat_loop", side_effect=RuntimeError("synthetic failure")),
+            redirect_stderr(StringIO()),
+        ):
+            result = _chat(
+                model="qwen3.5:9b",
+                ollama_url="http://localhost:11434/v1",
+                unlock_vault=True,
+                vault_root=self.temp.name,
+            )
+
+        self.assertEqual(result, 1)
+        self.assertEqual(shutdown_observations, [True])
+        self.assertTrue(FakeDatabase.instances[-1].zeroized)
+        runtime.aclose.assert_awaited_once_with()
+
+    def test_chat_cli_vault_opt_in_requires_flag(self) -> None:
+        from ada.cli import build_parser
+
+        opts = build_parser().parse_args(
+            ["chat", "--unlock-vault", "--vault-root", "/ada-memory"]
+        )
+        self.assertTrue(opts.unlock_vault)
+        self.assertEqual(opts.vault_root, "/ada-memory")
+        self.assertFalse(build_parser().parse_args(["chat"]).unlock_vault)
+
     def test_chat_wrong_password_exits_without_running_agent(self) -> None:
         from contextlib import redirect_stderr
         from io import StringIO
