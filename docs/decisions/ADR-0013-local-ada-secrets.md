@@ -37,6 +37,19 @@ The existing macOS Keychain IONOS probe is historical development evidence, not 
 
 An experimental KDBX reader, one-shot interactive check and opt-in **same-process local-chat vault lifetime** have been staged in the ADR implementation PR. This is **not** the MVP-60 service composition root or a live-provider integration; no actual IONOS credentials or production-approved reader are available; an independent agent review reported B1/B2 documentation blockers and production-hardening gates, not a human security audit. No real secrets have been migrated.
 
+## Security hardening follow-up
+
+[Issue #58](https://github.com/wichtelimwald/ada/issues/58) tracks the
+production credential gate separately from the merged synthetic PoC.
+The initial hardening branch adds a Linux-only `PR_SET_DUMPABLE=0` guard
+before password entry and an adapter-side check, a bounded Argon2 policy
+before decryption, early release of the reader's retained credential
+references, and a single `O_NOFOLLOW` read. Until these measures are
+validated on the actual runtime, the reader's dependency graph is
+hash-pinned and security-reviewed, and a dedicated restricted container
+is approved, **no real credential should be configured**. This does not
+change the accepted manual-unlock design or promise Python memory erasure.
+
 ## Revisit if
 
 Ada must restart unattended; the number of credentials or required per-service isolation materially grows; credentials need remote/multi-host availability; or KDBX library compatibility/licensing proves unsuitable.
