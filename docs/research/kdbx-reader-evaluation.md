@@ -144,6 +144,33 @@ A targeted independent reader review remains mandatory before using any real
 credentials, including payload-size behavior and verification that no
 authenticated content is parsed before cryptographic checks.
 
+## Follow-up review verification (PR #59, exact head `5fb62bb`)
+
+The independent agent's [second review](https://github.com/wichtelimwald/ada/pull/59) reported **FIX** on
+the reviewed revision, with eight inline findings. The reviewer ran the
+**full validation** in the development image: **344 tests discovered,
+6 skipped** (optional KDBX reader absent), `ada doctor` OK. In the
+hash-locked `secrets-poc` image: **27/28** focused tests passed; the
+one failure was the missing **Git CLI** needed by
+`test_memory_git_does_not_stage_vault_even_with_add_all`, which passed
+in the development image. These were two distinct test environments,
+not a single fully green container. There is no CI attestation.
+
+B1 reproduced a same-UID process that pre-opened `/proc/<pid>/mem`
+before `prctl` and could read the master passphrase during unlock and
+a decrypted entry afterward. This contradicts the earlier interpretation
+of `PR_SET_DUMPABLE=0` as sufficient same-UID isolation. The current
+documentation and test naming distinguish **late-open protection**
+from the still-unmet **isolated-from-startup** requirement.
+
+The review also independently matched all seven KDBX SHA-256 digests
+to official, non-yanked PyPI wheels. The remaining **43 distributions**
+in the experimental image are not covered by those hashes, and the
+application/build chain needs an end-to-end integrity review before
+live credentials. The exact Docker image build and focused tests reported
+by the maintainer were successful on `5fb62bb`.
+Changes after that revision are documentation and test naming only.
+
 ## Decision
 
 The project accepts **KDBX vault format + manual unlock** (ADR-0013).
