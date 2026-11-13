@@ -53,6 +53,32 @@ Before any real credentials: set `PR_SET_DUMPABLE=0` on Linux before the prompt 
 
 Evidence: maintainer-reported `17/17` focused tests and `333/333` full tests at commit `c3762db30030814e8499d1ffef3ebeab88217421` in Python 3.14.10/Linux ARM64. No CI attestation, independent human review or production-credential validation.
 
+## Security hardening in progress (issue #58)
+
+The follow-up branch adds a **fail-closed Linux process gate**:
+`PR_SET_DUMPABLE=0` is applied before the terminal asks for a passphrase.
+Direct adapter access also checks `PR_GET_DUMPABLE == 0`. The selected
+reader now reads from one `O_NOFOLLOW` file descriptor and checks the
+unauthenticated KDBX header **before** deriving a key.
+
+**Proposed KDF policy for this Ada-only vault:** KDBX4 with Argon2d or
+Argon2id, 64–256 MiB memory, 3–10 iterations, 1–8 parallel lanes.
+Reject legacy AES-KDF, weak KDF settings, and excessive resource requests
+rather than silently opening them. A legitimate vault outside this range
+must be reconfigured in KeePassXC; never bypass the policy via a flag.
+
+The adapter calls `zeroize_credentials()` **immediately** after decrypting,
+releasing the reader's stored password/key references. This remains *reference
+release*, **not reliable Python memory zeroization**; decrypted entry strings
+still live for the unlocked session. The test suite includes Linux subprocess
+checks for process non-dumpability and sibling access denial, pending exact-head
+validation on the target Mac.
+
+**Still prohibited:** real credentials. The default/shared VS Code runtime is
+not a production credential environment. Reviewed hash-pinned transitive
+dependencies, reader audit, dedicated runtime isolation and an independent
+security re-review remain uncompleted. See [issue #58](https://github.com/wichtelimwald/ada/issues/58).
+
 ## Decision
 
 The project accepts **KDBX vault format + manual unlock** (ADR-0013).
