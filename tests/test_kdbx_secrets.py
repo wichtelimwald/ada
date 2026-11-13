@@ -125,7 +125,7 @@ class KdbxSecretsTests(unittest.TestCase):
 
         output = StringIO()
         with (
-            patch("ada.cli.sys.stdin.isatty", return_value=True),
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
             patch("getpass.getpass", return_value="test-master"),
             redirect_stdout(output),
         ):
@@ -141,7 +141,7 @@ class KdbxSecretsTests(unittest.TestCase):
 
         output = StringIO()
         with (
-            patch("ada.cli.sys.stdin.isatty", return_value=False),
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: False)),
             patch("getpass.getpass") as ask,
             redirect_stderr(output),
         ):
