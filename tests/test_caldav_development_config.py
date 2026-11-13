@@ -176,7 +176,8 @@ class IONOSKeychainTests(unittest.TestCase):
                                         stdout=b"\xff", stderr=b""),
         )
         for fake in outputs:
-            with self.subTest(status=fake.returncode), (
+            with (
+                self.subTest(status=fake.returncode),
                 patch("ada.adapters.caldav.development_config.sys.platform", "darwin"),
                 patch("ada.adapters.caldav.development_config.subprocess.run",
                       return_value=fake),
