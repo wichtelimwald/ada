@@ -80,11 +80,14 @@ It must be executed **from the repo root** on the target **CPython 3.14 /
 Linux aarch64** container. It requests binary-only wheels from PyPI,
 requires precisely the seven package versions recorded during the synthetic
 Docker test, extracts each actual wheel SHA-256 from pip's installation report,
-and creates `requirements/kdbx-py314-linux-aarch64.txt`. It then checks
-`pip install --dry-run --require-hashes` against that candidate lock.
-The generated file requires **manual artifact and dependency review** before
-committing/using it. It does not pin the remaining Python application
-dependency graph, so this is **not yet a complete production build lock**.
+and constructs a candidate `requirements/kdbx-py314-linux-aarch64.txt`
+**in a temporary directory**. It then checks
+`pip install --dry-run --require-hashes` against that candidate and **prints**
+its contents for review. It deliberately leaves the checkout unchanged, so
+the maintainer can share the non-sensitive wheel hashes for a separate
+reviewed commit without causing local untracked-file conflicts.
+It does not pin the remaining Python application dependency graph,
+so this is **not yet a complete production build lock**.
 There is no claim that a hash makes the upstream wheel trustworthy.
 
 **Still prohibited:** real credentials. The default/shared VS Code runtime is
