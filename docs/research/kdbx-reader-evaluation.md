@@ -176,6 +176,21 @@ live credentials. The exact Docker image build and focused tests reported
 by the maintainer were successful on `5fb62bb`.
 Changes after that revision are documentation and test naming only.
 
+## Artifact provenance check (2026-11-13)
+
+The official [PyPI release page](https://pypi.org/project/kdbxtool/0.1.7/)
+confirms the already hash-pinned `kdbxtool-0.1.7-py3-none-any.whl`
+SHA-256 `48c8d5c6499514ff59bd75e29c8714cacfb32bbf178bac10394ce571b29df645`.
+PyPI also displays a **Trusted Publishing / publish attestation** for that
+specific wheel, issued by `release.yml` in
+`coreyleavitt/kdbxtool@fa5c6bfc1522474e44e764bb82e1711abf012d3a`
+on 2026-01-20 (Sigstore transparency entry 836102649).
+This is positive *artifact-origin evidence*, not a code audit, proof of
+reproducible source-to-wheel compilation or verification of the other
+libraries' wheel contents. The author and PyPI still classify 0.1.7 as
+**Alpha**. The reviewed reader's use of immutable Python strings remains a
+known limitation.
+
 ## Decision
 
 The project accepts **KDBX vault format + manual unlock** (ADR-0013).
