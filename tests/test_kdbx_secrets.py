@@ -150,6 +150,110 @@ class KdbxSecretsTests(unittest.TestCase):
         self.assertIn("interactive terminal", output.getvalue())
 
 
+    def test_chat_keeps_vault_unlocked_until_runtime_is_closed(self) -> None:
+        from unittest.mock import AsyncMock
+        from ada.cli import _chat
+
+        runtime = SimpleNamespace(aclose=AsyncMock())
+        during_session: list[bool] = []
+
+        def inspect_session(_runtime: object) -> int:
+            during_session.append(not FakeDatabase.instances[-1].zeroized)
+            return 0
+
+        with (
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
+            patch("getpass.getpass", return_value="test-master"),
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch(
+                "ada.adapters.local_ollama.build_local_ollama_runtime",
+                return_value=runtime,
+            ) as build,
+            patch("ada.cli._chat_loop", side_effect=inspect_session),
+        ):
+            result = _chat(
+                model="qwen3.5:9b",
+                ollama_url="http://localhost:11434/v1",
+                unlock_vault=True,
+                vault_root=self.temp.name,
+            )
+
+        self.assertEqual(result, 0)
+        self.assertEqual(during_session, [True])
+        self.assertTrue(FakeDatabase.instances[-1].zeroized)
+        runtime.aclose.assert_awaited_once_with()
+        self.assertNotIn("vault", repr(build.call_args).lower())
+
+    def test_chat_wrong_password_exits_without_running_agent(self) -> None:
+        from contextlib import redirect_stderr
+        from io import StringIO
+        from ada.cli import _chat
+
+        output = StringIO()
+        with (
+            patch("ada.cli.sys.stdin", SimpleNamespace(isatty=lambda: True)),
+            patch("getpass.getpass", return_value="incorrect"),
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch("ada.adapters.local_ollama.build_local_ollama_runtime") as build,
+            patch("ada.cli._chat_loop") as chat_loop,
+            redirect_stderr(output),
+        ):
+            result = _chat(
+                model="qwen3.5:9b",
+                ollama_url="http://localhost:11434/v1",
+                unlock_vault=True,
+                vault_root=self.temp.name,
+            )
+
+        self.assertEqual(result, 2)
+        build.assert_not_called()
+        chat_loop.assert_not_called()
+        self.assertNotIn("sensitive upstream", output.getvalue())
+        self.assertNotIn("incorrect", output.getvalue())
+
+    def test_chat_uses_no_vault_when_opt_in_absent(self) -> None:
+        from unittest.mock import AsyncMock
+        from ada.cli import _chat
+
+        runtime = SimpleNamespace(aclose=AsyncMock())
+        with (
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch(
+                "ada.adapters.local_ollama.build_local_ollama_runtime",
+                return_value=runtime,
+            ),
+            patch("ada.cli._chat_loop", return_value=0),
+            patch("getpass.getpass") as ask,
+        ):
+            self.assertEqual(
+                _chat(model="qwen3.5:9b", ollama_url="http://localhost:11434/v1"),
+                0,
+            )
+        ask.assert_not_called()
+        runtime.aclose.assert_awaited_once_with()
+
+    def test_chat_without_vault_path_fails_before_prompt(self) -> None:
+        from contextlib import redirect_stderr
+        from io import StringIO
+        from ada.cli import _chat
+
+        output = StringIO()
+        with (
+            patch("ada.adapters.local_ollama.check_local_ollama_ready"),
+            patch("ada.adapters.local_ollama.build_local_ollama_runtime") as build,
+            patch("getpass.getpass") as ask,
+            redirect_stderr(output),
+        ):
+            result = _chat(
+                model="qwen3.5:9b",
+                ollama_url="http://localhost:11434/v1",
+                unlock_vault=True,
+            )
+        self.assertEqual(result, 2)
+        self.assertIn("requires", output.getvalue())
+        ask.assert_not_called()
+        build.assert_not_called()
+
     def test_memory_git_does_not_stage_vault_even_with_add_all(self) -> None:
         with TemporaryDirectory() as root:
             FileMemoryStore(root)
