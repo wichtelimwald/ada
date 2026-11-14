@@ -46,7 +46,9 @@ another image name through arguments.
   no `docker exec`, bind-mounted source code, writable host directories
   or shared PID namespace.
 - Root filesystem read-only; only a 16 MiB `noexec,nosuid,nodev` /tmp
-  tmpfs. Only the KDBX `secrets/` directory is mounted **read-only**.
+  tmpfs. Only the single **`ada.kdbx` file** is bind-mounted
+  **read-only**; no other contents of the host's `secrets/` directory
+  are exposed. The image contains an empty unreadable mount target.
 - No network by default until MVP-60 S6 explicitly defines trusted
   IONOS/CalDAV egress. The current security release test is offline.
 - `--memory=1g --memory-swap=1g` and a PID limit bound the memory
