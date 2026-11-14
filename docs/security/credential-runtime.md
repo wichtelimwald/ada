@@ -57,9 +57,14 @@ another image name through arguments.
   be misreported as successful after such a crash.
 - Image sets `PYTHONNOUSERSITE=1`, starts `python -I -m ada`, and
   requires strict credential isolation checks. The strict Argon2 KDF
-  budget requires at least 2,048 MiB-rounds and at most 8,192
-  MiB-rounds, while preserving 64–256 MiB memory and 1–8 lanes.
-  Benchmark this range before activating real vaults. No unrestricted
+  budget requires at least 2,048 MiB-rounds and at most 32,768
+  MiB-rounds (64–256 MiB memory, 3–512 iterations, 1–8 lanes).
+  The expanded ceiling admits the operator's KeePassXC-created synthetic
+  64 MiB / 406-round file (25,984 MiB-rounds); a separate Argon2 benchmark
+  took 7.93 seconds and 83 MiB peak RSS on the target Mac's container.
+  This is not a full unlock measurement or a worst-case guarantee. Verify
+  the ceiling under container limits before activating real vaults.
+  No unrestricted
   Python plugin/extension loader is introduced.
 
 Container memory and swap limits are mandatory **runtime configuration**.
