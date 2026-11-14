@@ -61,21 +61,26 @@ Direct adapter access also checks `PR_GET_DUMPABLE == 0`. The selected
 reader now reads from one `O_NOFOLLOW` file descriptor and checks the
 unauthenticated KDBX header **before** deriving a key.
 
-**Implemented PoC KDF policy:** KDBX4 with Argon2d or Argon2id,
-64–256 MiB memory, 3–10 iterations, and 1–8 parallel lanes.
-It rejects legacy AES-KDF and out-of-range resource requests before KDF
-work. **Compatibility limitation (PR #59 I1):** KeePassXC 2.8.0 calibrates
-new databases toward roughly **1 second**, rather than fixing a 10-iteration
-default. In the reviewed target Docker VM, Argon2d/64 MiB/4 lanes required
-about 51 iterations to reach that target, which Ada currently rejects.
-The original claim that KeePassXC defaults to 64 MiB / 3 iterations was
-incorrect and has been removed. For synthetic interoperability tests,
-KeePassXC advanced settings within Ada's explicit bounds can be used,
-for example Argon2id / 256 MiB / 10 iterations / 4 lanes, **only after**
-checking actual unlock cost and available memory. Before live credentials,
-decide/test a bounded work policy that preserves strong offline resistance
-and supports the intended KeePassXC-generated vault, rather than silently
-weakening KDF settings for compatibility.
+**Current hardening branch (issue #58 / PR #60):** KDBX4 with
+Argon2d or Argon2id, **64–256 MiB**, **3–128 iterations** and **1–8
+parallel lanes**, with a combined `memory_kib × iterations` ceiling
+of **8,388,608 KiB-rounds (8,192 MiB-rounds)**. The strict isolated
+credential image additionally requires **at least 2,097,152 KiB-rounds
+(2,048 MiB-rounds)**; the synthetic research mode keeps its legacy test
+compatibility. Legacy AES-KDF, weak strict KDFs and out-of-budget
+requests fail closed **before derivation**. These numeric thresholds
+still require target benchmark and independent review. This replaces
+the 10-iteration ceiling from merged PR #59.
+
+**Why:** KeePassXC 2.8.0 targets ~1 second by calibrating a vault's
+Argon2 rounds; the reviewer's 64 MiB / 4-lane target-Virtual-Machine
+measurement estimated ~51 iterations. That setting now passes header
+preflight without relaxing the minimum memory/iteration checks. This
+does **not** establish a universal one-second runtime budget: Argon2
+costs vary with hardware, lanes, and workload. Before live credentials
+verify an *actual KeePassXC 2.8.0 synthetic vault* and worst-case
+derivation in the bounded container. Do not weaken a real vault's KDF
+to fit these bounds.
 
 The adapter calls `zeroize_credentials()` **immediately** after decrypting,
 releasing the reader's stored password/key references. This remains *reference
@@ -170,6 +175,21 @@ application/build chain needs an end-to-end integrity review before
 live credentials. The exact Docker image build and focused tests reported
 by the maintainer were successful on `5fb62bb`.
 Changes after that revision are documentation and test naming only.
+
+## Artifact provenance check (2026-11-13)
+
+The official [PyPI release page](https://pypi.org/project/kdbxtool/0.1.7/)
+confirms the already hash-pinned `kdbxtool-0.1.7-py3-none-any.whl`
+SHA-256 `48c8d5c6499514ff59bd75e29c8714cacfb32bbf178bac10394ce571b29df645`.
+PyPI also displays a **Trusted Publishing / publish attestation** for that
+specific wheel, issued by `release.yml` in
+`coreyleavitt/kdbxtool@fa5c6bfc1522474e44e764bb82e1711abf012d3a`
+on 2026-01-20 (Sigstore transparency entry 836102649).
+This is positive *artifact-origin evidence*, not a code audit, proof of
+reproducible source-to-wheel compilation or verification of the other
+libraries' wheel contents. The author and PyPI still classify 0.1.7 as
+**Alpha**. The reviewed reader's use of immutable Python strings remains a
+known limitation.
 
 ## Decision
 
