@@ -21,7 +21,12 @@ not decrypting/storing the KDBX vault.
   vaults using a bounded total-work budget, with upper bounds on memory,
   iterations and lanes. Validate a real KeePassXC 2.8-created **synthetic**
   vault on the target Linux/aarch64 image. Never lower a real vault's KDF
-  just to make it pass.
+  just to make it pass. **Maintainer decision 2026-11-14:** longer manual
+  startup unlocks are acceptable. A 64 MiB / 406-iteration KeePassXC
+  synthetic file was rejected by the former 8,192 MiB-round ceiling;
+  a separate KDF benchmark took 7.93 s / 83 MiB peak RSS. The revised
+  32,768 MiB-round bound and 512-iteration maximum are candidates pending
+  exact-head real-launcher and ceiling-cost validation; no unlimited KDF.
 - [ ] **Process isolation from startup:** dedicated single-process container,
   private PID namespace, non-root credential UID, no IDE/extensions or
   untrusted same-UID siblings, no arbitrary `docker exec`, no source bind
