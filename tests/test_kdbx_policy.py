@@ -79,7 +79,7 @@ class CredentialDockerLauncherTests(unittest.TestCase):
                 )
                 # Docker's default is a private PID namespace. --pid private
                 # is INVALID and must not recur in the production launcher.
-                self.assertNotRegex(active, r"--pid(?:\\s|=)")
+                self.assertNotRegex(active, r"--pid(?:\s|=)")
                 for required in (
                     "--network none",
                     "--read-only",
