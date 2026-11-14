@@ -15,11 +15,13 @@ if [ "$label" != "locked-aarch64-v1" ]; then
   exit 2
 fi
 
+# Docker creates a private PID namespace by default; --pid private is invalid.
+# Do not use --pid host or --pid container:<id> here.
 # Override the entrypoint for a synthetic-only runtime preflight.
 # The application itself must report secure PID1, procfs, cgroup limits,
 # -I Python flags, and read-only rootfs before any secret unlock.
 docker run --rm --pull never \
-  --pid private --network none \
+  --network none \
   --user 10001:10001 \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
   --pids-limit 64 --memory 1g --memory-swap 1g \
