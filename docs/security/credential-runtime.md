@@ -69,18 +69,29 @@ review. The *whole* Ada credential process includes PydanticAI, HTTP,
 Cedar, DBOS and CalDAV dependencies: the reviewer counted 43 additional
 distributions not covered by the seven-wheel lock.
 
+**Captured on target (2026-11-14, maintainer supplied):** CPython 3.14.10
+Linux/aarch64; pip's no-install report resolved exactly **49 packages** and
+its `--require-hashes --dry-run` passed. The seven earlier reviewed KDBX
+package hashes match exactly. The resulting 49-wheel candidate is committed
+as `requirements/ada-runtime-py314-linux-aarch64.txt`. The Docker Desktop
+`python:3.14-slim` local repository digest was reported as
+`sha256:9aaa474097d094040649f2162a627c0049b408f52138d980916788d80f04802f`
+and is pinned in `Dockerfile.credentials`. **A digest pin authenticates
+identity, not the package's own security or native library provenance.**
+
 Before building the credential image:
 
-1. On the target CPython 3.14 Linux/aarch64 environment run
-   `python scripts/capture_ada_runtime_hashes.py` and review the complete
-   wheel list, including setuptools build backend. It uses pip's
-   standard `--dry-run --report` and `--require-hashes`; no packages are
-   installed or source files modified. The seven earlier hashes must match.
-2. Commit the exact verified candidate to
-   `requirements/ada-runtime-py314-linux-aarch64.txt`.
-3. Record an exact reviewed multi-architecture digest for
-   `python:3.14-slim`, pin it in the credential Dockerfile and build
-   with that immutable base reference.
+1. Re-run `python scripts/capture_ada_runtime_hashes.py` on the target
+   CPython 3.14 Linux/aarch64 environment if dependency resolution is
+   questioned: the script rejects any changed hash from the committed lock,
+   requires the original seven KDBX digests to match and does not install
+   packages or modify source files.
+2. Verify the exact pinned base-image digest and its Linux/aarch64
+   platform manifest, inspect relevant OS layers and current vulnerability
+   advisories. Do not assume Docker Hub's `python:3.14-slim` tag remains
+   stable; the digest pin remains explicit.
+3. Build with that immutable base reference and check the resulting
+   distribution inventory.
 4. `Dockerfile.credentials` installs hash-verified **wheels only**, then
    builds Ada's local source offline with no dependency resolution or build
    isolation. `pip check` and an installed-distribution inventory
@@ -90,8 +101,10 @@ Before building the credential image:
    resulting evidence with the PR and NOTICE. Updates require a new
    reviewed lock and image build.
 
-No deployment image is production-approved until the full lock exists,
-the exact digest is pinned, and the code has been independently reviewed.
+The full wheel lock and Docker base digest are now pinned. **No deployment
+image is production-approved** until it builds on target, its installed
+package inventory/OS layers and known vulnerabilities have been reviewed,
+and the code and runtime isolation have passed independent assessment.
 
 ## Acceptance
 
