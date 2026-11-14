@@ -19,9 +19,11 @@ The guard denies *new* opens, not pre-opened descriptors.
 **Primary defense:** start Ada directly as PID 1 in its **own private PID
 namespace** in a dedicated container with no IDE, extensions, sidecars,
 server or untrusted co-tenant. A different unprivileged container has no
-access to this PID namespace by default. The launcher enforces
-`--pid private`; it does **not** grant Docker socket access, host PID or
-privileged capabilities. The credential image enables an additional code
+access to this PID namespace by default. Docker **creates a private PID
+namespace by default**; the launcher deliberately omits `--pid` (the
+unsupported `--pid private` option caused the first smoke test to fail).
+Neither launcher grants Docker socket access, host PID or privileged
+capabilities. The credential image enables an additional code
 check before prompting: Ada must be PID 1 and no other process may be
 visible under `/proc`. A process enumeration snapshot is defense in depth,
 not a solution to a namespace-sharing race.
