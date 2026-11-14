@@ -33,13 +33,12 @@ not decrypting/storing the KDBX vault.
   limits. Start network-disconnected for offline synthetic unlock; define
   explicit allowed provider egress when MVP-60 S6 supplies the trusted
   composition. No credentials in the VS Code Dev Container.
-- [ ] **Complete application supply chain:** a *single* Linux/aarch64
-  CPython 3.14 hash lock covers all Ada runtime dependencies, KDBX and
-  PEP 517 build requirements, rather than just seven KDBX wheels. Build
-  without source distributions or new unreviewed download paths; pin the
-  base image digest and run `pip check` plus inventory diff. Review
-  licenses, native libraries, wheel contents, known vulnerabilities and
-  the shipped third-party notices. No guarantees from hashes alone.
+- [ ] **Complete application supply chain:** **49** Linux/aarch64 CPython
+  3.14 runtime/build wheel hashes and a fixed base digest are now committed.
+  The target-side dry-run verification passed; the final Docker build,
+  installed-inventory check, native wheel/OS layer vulnerability review,
+  license attribution and shipped notices are **still outstanding**. Pinning
+  hashes alone does not prove software safety.
 - [ ] **KDBX reader safety:** focused source review of KDBX4 authenticated
   processing, KDF parsing, post-authenticated gzip expansion/oom, XML and
   protected-field handling; enforce container memory cap, no plaintext in
