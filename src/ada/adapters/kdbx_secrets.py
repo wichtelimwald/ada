@@ -16,17 +16,17 @@ from typing import Any
 
 _MAX_VAULT_SIZE = 16 * 1024 * 1024
 
-# Fixed memory and total-work ceilings prevent excessive Argon2 requests
-# before key derivation. Unlike the earlier t<=10 policy, this admits the
-# ~51 rounds observed for a KeePassXC 2.8.0 auto-calibrated 64 MiB vault.
-# This is a resource *upper bound*, not a password-strength guarantee.
+# Bounded Argon2 resource budget: also admits the operator's KeePassXC
+# synthetic vault measured at 64 MiB / 406 iterations, without weakening
+# the strict minimum. Startup may take longer; this is a work bound, not
+# a guarantee of unlock latency or protection against every denial of service.
 _MIN_KDF_MEMORY_KIB = 64 * 1024
 _MAX_KDF_MEMORY_KIB = 256 * 1024
 _MIN_KDF_ITERATIONS = 3
-_MAX_KDF_ITERATIONS = 128
+_MAX_KDF_ITERATIONS = 512
 _MIN_KDF_PARALLELISM = 1
 _MAX_KDF_PARALLELISM = 8
-_MAX_KDF_MEMORY_ITERATIONS_KIB = 8 * 1024 * 1024
+_MAX_KDF_MEMORY_ITERATIONS_KIB = 32 * 1024 * 1024
 # Strict credential runtime rejects a low-cost KDF even if the synthetic
 # reader remains compatible with older / cheaper test fixtures.
 _MIN_STRICT_KDF_MEMORY_ITERATIONS_KIB = 2 * 1024 * 1024
