@@ -203,23 +203,24 @@ class KdbxPolicyTests(unittest.TestCase):
                     _validate_kdf_header(header.to_bytes())
 
     def test_kee_passxc_autocalibrated_cost_is_accepted(self) -> None:
-        # KeePassXC 2.8.0 targets ~1 second, not a fixed 10 rounds.
-        # This header-only test does NOT derive a key or claim speed on all hosts.
+        # Both earlier reviewer calibration and the operator's KeePassXC
+        # synthetic vault profile must pass. Headers only: no expensive KDF.
         assert KdfType is not None
         for version in (KdfType.ARGON2ID, KdfType.ARGON2D):
-            with self.subTest(version=version):
-                header = replace(
-                    self.header,
-                    kdf_type=version,
-                    argon2_memory_kib=64 * 1024,
-                    argon2_iterations=51,
-                    argon2_parallelism=4,
-                )
-                _validate_kdf_header(header.to_bytes())
+            for iterations in (51, 406):
+                with self.subTest(version=version, iterations=iterations):
+                    header = replace(
+                        self.header,
+                        kdf_type=version,
+                        argon2_memory_kib=64 * 1024,
+                        argon2_iterations=iterations,
+                        argon2_parallelism=4,
+                    )
+                    _validate_kdf_header(header.to_bytes())
 
     def test_strict_runtime_rejects_cheap_kdf_but_accepts_calibrated(self) -> None:
-        # Strict credentials require at least 2048 MiB-rounds; a 64 MiB
-        # KeePassXC auto-calibrated 51-round vault still passes.
+        # Strict credentials still require at least 2048 MiB-rounds;
+        # neither 51 nor 406 iterations at 64 MiB weakens the floor.
         with patch.dict(
             "os.environ", {"ADA_REQUIRE_ISOLATED_CREDENTIALS": "1"}
         ):
@@ -230,13 +231,29 @@ class KdbxPolicyTests(unittest.TestCase):
                 with self.subTest(mem=header.argon2_memory_kib):
                     with self.assertRaisesRegex(SecretVaultError, "KDF policy rejected"):
                         _validate_kdf_header(header.to_bytes())
-            calibrated = replace(
-                self.header,
-                argon2_memory_kib=64 * 1024,
-                argon2_iterations=51,
-                argon2_parallelism=4,
-            )
-            _validate_kdf_header(calibrated.to_bytes())
+            for iterations in (51, 406):
+                with self.subTest(iterations=iterations):
+                    calibrated = replace(
+                        self.header,
+                        argon2_memory_kib=64 * 1024,
+                        argon2_iterations=iterations,
+                        argon2_parallelism=4,
+                    )
+                    _validate_kdf_header(calibrated.to_bytes())
+
+    def test_bounded_kdf_work_ceiling_is_accepted_without_derivation(self) -> None:
+        # 32,768 MiB-rounds is the inclusive ceiling. Test headers only.
+        for memory_kib, iterations in (
+            (64 * 1024, 512),
+            (256 * 1024, 128),
+        ):
+            with self.subTest(memory_kib=memory_kib, iterations=iterations):
+                header = replace(
+                    self.header,
+                    argon2_memory_kib=memory_kib,
+                    argon2_iterations=iterations,
+                )
+                _validate_kdf_header(header.to_bytes())
 
     def test_excessive_argon2_cost_rejected_before_derivation(self) -> None:
         cases = [
@@ -246,7 +263,12 @@ class KdbxPolicyTests(unittest.TestCase):
             replace(
                 self.header,
                 argon2_memory_kib=256 * 1024,
-                argon2_iterations=33,
+                argon2_iterations=129,
+            ),
+            replace(
+                self.header,
+                argon2_memory_kib=64 * 1024,
+                argon2_iterations=513,
             ),
         ]
         for header in cases:
