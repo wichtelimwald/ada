@@ -89,6 +89,13 @@ class CredentialDockerLauncherTests(unittest.TestCase):
                     "--pull never",
                 ):
                     self.assertIn(required, active)
+                if filename == "run_ada_credentials.sh":
+                    self.assertIn(
+                        "dst=/ada-memory/secrets/ada.kdbx,readonly", active
+                    )
+                    self.assertNotIn(
+                        "dst=/ada-memory/secrets,readonly", active
+                    )
                 checked = subprocess.run(
                     ["sh", "-n", str(script)],
                     capture_output=True,
