@@ -39,11 +39,12 @@ fi
 # /proc attack by other unprivileged workloads. Docker-host access remains
 # a trusted operator boundary: docker exec / socket admin can bypass this.
 # Offline-only until MVP-60 S6 defines and validates provider network egress.
+# Mount ONLY the KDBX file, not the whole secrets directory: least privilege.
 exec docker run --rm -it --pull never \
   --network none \
   --user 10001:10001 \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
   --pids-limit 64 --memory 1g --memory-swap 1g \
   --tmpfs /tmp:rw,nosuid,nodev,noexec,size=16m,mode=700,uid=10001,gid=10001 \
-  --mount "type=bind,src=${ADA_MEMORY_ROOT}/secrets,dst=/ada-memory/secrets,readonly" \
+  --mount "type=bind,src=${ADA_MEMORY_ROOT}/secrets/ada.kdbx,dst=/ada-memory/secrets/ada.kdbx,readonly" \
   "$image" "$@"
