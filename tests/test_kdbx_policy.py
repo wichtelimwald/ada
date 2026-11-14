@@ -63,6 +63,48 @@ class CredentialRuntimeInventoryTests(unittest.TestCase):
                 locked_versions(lock)
 
 
+class CredentialRuntimePinnedGraphTests(unittest.TestCase):
+    def test_full_hash_lock_covers_all_adopted_packages(self) -> None:
+        import tomllib
+        from scripts.check_credential_runtime_lock import locked_versions
+
+        root = Path(__file__).resolve().parents[1]
+        full = locked_versions(
+            root / "requirements/ada-runtime-py314-linux-aarch64.txt"
+        )
+        kdbx = {}
+        for line in (
+            root / "requirements/kdbx-py314-linux-aarch64.txt"
+        ).read_text(encoding="utf-8").splitlines():
+            if not line or line.startswith("#"):
+                continue
+            match = re.fullmatch(
+                r"([a-z0-9-]+)==([0-9.]+) --hash=sha256:([a-f0-9]{64})",
+                line,
+            )
+            self.assertIsNotNone(match)
+            assert match is not None
+            kdbx[match.group(1)] = match.group(2)
+        for name, version in kdbx.items():
+            self.assertEqual(full.get(name), version)
+
+        pyproject = tomllib.loads(
+            (root / "pyproject.toml").read_text(encoding="utf-8")
+        )
+        # First-level packages and the build backend must be present in
+        # the full transitive graph, independent of the lock file count.
+        for item in (
+            *pyproject["project"]["dependencies"],
+            *pyproject["project"]["optional-dependencies"]["secrets-poc"],
+            *pyproject["build-system"]["requires"],
+        ):
+            name = re.split(r"[<>=\\[;! ]", item, maxsplit=1)[0]
+            name = re.sub(r"[-_.]+", "-", name).lower()
+            self.assertIn(name, full, f"Unhashed dependency: {item}")
+
+        self.assertGreaterEqual(len(full), 49)
+
+
 class KdbxWheelLockTests(unittest.TestCase):
     def test_committed_lock_matches_expected_versions_and_sha256(self) -> None:
         from scripts.capture_kdbx_wheel_hashes import PINS
