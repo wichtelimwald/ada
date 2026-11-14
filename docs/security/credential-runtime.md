@@ -105,6 +105,25 @@ Before building the credential image:
    resulting evidence with the PR and NOTICE. Updates require a new
    reviewed lock and image build.
 
+### Existing security scanners (no extra runtime dependency)
+
+Use established scanners **outside** the credential-bearing image:
+
+- [PyPA pip-audit](https://github.com/pypa/pip-audit): in a disposable
+  development/audit environment with the tool installed, run
+  `pip-audit --require-hashes --disable-pip -r requirements/ada-runtime-py314-linux-aarch64.txt`.
+  It audits the **pinned 49-distribution graph** without resolving or
+  installing the dependencies again. Keep the full result and review any
+  advisories; do not auto-update the committed lock.
+- [Docker Scout](https://docs.docker.com/reference/cli/docker/scout/cves/):
+  `docker scout cves local://ada-credentials:locked` checks the **built
+  local image** for detected OS and application vulnerabilities. Document
+  tool availability, scan date, findings and any known blind spots.
+
+A clean scan is **not** a malicious-code or full native-binary security audit.
+Do not install scanners in the release image; neither tool substitutes for
+the independent code review or vulnerability analysis of embedded libraries.
+
 The full wheel lock and Docker base digest are now pinned. **No deployment
 image is production-approved** until it builds on target, its installed
 package inventory/OS layers and known vulnerabilities have been reviewed,
