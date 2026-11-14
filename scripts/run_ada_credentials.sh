@@ -33,12 +33,14 @@ if [ "$actual_label" != "locked-aarch64-v1" ]; then
   exit 2
 fi
 
+# Docker's DEFAULT PID mode creates a private namespace (do not pass
+# --pid private: Docker rejects it; never use host/container sharing).
 # Private PID namespace from container start closes the pre-opened same-UID
 # /proc attack by other unprivileged workloads. Docker-host access remains
 # a trusted operator boundary: docker exec / socket admin can bypass this.
 # Offline-only until MVP-60 S6 defines and validates provider network egress.
 exec docker run --rm -it --pull never \
-  --pid private --network none \
+  --network none \
   --user 10001:10001 \
   --read-only --cap-drop ALL --security-opt no-new-privileges \
   --pids-limit 64 --memory 1g --memory-swap 1g \
