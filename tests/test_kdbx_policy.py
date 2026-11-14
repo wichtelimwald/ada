@@ -63,6 +63,41 @@ class CredentialRuntimeInventoryTests(unittest.TestCase):
                 locked_versions(lock)
 
 
+class CredentialDockerLauncherTests(unittest.TestCase):
+    def test_launchers_rely_on_private_pid_default_and_keep_sandbox(self) -> None:
+        root = Path(__file__).resolve().parents[1] / "scripts"
+        for filename in (
+            "smoke_credential_runtime.sh",
+            "run_ada_credentials.sh",
+        ):
+            with self.subTest(script=filename):
+                script = root / filename
+                source = script.read_text(encoding="utf-8")
+                active = "\n".join(
+                    line for line in source.splitlines()
+                    if not line.lstrip().startswith("#")
+                )
+                # Docker's default is a private PID namespace. --pid private
+                # is INVALID and must not recur in the production launcher.
+                self.assertNotRegex(active, r"--pid(?:\\s|=)")
+                for required in (
+                    "--network none",
+                    "--read-only",
+                    "--cap-drop ALL",
+                    "--security-opt no-new-privileges",
+                    "--memory 1g --memory-swap 1g",
+                    "--pull never",
+                ):
+                    self.assertIn(required, active)
+                checked = subprocess.run(
+                    ["sh", "-n", str(script)],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(checked.returncode, 0, checked.stderr)
+
+
 class CredentialRuntimePinnedGraphTests(unittest.TestCase):
     def test_full_hash_lock_covers_all_adopted_packages(self) -> None:
         import tomllib
