@@ -62,9 +62,9 @@ reader now reads from one `O_NOFOLLOW` file descriptor and checks the
 unauthenticated KDBX header **before** deriving a key.
 
 **Current hardening branch (issue #58 / PR #60):** KDBX4 with
-Argon2d or Argon2id, **64–256 MiB**, **3–128 iterations** and **1–8
+Argon2d or Argon2id, **64–256 MiB**, **3–512 iterations** and **1–8
 parallel lanes**, with a combined `memory_kib × iterations` ceiling
-of **8,388,608 KiB-rounds (8,192 MiB-rounds)**. The strict isolated
+of **33,554,432 KiB-rounds (32,768 MiB-rounds)**. The strict isolated
 credential image additionally requires **at least 2,097,152 KiB-rounds
 (2,048 MiB-rounds)**; the synthetic research mode keeps its legacy test
 compatibility. Legacy AES-KDF, weak strict KDFs and out-of-budget
@@ -74,13 +74,17 @@ the 10-iteration ceiling from merged PR #59.
 
 **Why:** KeePassXC 2.8.0 targets ~1 second by calibrating a vault's
 Argon2 rounds; the reviewer's 64 MiB / 4-lane target-Virtual-Machine
-measurement estimated ~51 iterations. That setting now passes header
-preflight without relaxing the minimum memory/iteration checks. This
-does **not** establish a universal one-second runtime budget: Argon2
-costs vary with hardware, lanes, and workload. Before live credentials
-verify an *actual KeePassXC 2.8.0 synthetic vault* and worst-case
-derivation in the bounded container. Do not weaken a real vault's KDF
-to fit these bounds.
+measurement estimated ~51 iterations. A later operator-created synthetic
+KeePassXC vault had **Argon2d / 64 MiB / 406 iterations / 4 lanes**
+(25,984 MiB-rounds), which exceeded the previous cap and was rejected
+by the strict launcher. A separate matching Argon2 benchmark in the
+1 GiB-limited target container took **7.93 s / 83 MiB peak process RSS**;
+this is not a complete KDBX unlock or the ceiling-case cost. The maintainer
+accepted a longer one-time startup unlock rather than weakening this file's
+KDF. The new finite ceiling accommodates the observed setting, **not**
+arbitrary hardware-calibrated work. Before real credentials verify the
+unchanged *KeePassXC-created synthetic vault* through the production
+launcher and measure worst-case derivation in the bounded container.
 
 The adapter calls `zeroize_credentials()` **immediately** after decrypting,
 releasing the reader's stored password/key references. This remains *reference
