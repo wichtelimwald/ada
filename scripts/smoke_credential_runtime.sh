@@ -3,6 +3,9 @@
 # or using real credentials. Requires Docker Desktop on Linux/aarch64.
 set -eu
 
+# Also check the production launcher syntax (the Mac host may lack python).
+sh -n scripts/run_ada_credentials.sh
+
 image="ada-credentials:locked"
 docker build --file Dockerfile.credentials --target credential-runtime \
   --tag "$image" .
