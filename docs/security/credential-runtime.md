@@ -159,8 +159,9 @@ matches alone do not establish actual runtime exploitability. The full report
 and remediation rationale are recorded on
 [PR #60](https://github.com/wichtelimwald/ada/pull/60#issuecomment-6891333448).
 
-Three patch candidates have been addressed **in source, not yet validated on
-the target**:
+Three patch candidates have been addressed in source. The operator reported a
+passing target rebuild, offline smoke, Grype re-scan and full Python suite on
+2026-11-15; those runs did not print the exact Git SHA:
 
 - `pydantic-ai-slim` **2.46.0 → 2.66.0**, with its required
   `pydantic-graph` **2.66.0**, addressing both the streaming limiter advisory

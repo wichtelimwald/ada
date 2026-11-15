@@ -89,8 +89,9 @@ launcher; the early process-memory access regression also passed.
 The unlocked credential process and privileged Docker/host administrators
 remain trusted; Python cannot guarantee complete erasure of decrypted
 strings. The VS Code research container remains unsafe for real credentials.
-**Production approval, OOM containment evidence, independent security/license
-review and provider credential wiring remain open** in [PR #60](https://github.com/wichtelimwald/ada/pull/60).
+An oversized authenticated vault was contained by the 1-GiB limit (OOM kill).
+**Production approval, independent security/license review and provider
+credential wiring remain open** in [PR #60](https://github.com/wichtelimwald/ada/pull/60).
 No mail or calendar adapter uses live credentials yet.
 
 The current DBOS-backed calendar path is still **synthetic/test-only in the running application**. A generic CalDAV adapter (list/create/update/cancel) now exists behind `CalendarPort`, validated only against an in-process fake server that reproduces the recorded IONOS behavior; it is not yet wired into Ada's composition root, no real calendar account or personal event data is connected anywhere, and no development or production credential is configured. Updates and cancels are conditional on the event version the user approved, so an event changed in the meantime is reported as a conflict instead of being overwritten; recurring events and events with attendees stay read-only. MVP-60 S5 now adds availability-only conflict checking, a local table of directional approximate travel times, and explicit unknown-travel results. It is still **not connected to live family-calendar input**: trusted calendar selection, configuration/credentials, durability payload scrubbing, real-provider acceptance and the later email/admin-grant integration remain separate gates. No personal calendar data should be used in the current development path.
