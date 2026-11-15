@@ -25,8 +25,9 @@ not decrypting/storing the KDBX vault.
   startup unlocks are acceptable. A 64 MiB / 406-iteration KeePassXC
   synthetic file was rejected by the former 8,192 MiB-round ceiling;
   a separate KDF benchmark took 7.93 s / 83 MiB peak RSS. The revised
-  32,768 MiB-round bound and 512-iteration maximum are candidates pending
-  exact-head real-launcher and ceiling-cost validation; no unlimited KDF.
+  32,768 MiB-round bound and 512-iteration maximum passed synthetic
+  KeePassXC production-launcher interoperability and bounded-KDF target
+  benchmarks (see PR #60). No unlimited KDF.
 - [ ] **Process isolation from startup:** dedicated single-process container,
   private PID namespace, non-root credential UID, no IDE/extensions or
   untrusted same-UID siblings, no arbitrary `docker exec`, no source bind
@@ -40,10 +41,13 @@ not decrypting/storing the KDBX vault.
   composition. No credentials in the VS Code Dev Container.
 - [ ] **Complete application supply chain:** **49** Linux/aarch64 CPython
   3.14 runtime/build wheel hashes and a fixed base digest are now committed.
-  The target-side dry-run verification passed; the final Docker build,
-  installed-inventory check, native wheel/OS layer vulnerability review,
-  license attribution and shipped notices are **still outstanding**. Pinning
-  hashes alone does not prove software safety.
+  The earlier target-side dry-run, Docker image build and installed-inventory
+  checks passed. The **new** security refresh patches PydanticAI 2.66.0,
+  setuptools 84.1.0 and an exact Debian zlib package but has **not yet**
+  been rebuilt or tested on target. Grype found 212 CVE/package matches on
+  the previous image (63 High); update, rescan and triage of remaining OS
+  findings plus native wheel/license notices are **still outstanding**.
+  Pinning hashes alone does not prove software safety.
 - [ ] **KDBX reader safety:** source inspection confirms that upstream
   `kdbxtool 0.1.7` authenticates header and block HMACs **before**
   calling unbounded `gzip.decompress()`. The strict cgroup has a 1-GiB
