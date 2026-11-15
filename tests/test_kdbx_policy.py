@@ -81,7 +81,6 @@ class CredentialDockerLauncherTests(unittest.TestCase):
                 # is INVALID and must not recur in the production launcher.
                 self.assertNotRegex(active, r"--pid(?:\s|=)")
                 for required in (
-                    "--network none",
                     "--read-only",
                     "--cap-drop ALL",
                     "--security-opt no-new-privileges",
@@ -90,12 +89,16 @@ class CredentialDockerLauncherTests(unittest.TestCase):
                 ):
                     self.assertIn(required, active)
                 if filename == "run_ada_credentials.sh":
+                    self.assertIn('network="none"', active)
+                    self.assertIn('--network "$network"', active)
                     self.assertIn(
                         "dst=/ada-memory/secrets/ada.kdbx,readonly", active
                     )
                     self.assertNotIn(
                         "dst=/ada-memory/secrets,readonly", active
                     )
+                else:
+                    self.assertIn("--network none", active)
                 checked = subprocess.run(
                     ["sh", "-n", str(script)],
                     capture_output=True,
@@ -117,7 +120,8 @@ class CredentialDockerLauncherTests(unittest.TestCase):
         self.assertNotIn("ada-credentials:", launcher)
 
     def _run_launcher(
-        self, image_id: str | None, inspect_output: str | None
+        self, image_id: str | None, inspect_output: str | None,
+        *, probe: bool = False, network: bool = False,
     ) -> tuple[int, list[str]]:
         """Run the real launcher against a recording stub `docker`."""
         launcher = Path(__file__).resolve().parents[1] / "scripts" / "run_ada_credentials.sh"
@@ -150,8 +154,15 @@ class CredentialDockerLauncherTests(unittest.TestCase):
                 env["ADA_CREDENTIAL_IMAGE_ID"] = image_id
             if inspect_output is not None:
                 env["FAKE_INSPECT"] = inspect_output
+            if probe:
+                config = root / "pilot.json"
+                config.write_text("{}", encoding="utf-8")
+                config.chmod(0o600)
+                env["ADA_CALDAV_CONFIG"] = str(config)
+            if network:
+                env["ADA_CALDAV_ALLOW_NETWORK"] = "1"
             result = subprocess.run(
-                ["sh", str(launcher)],
+                ["sh", str(launcher), *(["calendar-probe"] if probe else [])],
                 env=env,
                 capture_output=True,
                 text=True,
@@ -172,6 +183,31 @@ class CredentialDockerLauncherTests(unittest.TestCase):
             calls[1].endswith(f" {image_id} secrets-check --memory-root /ada-memory")
         )
         self.assertNotIn("ada-credentials:", calls[1])
+
+    def test_calendar_probe_network_is_explicit_and_command_scoped(self) -> None:
+        image_id = "sha256:" + "a" * 64
+        inspected = f"{image_id} locked-aarch64-v1"
+        status, calls = self._run_launcher(
+            image_id, inspected, probe=True
+        )
+        self.assertEqual(status, 0)
+        self.assertEqual(len(calls), 2)
+        self.assertIn("--network none", calls[1])
+        self.assertIn("dst=/ada-config/caldav.json,readonly", calls[1])
+        self.assertTrue(calls[1].endswith(
+            f"{image_id} calendar-probe --memory-root /ada-memory "
+            "--config /ada-config/caldav.json"
+        ))
+        status, calls = self._run_launcher(
+            image_id, inspected, probe=True, network=True
+        )
+        self.assertEqual(status, 0)
+        self.assertIn("--network bridge", calls[1])
+        status, calls = self._run_launcher(
+            image_id, inspected, network=True
+        )
+        self.assertEqual(status, 2)
+        self.assertEqual(calls, [])
 
     def test_launcher_rejects_missing_tag_or_partial_image_id(self) -> None:
         for value in (
