@@ -168,7 +168,9 @@ def _chat(
                     print(f"warning: local model cleanup failed: {exc}", file=sys.stderr)
 
 
-def _unlock_vault(vault_root: str):
+def _unlock_vault(
+    vault_root: str, *, allowed_entries: frozenset[str] = frozenset()
+):
     """Unlock only from a trusted local terminal, never from model input."""
     from getpass import GetPassWarning, getpass
     from warnings import catch_warnings, simplefilter
@@ -183,7 +185,7 @@ def _unlock_vault(vault_root: str):
     # Deny NEW same-UID /proc memory opens before asking for a passphrase.
     # Already-open fds survive this prctl: this is not same-UID isolation.
     protect_credential_process()
-    vault = KdbxSecrets(vault_root)
+    vault = KdbxSecrets(vault_root, allowed_entries=allowed_entries)
     try:
         # getpass falls back to visible stdin when terminal echo cannot be
         # disabled. A password prompt must fail closed instead.
@@ -211,6 +213,47 @@ def _secrets_check(memory_root: str) -> int:
     except SecretVaultError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+
+
+def _calendar_probe(memory_root: str, config_path: str) -> int:
+    """Trusted operator-only CalDAV read probe, never a model-facing tool."""
+
+    from ada.adapters.kdbx_secrets import SecretVaultError
+    from ada.application.calendar_connection import (
+        CalendarConnectionConfigurationError,
+        load_connection_config,
+        probe_connection,
+    )
+
+    try:
+        config = load_connection_config(config_path)
+    except CalendarConnectionConfigurationError:
+        print("error: CalDAV pilot configuration is invalid", file=sys.stderr)
+        return 2
+
+    try:
+        with _unlock_vault(
+            memory_root, allowed_entries=frozenset({config.password_ref})
+        ) as vault:
+            password = vault.password(config.password_ref)
+            try:
+                calendars, events = probe_connection(config, password)
+            finally:
+                del password
+    except (SecretVaultError, Exception):
+        # Neither HTTP exceptions nor provider XML nor secret references may
+        # enter terminal diagnostics. No provider write is ever attempted.
+        print(
+            "error: CalDAV read probe failed; no calendar changes attempted",
+            file=sys.stderr,
+        )
+        return 2
+
+    print(
+        f"CalDAV read probe succeeded: {calendars} collections, "
+        f"{events} events in the next 7 days (no event details printed)."
+    )
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -269,6 +312,18 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="Persistent Ada Memory root holding secrets/ada.kdbx.",
     )
+    calendar_probe = subparsers.add_parser(
+        "calendar-probe",
+        help="Trusted operator-only CalDAV privilege and read check; no writes.",
+    )
+    calendar_probe.add_argument(
+        "--config", required=True,
+        help="Owner-only JSON file with provider mapping and KDBX secret reference.",
+    )
+    calendar_probe.add_argument(
+        "--memory-root", required=True,
+        help="Root holding the Ada-only secrets/ada.kdbx file.",
+    )
     return parser
 
 
@@ -280,6 +335,8 @@ def main() -> None:
         raise SystemExit(_doctor())
     if args.command == "secrets-check":
         raise SystemExit(_secrets_check(args.memory_root))
+    if args.command == "calendar-probe":
+        raise SystemExit(_calendar_probe(args.memory_root, args.config))
     if args.command == "chat":
         raise SystemExit(
             _chat(
