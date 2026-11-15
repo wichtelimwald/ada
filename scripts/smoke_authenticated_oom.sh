@@ -4,12 +4,12 @@
 # No host vault mount, real credentials, network, or Docker socket.
 set -eu
 
-image="ada-credentials:locked"
+image="ada-credentials:candidate"
 label=$(docker image inspect \
   --format '{{index .Config.Labels "org.ada.credential-runtime"}}' \
   "$image")
 if [ "$label" != "locked-aarch64-v1" ]; then
-  echo "error: build the locked credential image first" >&2
+  echo "error: run scripts/smoke_credential_runtime.sh first" >&2
   exit 2
 fi
 

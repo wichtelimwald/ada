@@ -6,7 +6,9 @@ set -eu
 # Also check the production launcher syntax (the Mac host may lack python).
 sh -n scripts/run_ada_credentials.sh
 
-image="ada-credentials:locked"
+# Builds the CURRENT working tree: a candidate tag only. The production
+# launcher runs solely an operator-recorded image ID of a reviewed build.
+image="ada-credentials:candidate"
 docker build --file Dockerfile.credentials --target credential-runtime \
   --tag "$image" .
 

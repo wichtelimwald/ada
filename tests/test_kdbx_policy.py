@@ -104,6 +104,103 @@ class CredentialDockerLauncherTests(unittest.TestCase):
                 )
                 self.assertEqual(checked.returncode, 0, checked.stderr)
 
+    def test_test_scripts_never_build_or_use_the_production_image(self) -> None:
+        # Smoke tests build arbitrary working trees; they must not produce
+        # or consume what the production launcher would run.
+        root = Path(__file__).resolve().parents[1] / "scripts"
+        for filename in ("smoke_credential_runtime.sh", "smoke_authenticated_oom.sh"):
+            with self.subTest(script=filename):
+                source = (root / filename).read_text(encoding="utf-8")
+                self.assertIn('image="ada-credentials:candidate"', source)
+                self.assertNotIn("ada-credentials:locked", source)
+        launcher = (root / "run_ada_credentials.sh").read_text(encoding="utf-8")
+        self.assertNotIn("ada-credentials:", launcher)
+
+    def _run_launcher(
+        self, image_id: str | None, inspect_output: str | None
+    ) -> tuple[int, list[str]]:
+        """Run the real launcher against a recording stub `docker`."""
+        launcher = Path(__file__).resolve().parents[1] / "scripts" / "run_ada_credentials.sh"
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "memory" / "secrets").mkdir(parents=True)
+            (root / "memory" / "secrets" / "ada.kdbx").write_bytes(b"synthetic")
+            bin_dir = root / "bin"
+            bin_dir.mkdir()
+            log = root / "docker.log"
+            stub = bin_dir / "docker"
+            stub.write_text(
+                "#!/bin/sh\n"
+                'printf "%s\\n" "$*" >> "$FAKE_DOCKER_LOG"\n'
+                'case "$1" in\n'
+                '  image) [ -n "${FAKE_INSPECT:-}" ] || exit 1\n'
+                '         printf "%s\\n" "$FAKE_INSPECT" ;;\n'
+                "  run) exit 0 ;;\n"
+                "  *) exit 99 ;;\n"
+                "esac\n",
+                encoding="utf-8",
+            )
+            stub.chmod(0o700)
+            env = {
+                "PATH": f"{bin_dir}{os.pathsep}/usr/bin{os.pathsep}/bin",
+                "ADA_MEMORY_ROOT": str(root / "memory"),
+                "FAKE_DOCKER_LOG": str(log),
+            }
+            if image_id is not None:
+                env["ADA_CREDENTIAL_IMAGE_ID"] = image_id
+            if inspect_output is not None:
+                env["FAKE_INSPECT"] = inspect_output
+            result = subprocess.run(
+                ["sh", str(launcher)],
+                env=env,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
+            return result.returncode, calls
+
+    def test_launcher_runs_only_the_recorded_full_image_id(self) -> None:
+        image_id = "sha256:" + "a" * 64
+        status, calls = self._run_launcher(image_id, f"{image_id} locked-aarch64-v1")
+        self.assertEqual(status, 0)
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(calls[0].startswith("image inspect "))
+        self.assertTrue(calls[0].endswith(f" {image_id}"))
+        self.assertTrue(calls[1].startswith("run "))
+        self.assertTrue(
+            calls[1].endswith(f" {image_id} secrets-check --memory-root /ada-memory")
+        )
+        self.assertNotIn("ada-credentials:", calls[1])
+
+    def test_launcher_rejects_missing_tag_or_partial_image_id(self) -> None:
+        for value in (
+            None,
+            "ada-credentials:locked",
+            "sha256:" + "a" * 12,
+            "sha256:" + "A" * 64,
+            "a" * 64,
+            "sha256:" + "a" * 64 + "0",
+        ):
+            with self.subTest(image_id=value):
+                status, calls = self._run_launcher(value, f"{value} locked-aarch64-v1")
+                self.assertNotEqual(status, 0)
+                self.assertEqual(calls, [])
+
+    def test_launcher_rejects_id_mismatch_wrong_label_or_absent_image(self) -> None:
+        image_id = "sha256:" + "a" * 64
+        for inspected in (
+            "sha256:" + "b" * 64 + " locked-aarch64-v1",
+            f"{image_id} ",
+            f"{image_id} locked-aarch64-v0",
+            None,
+        ):
+            with self.subTest(inspected=inspected):
+                status, calls = self._run_launcher(image_id, inspected)
+                self.assertEqual(status, 2)
+                self.assertEqual(len(calls), 1)
+                self.assertTrue(calls[0].startswith("image inspect "))
+
 
 class CredentialRuntimePinnedGraphTests(unittest.TestCase):
     def test_full_hash_lock_covers_all_adopted_packages(self) -> None:

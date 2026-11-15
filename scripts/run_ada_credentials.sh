@@ -19,17 +19,32 @@ if [ "$#" -eq 0 ]; then
   set -- secrets-check --memory-root /ada-memory
 fi
 
-# This exact locally built target must carry the label from the reviewed
-# Dockerfile credential-runtime stage. An arbitrary development image is denied.
-image="ada-credentials:locked"
-actual_label=$(docker image inspect \
-  --format '{{index .Config.Labels "org.ada.credential-runtime"}}' \
+# Image identity: the label is a constant every branch build carries, and
+# tags are mutable (smoke tests rebuild arbitrary working trees). Require the
+# operator-recorded, full content-addressed ID of the reviewed build and run
+# exactly that ID. Never derive this value from a tag at launch time.
+: "${ADA_CREDENTIAL_IMAGE_ID:?Set ADA_CREDENTIAL_IMAGE_ID to the recorded sha256 ID of the reviewed credential image}"
+image="${ADA_CREDENTIAL_IMAGE_ID}"
+image_hex="${image#sha256:}"
+case "${image}" in
+  sha256:*) ;;
+  *) echo "error: ADA_CREDENTIAL_IMAGE_ID must be a full sha256 image ID" >&2; exit 2 ;;
+esac
+case "${image_hex}" in
+  ''|*[!0-9a-f]*) echo "error: ADA_CREDENTIAL_IMAGE_ID must be a full sha256 image ID" >&2; exit 2 ;;
+esac
+if [ "${#image_hex}" -ne 64 ]; then
+  echo "error: ADA_CREDENTIAL_IMAGE_ID must be a full sha256 image ID" >&2
+  exit 2
+fi
+inspected=$(docker image inspect \
+  --format '{{.Id}} {{index .Config.Labels "org.ada.credential-runtime"}}' \
   "$image" 2>/dev/null) || {
-  echo "error: build the reviewed hash-locked credential image first" >&2
+  echo "error: recorded credential image ID is not present locally" >&2
   exit 2
 }
-if [ "$actual_label" != "locked-aarch64-v1" ]; then
-  echo "error: image is not the reviewed credential-runtime build target" >&2
+if [ "$inspected" != "$image locked-aarch64-v1" ]; then
+  echo "error: image is not the recorded reviewed credential-runtime build" >&2
   exit 2
 fi
 

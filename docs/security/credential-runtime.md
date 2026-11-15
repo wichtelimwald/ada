@@ -38,9 +38,23 @@ A read-only ciphertext mount is not process-memory isolation.
 ## Runtime launch policy
 
 `scripts/run_ada_credentials.sh` is the only supported startup command
-for the credential-bearing image. It requires an image with the reviewed
-`org.ada.credential-runtime=locked-aarch64-v1` label and never accepts
-another image name through arguments.
+for the credential-bearing image. It never accepts an image name through
+arguments. The constant `org.ada.credential-runtime=locked-aarch64-v1`
+label and mutable tags do **not** identify a reviewed build, so the launcher
+requires `ADA_CREDENTIAL_IMAGE_ID`: the full `sha256:` ID of the reviewed
+image, recorded by the operator. It checks that ID and the label locally and
+runs exactly that ID. Smoke/OOM scripts build and use only
+`ada-credentials:candidate`. Record the ID once, from a fresh worktree of
+the reviewed commit (no uncommitted or ignored files in the build context),
+never by re-reading a tag at launch time:
+
+```sh
+git worktree add --detach ../ada-reviewed <reviewed-commit>
+cd ../ada-reviewed
+docker build --file Dockerfile.credentials --target credential-runtime \
+  --tag ada-credentials:locked .
+docker image inspect --format '{{.Id}}' ada-credentials:locked
+```
 
 - Private PID namespace, user 10001, a single Ada foreground process;
   no `docker exec`, bind-mounted source code, writable host directories
@@ -194,8 +208,8 @@ and the code and runtime isolation have passed independent assessment.
   sibling cannot enter that namespace at process start. Late opens fail.
 - Deliberately oversized *authenticated* gzip vault triggers contained
   failure (OOM or explicit denial) without host-wide resource exhaustion.
-  Run `sh scripts/smoke_authenticated_oom.sh` after building the local
-  hash-locked image. The script constructs an entirely synthetic,
+  Run `sh scripts/smoke_authenticated_oom.sh` after
+  `scripts/smoke_credential_runtime.sh` built the candidate image. The script constructs an entirely synthetic,
   HMAC-authenticated compressed KDBX4 file in private container tmpfs;
   an exec-replaced PID 1 performs the **actual strict Ada unlock**.
   It demands Docker report `OOMKilled=true` and exit code 137 with
