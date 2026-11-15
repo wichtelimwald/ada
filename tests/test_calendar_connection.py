@@ -142,7 +142,8 @@ class CalDAVProbeTests(unittest.TestCase):
         server = build_fake_server()
         server.seed_resource(
             FAMILY_PATH, "one.ics",
-            b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
+            b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\n"
+            b"PRODID:-//Ada test//EN\r\nBEGIN:VEVENT\r\n"
             b"UID:one@example.invalid\r\nDTSTAMP:20261001T080000Z\r\n"
             b"DTSTART:20261002T090000Z\r\n"
             b"DTEND:20261002T100000Z\r\nSUMMARY:Synthetic secret title\r\n"
