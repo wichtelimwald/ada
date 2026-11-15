@@ -73,21 +73,25 @@ Current examples:
 | Local model serving | Self-hosted Ollama with configurable model profile; qwen3.5:9b target-Mac baseline | MIT runtime; model artifact Apache-2.0; accepted by ADR-0006 |
 | Development Memory history | Ada-owned file adapter using a separately installed Git CLI | Git is GPLv2 and not vendored by Ada; accepted by ADR-0010 |
 | Calendar integration | Standard CalDAV via a small Ada-owned adapter with provider profiles (IONOS Mail Business first), using `icalendar` and `recurring-ical-events` | BSD-2-Clause / LGPL-3.0-or-later; accepted by ADR-0009, read, create, update and cancel implemented (S1-S4) |
-| Ada credentials | Dedicated local KDBX vault, manually unlocked on every start; no personal macOS Keychain access | ADR-0013 accepted; optional one-shot and in-process local-chat unlock PoC, **no live-provider wiring**. Exact-head 333-test validation reported; reader hardening and security approval still pending |
+| Ada credentials | Dedicated local KDBX vault, manually unlocked on every start; no personal macOS Keychain access | ADR-0013 accepted; isolated offline credential-runtime candidate validated with synthetic KeePassXC vault; **no live-provider wiring or production security approval** (PR #60) |
 
 This table is intentionally short and user-facing. Detailed trade-offs, versions, evidence, and re-open triggers live in the ADRs and research documents.
 
-**Accepted credential direction; experimental local-chat lifecycle only:** [ADR-0013](docs/decisions/ADR-0013-local-ada-secrets.md) keeps IONOS and future service credentials in an **Ada-only, encrypted KDBX file** alongside the persistent Ada Memory storage, not in semantic Memory or its Git history. The maintainer manually unlocks it at each start; a restart stays locked until then. This does not grant Ada access to the operator's personal Keychain. An unlocked vault is **not isolated from processes with the same UID**: the independent review reproduced reading **the master passphrase and plaintext entry passwords** through Linux `/proc` from a sibling process, even with restricted Docker flags. The passphrase also opens accessible vault backups. Reader `lock()` does not reliably wipe those values from Python memory. No KDBX library is approved for production; an opt-in Apache-2.0 **kdbxtool** reader is being tested (alpha; maintainer-reported KeePassXC smoke test and Python 3.14 exact-head tests passed, security review still open). The `ada secrets-check` command unlocks and immediately locks a test vault. With the explicit `ada chat --unlock-vault` opt-in, the chat process retains the decrypted vault until exit without exposing it to the language model; **no calendar or mail adapter uses it yet**. VS Code offers an optional **synthetic-data-only** KDBX research Dev Container with a read-only mount; other same-UID processes (extensions, server, terminals) make it unsafe for real credentials. Production requires a hardened isolated runtime, strict KDF and dependency validation, and a separate security approval. The default Dev Container is unaffected. See [the PoC guide](docs/manual-secret-vault-poc.md).
-
-The hardening follow-up ([issue #58](https://github.com/wichtelimwald/ada/issues/58))
-adds Linux process non-dumpability (which denies **only new** process-memory
-opens; pre-opened descriptors remain readable), bounded Argon2/KDBX4
-requirements, single-descriptor file reading, and early release of retained
-reader credential references. Real credentials require isolation from process
-startup, not just `PR_SET_DUMPABLE=0`. These changes **do not yet establish a
-production-safe runtime**: the VS Code research container remains
-synthetic-only, only the seven KDBX-specific wheels are hash-pinned (not all
-Ada runtime dependencies), no isolated credential runtime is approved, and no IONOS account is connected.
+**Accepted credential direction; release candidate still synthetic-only:**
+[ADR-0013](docs/decisions/ADR-0013-local-ada-secrets.md) keeps service
+credentials in a dedicated encrypted KDBX file, separate from semantic Memory.
+The operator manually enters the passphrase at startup, without granting
+access to the personal macOS Keychain. A dedicated **offline** Docker image
+uses a private PID namespace, a single read-only vault-file mount, bounded
+Argon2 work and a hash-locked 49-package dependency graph. A genuine
+synthetic KeePassXC file successfully unlocked and re-locked in the isolated
+launcher; the early process-memory access regression also passed.
+The unlocked credential process and privileged Docker/host administrators
+remain trusted; Python cannot guarantee complete erasure of decrypted
+strings. The VS Code research container remains unsafe for real credentials.
+**Production approval, OOM containment evidence, independent security/license
+review and provider credential wiring remain open** in [PR #60](https://github.com/wichtelimwald/ada/pull/60).
+No mail or calendar adapter uses live credentials yet.
 
 The current DBOS-backed calendar path is still **synthetic/test-only in the running application**. A generic CalDAV adapter (list/create/update/cancel) now exists behind `CalendarPort`, validated only against an in-process fake server that reproduces the recorded IONOS behavior; it is not yet wired into Ada's composition root, no real calendar account or personal event data is connected anywhere, and no development or production credential is configured. Updates and cancels are conditional on the event version the user approved, so an event changed in the meantime is reported as a conflict instead of being overwritten; recurring events and events with attendees stay read-only. MVP-60 S5 now adds availability-only conflict checking, a local table of directional approximate travel times, and explicit unknown-travel results. It is still **not connected to live family-calendar input**: trusted calendar selection, configuration/credentials, durability payload scrubbing, real-provider acceptance and the later email/admin-grant integration remain separate gates. No personal calendar data should be used in the current development path.
 
