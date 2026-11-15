@@ -70,6 +70,13 @@ another image name through arguments.
 Container memory and swap limits are mandatory **runtime configuration**.
 An authenticated 65 KiB compressed vault expanded to 64 MiB in the
 reviewer's test; the 16 MiB ciphertext cap alone cannot bound RAM.
+Source inspection of published `kdbxtool==0.1.7` confirms
+[`Kdbx4Reader.decrypt`](https://github.com/coreyleavitt/kdbxtool/blob/fa5c6bfc1522474e44e764bb82e1711abf012d3a/src/kdbxtool/parsing/kdbx4.py)
+first verifies header and payload HMACs, then calls **unbounded**
+`gzip.decompress()` after authenticated decryption. Containment prevents
+host-wide memory exhaustion but cannot make a hostile authenticated vault
+safe for availability. This is a residual availability risk, not proof
+of a cryptographic authentication bypass.
 
 ## Supply chain and packaging
 
@@ -146,6 +153,15 @@ and the code and runtime isolation have passed independent assessment.
   sibling cannot enter that namespace at process start. Late opens fail.
 - Deliberately oversized *authenticated* gzip vault triggers contained
   failure (OOM or explicit denial) without host-wide resource exhaustion.
+  Run `sh scripts/smoke_authenticated_oom.sh` after building the local
+  hash-locked image. The script constructs an entirely synthetic,
+  HMAC-authenticated compressed KDBX4 file in private container tmpfs;
+  an exec-replaced PID 1 performs the **actual strict Ada unlock**.
+  It demands Docker report `OOMKilled=true` and exit code 137 with
+  the **same production 1-GiB memory/swap limits**. It leaves no host
+  vault file, uses no network and removes its ephemeral container.
+  **Not yet executed on target**; neither an unrelated exception nor
+  a crash outside the cgroup satisfies the gate.
 - Runtime image builds from the exact reviewed base digest and full wheel
   lock; distribution inventory and `pip check` pass. No secrets, credentials
   or personal events in logs, argv/env, model context or durable state.
