@@ -160,8 +160,11 @@ and the code and runtime isolation have passed independent assessment.
   It demands Docker report `OOMKilled=true` and exit code 137 with
   the **same production 1-GiB memory/swap limits**. It leaves no host
   vault file, uses no network and removes its ephemeral container.
-  **Not yet executed on target**; neither an unrelated exception nor
-  a crash outside the cgroup satisfies the gate.
+  **Passed on target (2026-11-15; maintainer output):** synthetic
+  authenticated KDBX4 ciphertext was 1,304,985 bytes with a 1,280 MiB
+  expanded payload; Docker reported a container-scoped OOM kill with
+  exit code 137 at the 1-GiB cgroup limit. This proves containment for
+  this case, not availability for hostile authenticated vaults.
 - Runtime image builds from the exact reviewed base digest and full wheel
   lock; distribution inventory and `pip check` pass. No secrets, credentials
   or personal events in logs, argv/env, model context or durable state.
