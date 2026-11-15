@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=80,<81"]
+requires = ["setuptools==84.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,7 +9,7 @@ description = "Local-first, privacy-first personal AI assistant"
 requires-python = ">=3.14,<3.15"
 license = "MIT"
 dependencies = [
-    "pydantic-ai-slim[openai]==2.46.0",
+    "pydantic-ai-slim[openai]==2.66.0",
     "httpx2==2.13.1",
     "cedarpy==4.12.0",
     "dbos==3.0.0",
