@@ -143,6 +143,11 @@ class CredentialRuntimePinnedGraphTests(unittest.TestCase):
             name = re.split(r"[<>=\\[;! ]", item, maxsplit=1)[0]
             name = re.sub(r"[-_.]+", "-", name).lower()
             self.assertIn(name, full, f"Unhashed dependency: {item}")
+            if "==" in item:
+                self.assertEqual(
+                    full[name], item.rsplit("==", maxsplit=1)[1],
+                    f"Stale runtime lock version for direct dependency: {item}",
+                )
 
         self.assertGreaterEqual(len(full), 49)
 
