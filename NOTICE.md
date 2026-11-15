@@ -53,7 +53,7 @@ See [KDBX reader evaluation](docs/research/kdbx-reader-evaluation.md).
 
 ## Adopted dependencies
 
-- **PydanticAI 2.66.0** (`pydantic-ai-slim[openai]`) — MIT License. Used behind Ada's replaceable agent-runtime adapter. Updated from 2.46.0 after the 2026-11-15 scan (security fixes through 2.66.0; target tests and image re-scan pending).
+- **PydanticAI 2.66.0** (`pydantic-ai-slim[openai]`) — MIT License. Used behind Ada's replaceable agent-runtime adapter. Updated from 2.46.0 after the 2026-11-15 scan; target validation is recorded above.
 - **httpx2 2.13.1** — BSD-3-Clause. Already in PydanticAI's dependency graph; pinned directly for Ada's proxy-independent local Ollama transport. Its [focused dependency review](docs/research/httpx2-direct-transport-review.md) records provenance, maintenance, privacy, security advisories, the installed wheel license, and transitive scope. Redistributing Ada-built images/installers still requires the separate release-artifact review below.
 - **cedarpy 4.12.0** — Apache License 2.0. Community-maintained Python/PyO3 binding used only behind AdaGuard.
 - **Cedar Policy engine 4.12.0** — Apache License 2.0. Embedded by cedarpy as the authorization engine selected by ADR-0004.
