@@ -44,11 +44,13 @@ not decrypting/storing the KDBX vault.
   installed-inventory check, native wheel/OS layer vulnerability review,
   license attribution and shipped notices are **still outstanding**. Pinning
   hashes alone does not prove software safety.
-- [ ] **KDBX reader safety:** focused source review of KDBX4 authenticated
-  processing, KDF parsing, post-authenticated gzip expansion/oom, XML and
-  protected-field handling; enforce container memory cap, no plaintext in
-  logs/durable storage, no key material after exit. Remaining Python memory
-  erasure limitations must be explicit and accepted.
+- [ ] **KDBX reader safety:** source inspection confirms that upstream
+  `kdbxtool 0.1.7` authenticates header and block HMACs **before**
+  calling unbounded `gzip.decompress()`. The strict cgroup has a 1-GiB
+  cap, but the authenticated oversized-vault OOM test
+  (`scripts/smoke_authenticated_oom.sh`) is **not yet executed**.
+  Continue reviewing XML/protected fields, plaintext log/durability paths
+  and Python memory-erasure limitations; document residual availability risk.
 - [ ] **Acceptance and review:** target-Mac Docker builds and full test
   suite, synthetic KeePassXC interoperability, process isolation tests,
   incorrect-passphrase/locked-state denial, dependency lock verification.
