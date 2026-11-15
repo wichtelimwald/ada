@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
@@ -21,7 +20,7 @@ from ada.application.calendar_connection import (
     probe_connection,
 )
 from ada.cli import _calendar_probe, build_parser
-from ada.adapters.caldav.dav_client import CalDAVConfigurationError
+from ada.adapters.caldav.dav_client import CalDAVConfigurationError, CalDAVProtocolError
 from caldav_test_support import (
     BASE_URL,
     FAMILY_PATH,
@@ -144,7 +143,8 @@ class CalDAVProbeTests(unittest.TestCase):
         server.seed_resource(
             FAMILY_PATH, "one.ics",
             b"BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\n"
-            b"UID:one@example.invalid\r\nDTSTART:20261002T090000Z\r\n"
+            b"UID:one@example.invalid\r\nDTSTAMP:20261001T080000Z\r\n"
+            b"DTSTART:20261002T090000Z\r\n"
             b"DTEND:20261002T100000Z\r\nSUMMARY:Synthetic secret title\r\n"
             b"END:VEVENT\r\nEND:VCALENDAR\r\n",
         )
@@ -182,18 +182,15 @@ class CalDAVProbeTests(unittest.TestCase):
                 self.assertEqual(server.put_attempts, 0)
 
     def test_probe_fails_closed_without_server_credentials(self) -> None:
-        server = build_fake_server()
-
         def reject(request: httpx2.Request) -> httpx2.Response:
             return httpx2.Response(401, content=b"authentication refused")
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(CalDAVProtocolError):
             probe_connection(
                 self._config(), "synthetic-password",
                 transport=httpx2.MockTransport(reject),
                 now=datetime(2026, 10, 1, tzinfo=timezone.utc),
             )
-        self.assertEqual(server.put_attempts, 0)
 
     def test_cli_never_exposes_password_or_provider_payload(self) -> None:
         class FakeVault:
@@ -204,9 +201,7 @@ class CalDAVProbeTests(unittest.TestCase):
                 return None
 
             def password(self, reference: str) -> str:
-                self_reference = reference
-                self_assert = self_reference == "ionos/calendar"
-                if not self_assert:
+                if reference != "ionos/calendar":
                     raise AssertionError("incorrect allowlist")
                 return "synthetic-sensitive-value"
 
