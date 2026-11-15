@@ -136,6 +136,47 @@ A clean scan is **not** a malicious-code or full native-binary security audit.
 Do not install scanners in the release image; neither tool substitutes for
 the independent code review or vulnerability analysis of embedded libraries.
 
+### Target Grype findings and focused refresh (2026-11-15)
+
+The operator scanned the earlier local `ada-credentials:locked` image with
+Grype: **212 advisory/package matches**, including **63 High**, **0 Critical**.
+Multiple matches may refer to one CVE in several Debian packages. Scanner
+matches alone do not establish actual runtime exploitability. The full report
+and remediation rationale are recorded on
+[PR #60](https://github.com/wichtelimwald/ada/pull/60#issuecomment-6891333448).
+
+Three patch candidates have been addressed **in source, not yet validated on
+the target**:
+
+- `pydantic-ai-slim` **2.46.0 → 2.66.0**, with its required
+  `pydantic-graph` **2.66.0**, addressing both the streaming limiter advisory
+  [GHSA-6fqq-452j-qhrp](https://github.com/pydantic/pydantic-ai/security/advisories/GHSA-6fqq-452j-qhrp)
+  (fixed in 2.53.0) and later fixes published in 2.66.0. Assess API
+  compatibility by the full Ada suite.
+- `setuptools` **80.10.2 → 84.1.0** in both PEP 517 build metadata and wheel
+  lock. This fixes [GHSA-h35f-9h28-mq5c](https://github.com/pypa/setuptools/security/advisories/GHSA-h35f-9h28-mq5c)
+  (macOS source distribution) and
+  [GHSA-xmj3-9gf7-h52w](https://github.com/pypa/setuptools/security/advisories/GHSA-xmj3-9gf7-h52w)
+  (Windows legacy wheel installation); these are not confirmed exploitable in
+  the reviewed Linux wheel-only build. Remaining build packages retain their
+  original locks.
+- The pinned `python:3.14-slim` base digest stays unchanged. Its Debian
+  `zlib1g` is updated **only** to the exact stable-security version
+  `1:1.3.dfsg+really1.3.1-1+deb13u1`, following
+  [DSA-6613-1](https://lists.debian.org/debian-security-announce/2026/msg00532.html).
+  The APT index is signed but not snapshot-pinned: reproducibility and the
+  updated package version need explicit image-build and scanner verification.
+  **Other OS packages are not automatically upgraded.**
+
+The scan also flags CPython 3.14.10 for
+[CVE-2026-119170](https://mail.python.org/archives/list/security-announce%40python.org/message/PXVTTOBPUMFJSSUXN6XCS7FC5DZOSZXK/),
+which affects **only OpenSSL FIPS-mode users**. As of 2026-11-15, 3.14.10
+is the latest published 3.14 patch and 3.14.11 is **not available**. No
+FIPS-mode requirement is specified for this image; verify the actual runtime
+configuration and document risk acceptance rather than claiming a nonexistent
+patch. Other Grype findings (notably Debian `(won't fix)`) still need
+reachability/mitigation review. No clean image or production approval yet.
+
 The full wheel lock and Docker base digest are now pinned. **No deployment
 image is production-approved** until it builds on target, its installed
 package inventory/OS layers and known vulnerabilities have been reviewed,
