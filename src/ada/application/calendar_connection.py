@@ -34,7 +34,7 @@ class CalendarConnectionConfig:
 def _required_string(value: object) -> str:
     if not isinstance(value, str) or not value or value != value.strip():
         raise CalendarConnectionConfigurationError("invalid CalDAV configuration")
-    if any(character in value for character in "\r\n\x00"):
+    if any(character in value for character in "\r\n\t\x00"):
         raise CalendarConnectionConfigurationError("invalid CalDAV configuration")
     return value
 
@@ -60,7 +60,7 @@ def load_connection_config(path: str | Path) -> CalendarConnectionConfig:
                     "invalid CalDAV configuration"
                 )
         payload = json.loads(raw)
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+    except (OSError, UnicodeError, json.JSONDecodeError):
         raise CalendarConnectionConfigurationError(
             "invalid CalDAV configuration"
         ) from None
@@ -116,7 +116,7 @@ def load_connection_config(path: str | Path) -> CalendarConnectionConfig:
         try:
             audience = CalendarAudience(item["audience"])
             mode = CalendarAccessMode(item["mode"])
-        except ValueError:
+        except (TypeError, ValueError):
             raise CalendarConnectionConfigurationError("invalid CalDAV calendars") from None
         refs.append(
             CalendarRef(
