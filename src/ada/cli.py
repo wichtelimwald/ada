@@ -218,7 +218,6 @@ def _secrets_check(memory_root: str) -> int:
 def _calendar_probe(memory_root: str, config_path: str) -> int:
     """Trusted operator-only CalDAV read probe, never a model-facing tool."""
 
-    from ada.adapters.kdbx_secrets import SecretVaultError
     from ada.application.calendar_connection import (
         CalendarConnectionConfigurationError,
         load_connection_config,
@@ -240,7 +239,7 @@ def _calendar_probe(memory_root: str, config_path: str) -> int:
                 calendars, events = probe_connection(config, password)
             finally:
                 del password
-    except (SecretVaultError, Exception):
+    except Exception:
         # Neither HTTP exceptions nor provider XML nor secret references may
         # enter terminal diagnostics. No provider write is ever attempted.
         print(
