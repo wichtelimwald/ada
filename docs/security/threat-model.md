@@ -116,6 +116,28 @@ review is not an independent human security audit.
   remnants and backups remain outside the app's guarantee. A runtime
   process-hardening flag is not a substitute for a trusted code base.
 
+## MVP-60 S6 operator-only CalDAV probe (not live-authorized)
+
+The new `calendar-probe` path is a **trusted operator command**, not a
+model tool or DBOS workflow. It adds a second read-only mount for the
+owner-controlled JSON provider configuration, then looks up one allowlisted
+KDBX password reference after the isolated startup passphrase prompt.
+Only the existing CalDAV client receives the secret; the configured origin
+must be HTTPS, with no URL userinfo, redirects or ambient proxy.
+The initial probe checks collection privileges and reads a bounded
+seven-day window, outputting only event counts.
+
+The launcher still defaults to `--network none`. An operator may opt in to
+Docker bridge networking for `calendar-probe` alone. **Bridge allows more
+egress than the configured origin at the OS level.** The trusted application
+requests only its configured HTTPS origin, but a compromised in-process
+dependency could use the available network and all unlocked KDBX data.
+Treat the Mac user, Docker administrator and all code executing inside the
+credential container as part of the accepted trust boundary; no claim of
+per-destination firewall isolation is made. Do not activate real service
+credentials until focused S6/S7 review and explicit operator acceptance.
+No calendar data is persisted or sent to the model by this probe.
+
 ## Threats to evaluate
 
 - direct and indirect prompt injection,
