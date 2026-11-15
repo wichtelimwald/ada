@@ -47,8 +47,10 @@ not decrypting/storing the KDBX vault.
 - [ ] **KDBX reader safety:** source inspection confirms that upstream
   `kdbxtool 0.1.7` authenticates header and block HMACs **before**
   calling unbounded `gzip.decompress()`. The strict cgroup has a 1-GiB
-  cap, but the authenticated oversized-vault OOM test
-  (`scripts/smoke_authenticated_oom.sh`) is **not yet executed**.
+  cap. The authenticated oversized-vault OOM test
+  (`scripts/smoke_authenticated_oom.sh`) **passed on target 2026-11-15**:
+  the 1,280 MiB expanded payload was contained by the 1-GiB cgroup
+  (Docker OOMKilled=true/exit 137).
   Continue reviewing XML/protected fields, plaintext log/durability paths
   and Python memory-erasure limitations; document residual availability risk.
 - [ ] **Acceptance and review:** target-Mac Docker builds and full test
