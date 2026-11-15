@@ -6,9 +6,8 @@ Depends on: MVP-00 (done)
 Owner PR: https://github.com/wichtelimwald/ada/pull/39 (plan/research/ADR, merged);
 S1-S3 implementation PR: https://github.com/wichtelimwald/ada/pull/44 (merged);
 S4 implementation PR: https://github.com/wichtelimwald/ada/pull/48 (merged);
-S5 implementation draft: https://github.com/wichtelimwald/ada/pull/54
-(unreviewed; tests not run on the exact head).
-S6-S7 remain pending, so the roadmap stays `ready` until their gates pass.
+S5 implementation PR: https://github.com/wichtelimwald/ada/pull/54 (merged).
+S6 is in implementation, S7 remains pending; roadmap stays `ready`.
 
 ## Goal
 
@@ -386,9 +385,26 @@ S6-S7 (roadmap `done` only in the last PR).
   live household pilot: S6 must configure and compose the trusted calendar
   read path; S7 requires provider acceptance. Independent review and exact-head
   tests are pending.
-- **S6 Operations:** credential source (D2), durable payload retention (D5),
-  configuration, `ada doctor` checks (reachability, privileges vs configured
-  mode, no credential echo), `docs/manual-setup.md`, README, NOTICE.md.
+- **S6 Operations (in progress):** the first operator-only, **read-only**
+  connection slice is implemented on the S6 branch. A 0600 JSON config maps
+  the IONOS HTTPS origin, one KDBX `password_ref` and explicitly named
+  CalDAV collections/audiences/access modes. `ada calendar-probe` prompts
+  for the manually entered vault passphrase in the isolated runtime, uses
+  only that allowlisted KDBX entry, checks each collection's provider-reported
+  privileges via PROPFIND before REPORT, reads a bounded seven-day window and
+  prints counts only (no titles or locations). No model, DBOS persistence,
+  credentials in config/env/argv, or writes. The existing ID-bound launcher
+  mounts the config as a second read-only **file** and leaves network disabled
+  by default; `ADA_CALDAV_ALLOW_NETWORK=1` opts in to Docker bridge for this
+  command alone. **Bridge does not enforce an egress destination firewall**:
+  trusted `httpx2` enforces the configured origin, but a compromised
+  same-process dependency could still use the open network. This is not
+  authorization for production credentials or a live run before review.
+  **Still open in S6:** D5 keyed operation record, crash-safe DBOS payload
+  purge/scrub, trusted read/write action composition, fuller doctor checks,
+  targeted network/secret-path review and a verified real-password startup.
+  `docs/manual-setup.md`, README and NOTICE stay in sync with this limited
+  implemented scope.
 - **S7 Real-provider acceptance:** maintainer-run on the target Mac with
   synthetic IONOS calendars.
 

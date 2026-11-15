@@ -120,6 +120,24 @@ class CalDAVCalendarAdapter:
     def close(self) -> None:
         self._client.close()
 
+    def verify_configured_access(self) -> None:
+        """Read-only startup check: the provider must confirm the configured mode.
+
+        Never infer permissions from a successful read or from local config.
+        A mismatch stops the pilot before any REPORT or calendar write.
+        """
+
+        for ref in self._calendars.values():
+            privileges = self._resolve_collection(ref).privileges
+            writable = "write" in privileges
+            if (
+                "read" not in privileges
+                or writable != (ref.access_mode is CalendarAccessMode.WRITE)
+            ):
+                raise CalDAVConfigurationError(
+                    "CalDAV provider privileges do not match configured access"
+                )
+
     def _resolve_collection(self, ref: CalendarRef) -> CollectionInfo:
         cached = self._collection_cache.get(ref.calendar_id)
         if cached is not None:
