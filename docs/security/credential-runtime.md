@@ -1,6 +1,8 @@
 # Ada credential-bearing runtime — release candidate requirements
 
-**State: release-hardening branch / issue #58, NOT APPROVED FOR REAL SECRETS.**
+**State: synthetic-only release hardening; NOT APPROVED FOR REAL SECRETS.**
+Scope-limited review closure, accepted residuals and the separate S6 gates:
+[credential-release-hardening.md](../plans/credential-release-hardening.md).
 Implementation: `Dockerfile.credentials`, `scripts/run_ada_credentials.sh`,
 `scripts/capture_ada_runtime_hashes.py`,
 `scripts/check_credential_runtime_lock.py`.
